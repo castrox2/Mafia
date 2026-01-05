@@ -1,0 +1,40 @@
+***What I Know***
+
+Jackbox games uses Unity Engine for game logic and Node.js and JS for 
+web-based UI and real-time communication
+
+Languages and Frameworks and Other Things Used:
+    - C#
+         - Gameplay Logic and Mechanics
+         - Unity Engine
+    - C++
+        - Competency
+    - JS
+        - Mobile UI and Interactions
+    - Node.js
+        - Room Codes 
+        - device-to-device communication
+    - HTML5 
+        - Render UI on phone
+    - CSS
+        - Styling
+    - AWS
+        - Amazon GameLift for game session managment
+    - WebSockets
+        - Real-time, low-latency connection between host and palyer devices
+
+
+
+--------------------------------------------------------------------------------------------------------------
+
+3 Requirements 
+     - The Host (Steam App)
+        - Built in Engine
+        - Displays room code
+        - Game state
+
+    - Web Controller (Phones)
+        - Website where players enter code
+    
+    - Relay Server
+        - Central Server that passes data between Host and Controller

@@ -1,0 +1,93 @@
+// Ideas and TODOS //
+
+Version 1
+
+Have Basic UI
+    - Not to flashy
+    - Not to dull
+
+Have Basic Mafia Gameplay
+    - Survivors
+    - Impostors
+    - Random Role Assign
+    - Some API for story telling 
+        - so that all players can play
+        - Limited to preset stories
+    - Lobby and Join system like jackbox (creates room and have a code to use to join said room)
+    - Funtional "Phases"
+        - Story Telling Phase
+        - Action Phase (roles make their moves)
+        - Talking Phase
+        - Voting Phase
+
+Basic Settings
+    - Gameplay Settings:
+        - Set Max # of Players
+        - Set # of Impostors 
+            - Impostors MUST be less than half of the total player count
+            - If 10 players, Impostors < 4 Players
+            - If 7 players, Impostors < 3 Players
+        - Phase Timers
+            - Set Story Phase Timers
+            - Set Action Phase Timers
+            - Set Talking Phase Timers
+            - Set Voting Phase Timers
+        - Story Teller Toggle (On/Off)
+        
+    - General Settings
+        - Volume 
+        - ??
+        - ??
+
+Versions 1.01 - 1.09
+
+    - Bug Fixes
+        - Minor
+        - Major
+    - Mini Updates (whatever comes up as good idea)
+
+Version 1.1
+
+Roles
+    - Intorduce More Roles (Doctor and Sherrif)
+    - Manual Role Assignments
+    - Intorduce Custom Story Telling
+    - UI Updates
+
+Version 1.11 - 1.19
+    - More Bug Fixing
+    - More Mini Updates
+
+Version 1.2
+
+// NEXT MAJOR UPDATE //
+
+    - Introduce Basic Script
+        - Introduce Townsfolke
+        - Introduce Outsider(s)
+        - Introduce Minion(s)
+        - Introduce Demons(s)
+    - Introduce New Roles
+        - 12 Townsfolke Roles
+        - 4 Outsider Roles
+        - 4 Minion Roles
+        - 1 Demon Role
+    - Introduce New Story Presets
+    - Introduce "Help" Tab / Option
+        - Can go over each gamemode and role to help player 
+          understand each gamemode and all the roles
+        - Explanations and Examples
+    - Add Role Limits
+        - If 12 players only 2 Outsiders, 2 Minions, 1 Demon
+    
+Version 1.21 - 1.29
+    - Bug Fixing
+    - Mini Updates
+
+Version 1.3
+
+// MAJOR UPDATE //
+
+    - Introduce Advanced Script
+    - Introduce New Roles
+    - More Story Presets
