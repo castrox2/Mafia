@@ -1,0 +1,63 @@
+// What Goes In Here //
+
+## src/App.tsx:
+
+Top level app logic:
+    - Decides which screen to show
+    - hold golbal state (room, player, phase)
+    - Wire socket events to UI
+        -- Example: 
+            ~ show Home
+            ~ show Lobby
+            ~ show Game
+    *** NO GAME LOGIC IN THIS FILE *** || *** ONLY UI FLOW ***
+
+## src/socket.ts:
+
+Single socket connection:
+    - Creates sockt.io client
+    - Exports a shared socket instance
+    - Handles reconnections
+    ``` export const socket = io(SERVER_URL) ```
+    
+    --- What it does ---
+    - Prevents multiple socket connections
+    - Keeps networking centralized
+
+## src/types.ts:
+
+Shared frontent types:
+    - Contains:
+        -- Player
+        -- RoomState
+        -- Phase
+        -- ChatMessage
+    Keeps components clean and consistent
+
+## src/components.ts: 
+
+Reusable UI pieces:
+    - Contains:
+        -- PlayerList.tsx
+        -- ChatBox.tsx
+        -- VotePanel.tsx
+        -- Timer.tsx
+    - Rules:
+        -- NO SOCKET LOGIC IN THIS FOLDER
+        -- RECIEVE PROPS ONLY
+        -- PURELY UI
+
+## src/pages
+
+Full Screens / Views:
+    - Contains:
+        -- Home.tsx
+            ~ Create and Join rooms
+        -- Lobby.tsx
+            ~ Waiting room
+        -- Game.tsx
+            ~ Main Gameplay
+    - Use Socket events
+    - Coordinate components
+    - Control UI state
+

@@ -1,3 +1,58 @@
+*** SWITCH BACK TO WEB VERSION ***
+
+                                                ###    Mental Model    ###
+
+Client = UI + Inputs
+Server = Referee
+Room = Container
+Game Logic = Purely Functions
+
+                                                ###    MUST HAVE FILES     ###
+                                                ###     In Set Order       ###
+
+DAY 1:
+
+1. server/index.ts
+2. server/socketHandlers.ts
+3. server/rooms.ts
+4. client/socket.ts
+5. client/App.tsx
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ***What I Know***
 
 Jackbox games uses Unity Engine for game logic and Node.js and JS for 
