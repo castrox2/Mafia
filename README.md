@@ -69,3 +69,5 @@ Play this with friends to find out who the best liar, detective, or maybe even t
 
     - Killer / Impostor / Murderer
         - Gets to kill a player each night
+     
+*** **WILL ADD A SPECIFIC .txt FILE FOR ROLES AND WHAT THEY DO** ***
