@@ -1,0 +1,26 @@
+# Node dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# React build files
+client/build/
+client/node_modules/
+
+# Electron build output
+electron/dist/
+electron/node_modules/
+
+# TypeScript compiled files
+*.tsbuildinfo
+*.js
+*.js.map
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

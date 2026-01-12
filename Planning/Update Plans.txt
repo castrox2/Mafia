@@ -1,4 +1,4 @@
-// Ideas and TODOS //
+// Ideas //
 
 Version 1
 
