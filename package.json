@@ -23,6 +23,7 @@
     "electron-builder": "^26.4.0"
   },
   "dependencies": {
+    "@socket.io/admin-ui": "^0.5.1",
     "7zip-bin": "^5.2.0",
     "abbrev": "^3.0.1",
     "agent-base": "^7.1.4",
@@ -229,6 +230,7 @@
     "simple-update-notifier": "^2.0.0",
     "smart-buffer": "^4.2.0",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "socks": "^2.8.7",
     "socks-proxy-agent": "^8.0.5",
     "source-map": "^0.6.1",
