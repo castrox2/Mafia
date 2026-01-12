@@ -5,7 +5,7 @@ Impostors / Murderer
 Sherrif / Detective
 Doctor
 
-Basic Scripted Roles:
+Trouble Brewing Script Roles:
 
     Townsfolke:
         - Washerwoman
@@ -37,6 +37,6 @@ Basic Scripted Roles:
     Demons:
         - Imp
 
-Advanced Scripted Roles:
+Blood On The Clock Tower Script Roles:
 
     
