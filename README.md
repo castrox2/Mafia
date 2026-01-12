@@ -36,14 +36,20 @@ Play this with friends to find out who the best liar, detective, or maybe even t
 ** MAY NEED A STORY TELLER / GAME MASTER **
 
 🕵️ Roles Assignment - Each player will be a given a random role, based on which version of mafia is played.
+
 📖 Story Telling - Story is told, setting the scene for the game, during this time the story teller will also tell the players what happened during the night time,
                     in this case, it will be shown to the players through their phones who has died and who was saved and such.
+                    
 💬 Private Discussion - Players are now able to pull other players aside to talk to them to gather info.
+
 🗣️ Public Discussion - Players are no longer allowed to talk privately and must discuss their findings with the group.
+
 ⁉️ Voting Phase - Players will now vote who they think the mafia / impostor is.
             (NOTE: If two players recieve an equal amount of votes, those two players will be able to defend themselves.
             This will also start another voting phase where players must vote ONLY between those two players)
+            
 👹 Roles / Night - Each player with a role may now use their abilities, if applicable.
+
 🔁 Loops back to story and so on.
 
 # Roles 
