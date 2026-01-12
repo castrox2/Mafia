@@ -1,11 +1,418 @@
-Basic Roles:
+-----------------------------------------------     Basic Roles!     -----------------------------------------------
 
 Survivors / Innocent
 Impostors / Murderer
 Sherrif / Detective
 Doctor
 
-Trouble Brewing Script Roles:
+
+-----------------------------------------------     All Blood On The Clock Tower❗     -----------------------------------------------
+
+
+
+-----------------------------------------------     Townsfolke❗     -----------------------------------------------
+
+        -- A
+            - Acrobat
+            - Alchemist
+            - Amnesiac
+            - Artist
+            - Atheist
+        
+        -- B
+            - Balloonist
+            - Banshee
+            - Bounty Hunter
+        
+        -- C
+            - Cannibal
+            - Chambermaid
+            - Chef
+            - Choirboy
+            - Clockmaker
+            - Courtier
+            - Cult Leader
+        
+        -- D
+            - Dreamer
+
+        -- E
+            - Empath
+            - Engineer
+            - Exorcist
+        
+        -- F
+            - Farmer
+            - Fisherman
+            - Flowergirl
+            - Fool
+            - Fortune Teller
+        
+        -- G
+            - Gambler
+            - General
+            - Gossip
+            - Grandmother
+        
+        -- H
+            - High Priestes
+            - Huntsman
+        
+        -- I
+            - Innkeeper
+            - Investigator
+
+        -- J
+            - Juggler
+        
+        -- K
+            - King
+            - Knight
+
+        -- L
+            - Librarian
+            - Lyncanthrope
+        
+        -- M
+            - Magician
+            - Mathematician
+            - Mayor
+            - Minstrel
+            - Monk
+
+        -- N
+            - Nightwatchman
+            - Noble
+        
+        -- O 
+            - Oracle
+
+        -- P
+            - Pacifist
+            - Philosopher
+            - Pixie
+            - Poppy Grower
+            - Preacher
+            - Princess
+            - Professor
+
+        -- R 
+            - Ravenkeeper
+        
+        -- S 
+            - Sage
+            - Sailor
+            - Savant
+            - Seamstres
+            - Shugenja
+            - Slayer
+            - Snake Charmer
+            - Soldier
+            - Steward
+        
+        -- T 
+            - Tea Lady
+            - Town Crier
+        
+        -- U 
+            - Undertaker
+
+        -- V
+            - Village Idiot
+            - Virgin
+        
+        -- W
+            - Washerwoman
+
+-----------------------------------------------     Outsiders❗     -----------------------------------------------
+        -- B
+            - Barber
+            - Butler
+        
+        -- D
+            - Damsel
+            - Drunk
+        
+        -- G
+            - Golem
+            - Goon
+        
+        -- H 
+            - Hatter
+            - Heretic
+            - Hermit
+        
+        -- K 
+            - Klutz
+
+        -- L
+            - Lunatic
+            - Moonchild
+            - Mutant
+        
+        -- O
+            - Ogre
+        
+        -- P
+            - Plague Doctor
+            - Politician
+            - Puzzlemaster
+        
+        -- R
+            - Recluse
+        
+        -- S 
+            - Saint
+            - Snitch
+            - Sweetheart
+
+        -- T
+            - Tinker
+
+        -- Z
+            - Zealot
+
+-----------------------------------------------     Minions❗     -----------------------------------------------
+
+        -- A
+            - Assassin
+        -- B
+            - Barber
+            - Boffin
+            - Boomdandy
+        -- C
+            - Cerenovus
+        -- D
+            - Devil's Advocate
+        -- E
+            - Evil Twin
+        -- F
+            - Fearmongerer
+        -- G
+            - Goblin
+            - Godfather
+        -- H
+            - Harpy
+        -- M
+            - Marionette
+            - Mastermind
+            - Mezepheles
+        -- O
+            - Organ Grinder
+        -- P
+            - Pit-Hag
+            - Poisoner
+            - Psychopath
+        -- S
+            - Scarlet Woman
+            - Spy
+            - Summoner
+        -- V
+            - Vizier
+        -- W
+            - Widow
+            - Witch
+            - Wizard
+            - Wraith
+        -- X
+            - Xaan
+
+-----------------------------------------------     Demons❗     -----------------------------------------------
+
+        -- A
+            - Al-Hadikhia
+        -- F
+            - Fang Gu
+        -- I
+            - Imp
+        -- K
+            - Kazali
+        -- L
+            - Legion
+            - Leviathan
+            - Lil' Monsta
+            - Lleech
+            - Lord of Typhoon
+        -- N
+            - No Dashii
+        -- O
+            - Ojo
+        -- P
+            - Po
+            - Pukka
+        -- R
+            - Riot
+        -- S
+            - Shabaloth
+        -- V
+            - Vigormortis
+            - Vortox
+        -- Y
+            - Yaggababble
+        -- Z
+            - Zombuul
+    
+-----------------------------------------------     Traveler❗     -----------------------------------------------
+
+        -- A
+            - Apprentice
+        -- B
+            - Barista
+            - Bishop
+            - Bone Collector
+            - Bureaucrat
+            - Butcher
+        -- D
+            - Deviant
+        -- G
+            - Gangster
+            - Gnome
+            - Gunslinger
+        -- H
+            - Harlot
+        -- J
+            - Judge
+        -- M
+            - Matron
+        -- S
+            - Scapegoat
+        -- T
+            - Thief
+        -- V
+            - Voudon
+    
+-----------------------------------------------     Fabled❗     -----------------------------------------------
+
+        -- A
+            - Angel
+        -- B
+            - Buddhist
+        -- D
+            - Deus ex Fiasco
+            - Doomsayer
+            - Duchess
+        -- F
+            - Ferryman
+            - Fibbin
+            - Fiddler
+        -- H
+            - Hell's Librarian
+        -- R
+            - Revolutionary
+        -- S
+            - Sentinel
+            - Spirit of Ivory
+        -- T
+            - Toymaker
+    
+-----------------------------------------------     Loric❗     -----------------------------------------------
+
+        -- B
+            - Big Wig
+            - Bootlegger
+        -- G
+            - Gardener
+        -- H
+            - Hindu
+        -- S
+            - Storm Caller
+        -- T
+            - Tor
+        -- Z
+            - Zenomancer
+
+-----------------------------------------------     What Do They Do❓     -----------------------------------------------
+
+
+
+-----------------------------------------------     Townsfolke❗     -----------------------------------------------
+
+        Concept: 
+            - The core Good-aligned team. They have positive, information-gathering, or protective abilities to help find the Demon.
+
+        Key Rules: 
+            - They do not know each other. They wake up individually at night to use their ability.
+            - Their abilities are (mostly) true and helpful, but can be interfered with by poisoning/drunkenness or demon abilities.
+
+            - Goal: Execute the Demon to win.
+
+-----------------------------------------------     Outsiders❗     -----------------------------------------------
+        Concept: 
+            - Good-aligned characters whose abilities are harmful or misleading to the Good team. 
+              Their presence is a drawback caused by certain Townsfolk (e.g., the Saint adds an extra Outsider).
+
+        Key Rules:
+            - They are on the Good team and win with Good.
+            - They often don't know they are an Outsider (e.g., the Drunk believes they are a Townsfolk).
+            - Their existence is a key piece of "world info" for the Good team to decipher.
+
+-----------------------------------------------     Minions❗     ----------------------------------------------- 
+        Concept: 
+            - The Evil-aligned support team. They know the Demon and each other and have abilities to mislead, disrupt, or protect the Demon.
+
+        Key Rules:
+            - They know who the Demon and fellow Minions are (the "Evil team").
+            - They wake together at the start of the game for this recognition.
+            - They do not win if they are alive at the end. They win only if the Demon wins.
+
+            - Goal: Protect the Demon and sow confusion.
+
+-----------------------------------------------     Demons❗     -----------------------------------------------
+        Concept: 
+            - The primary Evil player. They kill one player each night and usually have a powerful misinformation ability.
+
+        Key Rules:
+            - They know who the Minions are (but Minions do not necessarily know which player is the Demon, unless the Demon is the one who kills).
+            - They are the only evil player who kills at night.
+            - If the Demon is executed, Good wins immediately.
+
+            - Goal: Survive to achieve numerical parity with Good players ("evil majority") or eliminate all Townsfolk/Outsiders.
+
+-----------------------------------------------     Traveler❗     -----------------------------------------------
+        Concept: 
+            - Variable-aligned players who can join or leave an in-progress game without breaking it.
+
+        Key Rules:
+            - They are not in the Grimoire. They are given a character sheet upon joining.
+            - Their character and alignment (Good or Evil) is publicly announced.
+            - The living players vote on whether to allow a new Traveler to join.
+            - They do not die; they "depart." Upon departure, they use a powerful one-time ability.
+            - They visit a player each night, making them interactable by night abilities.
+
+-----------------------------------------------     Fabled❗     -----------------------------------------------
+        Concept: 
+            - Special characters that are never placed in the Grimoire. They add a unique, global rule that affects the entire game.
+
+        Key Rules:
+            - They are not assigned to any player. Their sheet is placed in the center of play.
+            - They are controlled solely by the Storyteller.
+            - They modify core game rules (e.g., The Storyteller may break the rules, The Angel protects a new player on their first day).
+            - Used to balance custom scripts, fix edge cases, or introduce a novel twist.
+
+-----------------------------------------------     Loric❗     -----------------------------------------------
+    (May be wrong or off due to the fact that they are a weird "role")
+        Concept: 
+            - Advanced Storyteller characters that introduce a single, powerful, and disruptive global rule to fundamentally warp the game. 
+            - Their purpose is not to solve problems but to create exciting new ones, transforming familiar scripts into fresh, challenging experiences.
+
+        Key Rules:
+            - They are never assigned to any player. Their character sheet is placed publicly as a permanent game condition.
+            - They are controlled solely by the Storyteller and cannot be removed by any player action, vote, or ability.
+            - Their effect is active for the entire game, altering core assumptions and strategies from the start.
+            - They are designed to be permanently integrated into a specific script (e.g., "Trouble Brewing with The Hellmouth") to create a deliberate, high-concept variant.
+
+            - Philosophy: "Twist over Fix." While Fabled characters smooth the game, Loric characters reshape it.
+
+        Example:
+
+            - Rule: "The Demon is an Outsider. If a player becomes the Demon, they are now an Outsider, and a Minion becomes the Demon."
+
+            - Effect: This introduces a massive new problem. The core assumption that the Demon is on the Evil team is shattered. 
+                      The Good team must now deduce which Outsider is secretly the killer, and the Evil team has a bizarre, public-facing Demon. 
+                      It warps every piece of logic in the game.
+
+
+-----------------------------------------------     Trouble Brewing Script❗     -----------------------------------------------
 
     Townsfolke:
         - Washerwoman
@@ -36,7 +443,3 @@ Trouble Brewing Script Roles:
 
     Demons:
         - Imp
-
-Blood On The Clock Tower Script Roles:
-
-    
