@@ -34,7 +34,7 @@ Play this with friends to find out who the best liar, detective, or maybe even t
 
 ** MAY NEED A STORY TELLER / GAME MASTER **
 
-🕵️ Roles Assignment - Each player will be a given a random role, based on which version of mafia is played.
+🕵️ Role Assignment - Each player will be a given a random role, based on which version of mafia is played.
 
 📖 Story Telling - Story is told, setting the scene for the game, during this time the story teller will also tell the players what happened during the night time,
                     in this case, it will be shown to the players through their phones who has died and who was saved and such.
