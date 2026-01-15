@@ -2,12 +2,8 @@
   "name": "mafia-local",
   "version": "1.0.0",
   "description": "Web game based on the party game mafia and its different variations",
-  "main": "electron/main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "electron .",
-    "start": "ts-node src/main.ts",
-    "build": "tsc"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
