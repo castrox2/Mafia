@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mafia Local – Room Test LIVE</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        max-width: 600px;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+      }
+
+      .row {
+        margin-bottom: 10px;
+      }
+
+      input {
+        padding: 6px;
+        margin-right: 6px;
+      }
+
+      button {
+        padding: 6px 12px;
+        margin-right: 6px;
+      }
+
+      ul {
+        padding-left: 18px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Room Test</h1>
+    <p>Open this page in multiple tabs/devices and join the same room code.</p>
+
+    <!-- ✅ REQUIRED INPUTS -->
+    <div class="row">
+      <input id="name" placeholder="Your name" />
+      <input id="room" placeholder="Room code (e.g. ABCD)" />
+    </div>
+
+    <!-- ✅ REQUIRED BUTTONS -->
+    <div class="row">
+      <button id="joinBtn">Join Room</button>
+      <button id="leaveBtn">Leave Room</button>
+    </div>
+
+    <h3>Players in room:</h3>
+
+    <!-- ✅ REQUIRED PLAYER LIST -->
+    <ul id="players"></ul>
+
+    <!-- Socket.IO client -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- ✅ SAFE CLIENT SCRIPT -->
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        const socket = io();
+        let currentRoom = "";
+
+        const nameInput = document.getElementById("name");
+        const roomInput = document.getElementById("room");
+        const playersList = document.getElementById("players");
+        const joinBtn = document.getElementById("joinBtn");
+        const leaveBtn = document.getElementById("leaveBtn");
+
+        // Safety check (prevents white screen)
+        if (!nameInput || !roomInput || !playersList || !joinBtn || !leaveBtn) {
+          console.error("Missing required HTML elements");
+          return;
+        }
+
+        function renderPlayers(players) {
+          playersList.innerHTML = "";
+          players.forEach((p) => {
+            const li = document.createElement("li");
+            li.textContent = p.name;
+            playersList.appendChild(li);
+          });
+        }
+
+        joinBtn.addEventListener("click", () => {
+          const playerName = nameInput.value.trim();
+          const roomId = roomInput.value.trim().toUpperCase();
+
+          if (!playerName || !roomId) {
+            alert("Enter a name and room code.");
+            return;
+          }
+
+          currentRoom = roomId;
+          socket.emit("joinRoom", { roomId, playerName });
+        });
+
+        leaveBtn.addEventListener("click", () => {
+          if (!currentRoom) return;
+          socket.emit("leaveRoom", currentRoom);
+          currentRoom = "";
+          playersList.innerHTML = "";
+        });
+
+        socket.on("playerJoined", (players) => {
+          renderPlayers(players);
+        });
+
+        socket.on("playerLeft", (players) => {
+          renderPlayers(players);
+        });
+      });
+    </script>
+  </body>
+</html>
