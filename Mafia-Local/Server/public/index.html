@@ -2,16 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Mafia Local – Room Test LIVE</title>
+    <title>Mafia Local – Room Test</title>
+
     <style>
       body {
         font-family: sans-serif;
         padding: 20px;
         max-width: 600px;
-      }
-
-      h1 {
-        margin-bottom: 8px;
       }
 
       .row {
@@ -31,88 +28,139 @@
       ul {
         padding-left: 18px;
       }
+
+      #status {
+        margin-top: 10px;
+        font-weight: bold;
+      }
     </style>
   </head>
 
   <body>
-    <h1>Room Test</h1>
-    <p>Open this page in multiple tabs/devices and join the same room code.</p>
+    <h1>Mafia Local – Room Test</h1>
 
-    <!-- ✅ REQUIRED INPUTS -->
+    <!-- Player name + room code -->
     <div class="row">
-      <input id="name" placeholder="Your name" />
-      <input id="room" placeholder="Room code (e.g. ABCD)" />
+      <input id="name" type="text" placeholder="Your name" />
+      <input id="room" type="text" placeholder="Room code (e.g. ABCD)" />
     </div>
 
-    <!-- ✅ REQUIRED BUTTONS -->
+    <!-- Controls -->
     <div class="row">
+      <button id="createBtn">Create Room</button>
       <button id="joinBtn">Join Room</button>
       <button id="leaveBtn">Leave Room</button>
     </div>
 
-    <h3>Players in room:</h3>
+    <div id="status"></div>
 
-    <!-- ✅ REQUIRED PLAYER LIST -->
+    <h3>Players in room:</h3>
     <ul id="players"></ul>
 
     <!-- Socket.IO client -->
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- ✅ SAFE CLIENT SCRIPT -->
     <script>
       window.addEventListener("DOMContentLoaded", () => {
-        const socket = io();
-        let currentRoom = "";
+        const socket = io()
+        let currentRoom = ""
 
-        const nameInput = document.getElementById("name");
-        const roomInput = document.getElementById("room");
-        const playersList = document.getElementById("players");
-        const joinBtn = document.getElementById("joinBtn");
-        const leaveBtn = document.getElementById("leaveBtn");
+        const nameInput = document.getElementById("name")
+        const roomInput = document.getElementById("room")
+        const playersList = document.getElementById("players")
+        const joinBtn = document.getElementById("joinBtn")
+        const leaveBtn = document.getElementById("leaveBtn")
+        const createBtn = document.getElementById("createBtn")
+        const status = document.getElementById("status")
 
-        // Safety check (prevents white screen)
-        if (!nameInput || !roomInput || !playersList || !joinBtn || !leaveBtn) {
-          console.error("Missing required HTML elements");
-          return;
+        if (
+          !nameInput ||
+          !roomInput ||
+          !playersList ||
+          !joinBtn ||
+          !leaveBtn ||
+          !createBtn ||
+          !status
+        ) {
+          console.error("Missing required HTML elements")
+          return
         }
 
         function renderPlayers(players) {
-          playersList.innerHTML = "";
+          playersList.innerHTML = ""
           players.forEach((p) => {
-            const li = document.createElement("li");
-            li.textContent = p.name;
-            playersList.appendChild(li);
-          });
+            const li = document.createElement("li")
+            li.textContent = p.name
+            playersList.appendChild(li)
+          })
         }
 
-        joinBtn.addEventListener("click", () => {
-          const playerName = nameInput.value.trim();
-          const roomId = roomInput.value.trim().toUpperCase();
+        function setStatus(text) {
+          status.textContent = text
+        }
 
-          if (!playerName || !roomId) {
-            alert("Enter a name and room code.");
-            return;
+        socket.on("connect", () => {
+          setStatus("Connected ✅")
+        })
+
+        // ======================
+        // CREATE ROOM
+        // ======================
+        createBtn.addEventListener("click", () => {
+          const playerName = nameInput.value.trim()
+          if (!playerName) {
+            alert("Enter your name first.")
+            return
           }
 
-          currentRoom = roomId;
-          socket.emit("joinRoom", { roomId, playerName });
-        });
+          socket.emit("createRoom", { playerName })
+        })
 
+        // ======================
+        // JOIN ROOM
+        // ======================
+        joinBtn.addEventListener("click", () => {
+          const playerName = nameInput.value.trim()
+          const roomId = roomInput.value.trim().toUpperCase()
+
+          if (!playerName || !roomId) {
+            alert("Enter a name and room code.")
+            return
+          }
+
+          currentRoom = roomId
+          socket.emit("joinRoom", { roomId, playerName })
+        })
+
+        // ======================
+        // LEAVE ROOM
+        // ======================
         leaveBtn.addEventListener("click", () => {
-          if (!currentRoom) return;
-          socket.emit("leaveRoom", currentRoom);
-          currentRoom = "";
-          playersList.innerHTML = "";
-        });
+          if (!currentRoom) return
+          socket.emit("leaveRoom", currentRoom)
+          currentRoom = ""
+          playersList.innerHTML = ""
+          setStatus("Left room")
+        })
+
+        // ======================
+        // SERVER EVENTS
+        // ======================
+        socket.on("roomCreated", ({ roomId }) => {
+          currentRoom = roomId
+          roomInput.value = roomId
+          setStatus(`Room created: ${roomId}`)
+        })
 
         socket.on("playerJoined", (players) => {
-          renderPlayers(players);
-        });
+          renderPlayers(players)
+          setStatus(`In room: ${currentRoom}`)
+        })
 
         socket.on("playerLeft", (players) => {
-          renderPlayers(players);
-        });
-      });
+          renderPlayers(players)
+        })
+      })
     </script>
   </body>
 </html>

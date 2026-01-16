@@ -1,6 +1,7 @@
 import express from "express"
 import http from "http"
 import { Server as SocketIOServer } from "socket.io"
+import { generateRoomCode } from "./utils/generateRoomCode.js"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -66,6 +67,36 @@ const removeFromAllRooms = (socketId: string, skipRoomId?: string) => {
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
+
+socket.on("createRoom", ({ playerName }: { playerName: string }) => {
+  const cleanName = (playerName || "").trim()
+  if (!cleanName) return
+
+  // Create a new unique room code
+  const roomId = generateRoomCode(rooms)
+
+  // remove from other rooms FIRST (skip the one we are creating/joining)
+  removeFromAllRooms(socket.id, roomId)
+
+  // ensure room exists
+  if (!rooms[roomId]) rooms[roomId] = { players: [] }
+  const room = rooms[roomId]
+  if (!room) return
+
+  // join room
+  socket.join(roomId)
+
+  // add player as first member
+  room.players = room.players.filter((p) => p.id !== socket.id)
+  room.players.push({ id: socket.id, name: cleanName })
+
+  // Tell ONLY this socket what the room code is
+  socket.emit("roomCreated", { roomId })
+
+  // Update the room list for everyone in the room (currently just host)
+  io.to(roomId).emit("playerJoined", room.players)
+})
+
 
 socket.on(
   "joinRoom",
