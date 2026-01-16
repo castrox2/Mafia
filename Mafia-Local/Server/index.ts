@@ -2,6 +2,7 @@ import express from "express"
 import http from "http"
 import { Server as SocketIOServer } from "socket.io"
 import { generateRoomCode } from "./utils/generateRoomCode.js"
+import { emit } from "cluster"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -32,6 +33,7 @@ type Player = {
 }
 
 type Room = {
+  hostId: string
   players: Player[]
 }
 
@@ -48,7 +50,10 @@ const removeFromAllRooms = (socketId: string, skipRoomId?: string) => {
     if (!room) continue
 
     const before = room.players.length
-    room.players = room.players.filter((p) => p.id !== socketId)
+    // If host leaves, assign new host
+    if (room.hostId === socketId) {
+      room.hostId = room.players[0]?.id ?? ""
+    }
 
     if (before !== room.players.length) {
       // If room is now empty, delete it and emit []
@@ -62,7 +67,17 @@ const removeFromAllRooms = (socketId: string, skipRoomId?: string) => {
   }
 }
 
+// Helper: broadcast room state
+const emitRoomState = (roomId: string) => {
+  const room = rooms[roomId]
+  if (!room) return
 
+  io.to(roomId).emit("roomState", {
+    roomId,
+    hostId: room.hostId,
+    players: room.players
+  })
+}
 
 
 io.on("connection", (socket) => {
@@ -79,7 +94,7 @@ socket.on("createRoom", ({ playerName }: { playerName: string }) => {
   removeFromAllRooms(socket.id, roomId)
 
   // ensure room exists
-  if (!rooms[roomId]) rooms[roomId] = { players: [] }
+  if (!rooms[roomId]) rooms[roomId] = { hostId: socket.id, players: [] }
   const room = rooms[roomId]
   if (!room) return
 
@@ -92,9 +107,7 @@ socket.on("createRoom", ({ playerName }: { playerName: string }) => {
 
   // Tell ONLY this socket what the room code is
   socket.emit("roomCreated", { roomId })
-
-  // Update the room list for everyone in the room (currently just host)
-  io.to(roomId).emit("playerJoined", room.players)
+  emitRoomState(roomId)
 })
 
 
@@ -110,7 +123,7 @@ socket.on(
     removeFromAllRooms(socket.id, cleanRoomId)
 
     // ensure room exists
-    if (!rooms[cleanRoomId]) rooms[cleanRoomId] = { players: [] }
+    if (!rooms[cleanRoomId]) rooms[cleanRoomId] = { hostId: socket.id, players: [] }
 
     const room = rooms[cleanRoomId]
     if (!room) return // extra safety
@@ -122,7 +135,7 @@ socket.on(
     room.players = room.players.filter((p) => p.id !== socket.id)
     room.players.push({ id: socket.id, name: cleanName })
 
-    io.to(cleanRoomId).emit("playerJoined", room.players)
+    emitRoomState(cleanRoomId)
   }
 )
 
@@ -136,10 +149,14 @@ socket.on("leaveRoom", (roomId: string) => {
 
   room.players = room.players.filter((p) => p.id !== socket.id)
 
+  if (room.hostId === socket.id) {
+    room.hostId = room.players[0]?.id ?? ""
+  }
+
   // If empty, delete FIRST, and emit an empty list safely
   if (room.players.length === 0) {
     delete rooms[roomId]
-    io.to(roomId).emit("playerLeft", [])
+    emitRoomState(roomId)
     return
   }
 

@@ -160,6 +160,12 @@
         socket.on("playerLeft", (players) => {
           renderPlayers(players)
         })
+
+        socket.on("roomState", ({ roomId, hostId, players }) => {
+          renderPlayers(players)
+          const amIHost = socket.id === hostId
+          setStatus(`In room: ${roomId} ${amIHost ? "(Host)" : ""}`)
+        })
       })
     </script>
   </body>
