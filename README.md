@@ -1,4 +1,4 @@
-# Mafia
+# Mafia 🎭
 
 Mafia, the game that either strengthens frienships or ruins them 😛
 Play this with friends to find out who the best liar, detective, or maybe even the dumbest!
