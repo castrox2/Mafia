@@ -2,7 +2,6 @@ import express from "express"
 import http from "http"
 import { Server as SocketIOServer } from "socket.io"
 import { generateRoomCode } from "./utils/generateRoomCode.js"
-import { emit } from "cluster"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -82,6 +81,35 @@ const emitRoomState = (roomId: string) => {
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
+
+socket.on("disconnecting", () => {
+  for (const roomId of socket.rooms) {
+    // socket.rooms always includes socket.id — ignore it
+    if (roomId === socket.id) continue
+
+    const room = rooms[roomId]
+    if (!room) continue
+
+    // Remove player
+    room.players = room.players.filter((p) => p.id !== socket.id)
+
+    // If host left, transfer host to first remaining player
+    if (room.hostId === socket.id) {
+      room.hostId = room.players[0]?.id ?? ""
+    }
+
+    // If room is empty, delete it
+    if (room.players.length === 0) {
+      delete rooms[roomId]
+      io.to(roomId).emit("roomClosed", { roomId })
+      continue
+    }
+
+    // Otherwise, broadcast updated room state
+    emitRoomState(roomId)
+  }
+})
+
 
 socket.on("createRoom", ({ playerName }: { playerName: string }) => {
   const cleanName = (playerName || "").trim()
