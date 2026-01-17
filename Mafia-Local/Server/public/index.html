@@ -2,13 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mafia Local – Room Test</title>
 
     <style>
       body {
         font-family: sans-serif;
         padding: 20px;
-        max-width: 700px;
+        max-width: 600px;
+      }
+
+      h1 {
+        margin-bottom: 8px;
       }
 
       .row {
@@ -16,13 +21,15 @@
       }
 
       input {
-        padding: 6px;
+        padding: 10px;
         margin-right: 6px;
+        font-size: 16px;
       }
 
       button {
-        padding: 6px 12px;
+        padding: 10px 12px;
         margin-right: 6px;
+        font-size: 16px;
       }
 
       ul {
@@ -32,6 +39,7 @@
       #status {
         margin-top: 10px;
         font-weight: bold;
+        white-space: pre-wrap;
       }
 
       #qrWrap {
@@ -42,7 +50,6 @@
         margin-top: 8px;
         width: 220px;
         height: 220px;
-        image-rendering: pixelated;
         border: 1px solid #ddd;
         border-radius: 6px;
       }
@@ -58,6 +65,7 @@
 
   <body>
     <h1>Mafia Local – Room Test</h1>
+    <p>Open this page in multiple tabs/devices and join the same room code.</p>
 
     <!-- Player name + room code -->
     <div class="row">
@@ -67,13 +75,14 @@
 
     <!-- Controls -->
     <div class="row">
-      <button id="createBtn">Create Room</button>
-      <button id="joinBtn">Join Room</button>
-      <button id="leaveBtn">Leave Room</button>
+      <button id="createBtn" type="button">Create Room</button>
+      <button id="joinBtn" type="button">Join Room</button>
+      <button id="leaveBtn" type="button">Leave Room</button>
     </div>
 
     <div id="status"></div>
 
+    <!-- QR / Join Link -->
     <div id="qrWrap"></div>
 
     <h3>Players in room:</h3>
@@ -84,7 +93,10 @@
 
     <script>
       window.addEventListener("DOMContentLoaded", () => {
-        const socket = io()
+        // IMPORTANT: explicitly connect to the same host/port as the page
+        // (this helps on mobile Safari when using LAN IP)
+        const socket = io(window.location.origin)
+
         let currentRoom = ""
 
         const nameInput = document.getElementById("name")
@@ -107,6 +119,7 @@
           !qrWrap
         ) {
           console.error("Missing required HTML elements")
+          alert("Missing required HTML elements (check element IDs).")
           return
         }
 
@@ -127,9 +140,29 @@
           qrWrap.innerHTML = ""
         }
 
+        // Connection debug (helps on mobile)
         socket.on("connect", () => {
-          setStatus("Connected ✅")
+          setStatus(`Connected ✅`)
         })
+
+        socket.on("connect_error", (err) => {
+          setStatus(`Connect error: ${err.message}`)
+          console.error("connect_error", err)
+        })
+
+        socket.on("disconnect", (reason) => {
+          setStatus(`Disconnected: ${reason}`)
+        })
+
+        // QR join support: /?room=ABCD
+        const params = new URLSearchParams(window.location.search)
+        const roomFromQr = (params.get("room") || "").trim().toUpperCase()
+        if (roomFromQr) {
+          roomInput.value = roomFromQr
+          setStatus(
+            `Room code loaded: ${roomFromQr}. Enter your name and press Join.`
+          )
+        }
 
         // Create room
         createBtn.addEventListener("click", () => {
@@ -139,11 +172,11 @@
             return
           }
 
-          // IMPORTANT: QR will use whatever origin you opened this page with.
-          // If you opened with localhost, phones won't be able to use it.
+          setStatus("Creating room…")
+
           socket.emit("createRoom", {
             playerName,
-            baseUrl: window.location.origin,
+            baseUrl: window.location.origin
           })
         })
 
@@ -157,8 +190,10 @@
             return
           }
 
-          currentRoom = roomId
+          setStatus(`Joining ${roomId}…`)
           clearQr()
+
+          currentRoom = roomId
           socket.emit("joinRoom", { roomId, playerName })
         })
 
@@ -176,7 +211,7 @@
         socket.on("roomCreated", ({ roomId, joinUrl, qrDataUrl }) => {
           currentRoom = roomId
           roomInput.value = roomId
-          setStatus(`Room created: ${roomId}`)
+          setStatus(`Room created: ${roomId}\n${joinUrl || ""}`)
 
           if (qrDataUrl && joinUrl) {
             qrWrap.innerHTML = `
@@ -185,18 +220,27 @@
               <div id="joinUrl">${joinUrl}</div>
             `
           } else {
-            // If server didn't send QR yet, keep it empty
             clearQr()
           }
         })
 
-        socket.on("playerJoined", (players) => {
+        // Use roomState as the single source of truth
+        socket.on("roomState", ({ roomId, hostId, players }) => {
+          currentRoom = roomId
+          roomInput.value = roomId
           renderPlayers(players)
-          setStatus(`In room: ${currentRoom}`)
+
+          const amIHost = socket.id === hostId
+          setStatus(`In room: ${roomId}${amIHost ? " (Host)" : ""}`)
         })
 
-        socket.on("playerLeft", (players) => {
-          renderPlayers(players)
+        socket.on("roomClosed", ({ roomId }) => {
+          if (currentRoom === roomId) {
+            currentRoom = ""
+            renderPlayers([])
+            clearQr()
+            setStatus("Room closed")
+          }
         })
 
         socket.on("roomFull", ({ roomId, max }) => {
