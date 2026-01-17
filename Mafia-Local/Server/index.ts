@@ -1,7 +1,8 @@
 import express from "express"
 import http from "http"
 import { Server as SocketIOServer } from "socket.io"
-import { generateRoomCode } from "./utils/generateRoomCode.js"
+import { generateRoomCode, generateRoomJoinQrDataUrl } from "./utils/generateRoomCode.js"
+import os from "os"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -78,6 +79,24 @@ const emitRoomState = (roomId: string) => {
   })
 }
 
+// Helper:
+function getLanIp(): string { 
+  const nets = os.networkInterfaces()
+
+  for (const name of Object.keys(nets)) {
+    const netInfo = nets[name]
+    if (!netInfo) continue
+
+    for (const net of netInfo) {
+      // We only want IPv4, non-internal addresses
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address
+      }
+    }
+  }
+
+  return "127.0.0.1"
+}
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
@@ -111,9 +130,12 @@ socket.on("disconnecting", () => {
 })
 
 
-socket.on("createRoom", ({ playerName }: { playerName: string }) => {
+socket.on("createRoom", async ({ playerName, baseUrl }: { playerName: string; baseUrl: string }) => {
   const cleanName = (playerName || "").trim()
+  const cleanBaseUrl = (baseUrl || "").trim()
+  
   if (!cleanName) return
+  if (!cleanBaseUrl) return
 
   // Create a new unique room code
   const roomId = generateRoomCode(rooms)
@@ -133,8 +155,11 @@ socket.on("createRoom", ({ playerName }: { playerName: string }) => {
   room.players = room.players.filter((p) => p.id !== socket.id)
   room.players.push({ id: socket.id, name: cleanName })
 
+  const lanBaseUrl = `http://${getLanIp()}:3000`
+  const { joinUrl, qrDataUrl } = await generateRoomJoinQrDataUrl(lanBaseUrl, roomId)
+
   // Tell ONLY this socket what the room code is
-  socket.emit("roomCreated", { roomId })
+  socket.emit("roomCreated", { roomId, joinUrl, qrDataUrl })
   emitRoomState(roomId)
 })
 

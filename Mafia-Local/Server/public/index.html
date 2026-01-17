@@ -8,7 +8,7 @@
       body {
         font-family: sans-serif;
         padding: 20px;
-        max-width: 600px;
+        max-width: 700px;
       }
 
       .row {
@@ -33,6 +33,26 @@
         margin-top: 10px;
         font-weight: bold;
       }
+
+      #qrWrap {
+        margin-top: 12px;
+      }
+
+      #qrWrap img {
+        margin-top: 8px;
+        width: 220px;
+        height: 220px;
+        image-rendering: pixelated;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+      }
+
+      #joinUrl {
+        margin-top: 6px;
+        font-size: 12px;
+        word-break: break-all;
+        opacity: 0.9;
+      }
     </style>
   </head>
 
@@ -54,6 +74,8 @@
 
     <div id="status"></div>
 
+    <div id="qrWrap"></div>
+
     <h3>Players in room:</h3>
     <ul id="players"></ul>
 
@@ -72,6 +94,7 @@
         const leaveBtn = document.getElementById("leaveBtn")
         const createBtn = document.getElementById("createBtn")
         const status = document.getElementById("status")
+        const qrWrap = document.getElementById("qrWrap")
 
         if (
           !nameInput ||
@@ -80,7 +103,8 @@
           !joinBtn ||
           !leaveBtn ||
           !createBtn ||
-          !status
+          !status ||
+          !qrWrap
         ) {
           console.error("Missing required HTML elements")
           return
@@ -99,13 +123,15 @@
           status.textContent = text
         }
 
+        function clearQr() {
+          qrWrap.innerHTML = ""
+        }
+
         socket.on("connect", () => {
           setStatus("Connected ✅")
         })
 
-        // ======================
-        // CREATE ROOM
-        // ======================
+        // Create room
         createBtn.addEventListener("click", () => {
           const playerName = nameInput.value.trim()
           if (!playerName) {
@@ -113,12 +139,15 @@
             return
           }
 
-          socket.emit("createRoom", { playerName })
+          // IMPORTANT: QR will use whatever origin you opened this page with.
+          // If you opened with localhost, phones won't be able to use it.
+          socket.emit("createRoom", {
+            playerName,
+            baseUrl: window.location.origin,
+          })
         })
 
-        // ======================
-        // JOIN ROOM
-        // ======================
+        // Join room
         joinBtn.addEventListener("click", () => {
           const playerName = nameInput.value.trim()
           const roomId = roomInput.value.trim().toUpperCase()
@@ -129,27 +158,36 @@
           }
 
           currentRoom = roomId
+          clearQr()
           socket.emit("joinRoom", { roomId, playerName })
         })
 
-        // ======================
-        // LEAVE ROOM
-        // ======================
+        // Leave room
         leaveBtn.addEventListener("click", () => {
           if (!currentRoom) return
           socket.emit("leaveRoom", currentRoom)
           currentRoom = ""
           playersList.innerHTML = ""
+          clearQr()
           setStatus("Left room")
         })
 
-        // ======================
-        // SERVER EVENTS
-        // ======================
-        socket.on("roomCreated", ({ roomId }) => {
+        // Server events
+        socket.on("roomCreated", ({ roomId, joinUrl, qrDataUrl }) => {
           currentRoom = roomId
           roomInput.value = roomId
           setStatus(`Room created: ${roomId}`)
+
+          if (qrDataUrl && joinUrl) {
+            qrWrap.innerHTML = `
+              <div><strong>Scan to join:</strong></div>
+              <img src="${qrDataUrl}" alt="Room QR Code" />
+              <div id="joinUrl">${joinUrl}</div>
+            `
+          } else {
+            // If server didn't send QR yet, keep it empty
+            clearQr()
+          }
         })
 
         socket.on("playerJoined", (players) => {
@@ -161,10 +199,15 @@
           renderPlayers(players)
         })
 
-        socket.on("roomState", ({ roomId, hostId, players }) => {
-          renderPlayers(players)
-          const amIHost = socket.id === hostId
-          setStatus(`In room: ${roomId} ${amIHost ? "(Host)" : ""}`)
+        socket.on("roomFull", ({ roomId, max }) => {
+          setStatus(`Room ${roomId} is full (max ${max} players).`)
+          alert(`Room ${roomId} is full (max ${max} players).`)
+        })
+
+        // Optional: clean leave on refresh (helps prevent duplicates)
+        window.addEventListener("beforeunload", () => {
+          if (currentRoom) socket.emit("leaveRoom", currentRoom)
+          socket.disconnect()
         })
       })
     </script>
