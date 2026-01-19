@@ -80,6 +80,14 @@
       <button id="leaveBtn" type="button">Leave Room</button>
     </div>
 
+    <!-- Test controls -->
+    <div class="row">
+      <button id="killMeBtn" type="button">Kill Me (test)</button>
+      <button id="reviveMeBtn" type="button">Revive Me (test)</button>
+      <button id="readyBtn" type="button">Ready (test)</button>
+      <button id="notReadyBtn" type="button">Not Ready (test)</button>
+    </div>
+
     <div id="status"></div>
 
     <!-- QR / Join Link -->
@@ -93,11 +101,10 @@
 
     <script>
       window.addEventListener("DOMContentLoaded", () => {
-        // IMPORTANT: explicitly connect to the same host/port as the page
-        // (this helps on mobile Safari when using LAN IP)
         const socket = io(window.location.origin)
 
         let currentRoom = ""
+        let lastRoomState = null
 
         const nameInput = document.getElementById("name")
         const roomInput = document.getElementById("room")
@@ -105,32 +112,12 @@
         const joinBtn = document.getElementById("joinBtn")
         const leaveBtn = document.getElementById("leaveBtn")
         const createBtn = document.getElementById("createBtn")
+        const killMeBtn = document.getElementById("killMeBtn")
+        const reviveMeBtn = document.getElementById("reviveMeBtn")
+        const readyBtn = document.getElementById("readyBtn")
+        const notReadyBtn = document.getElementById("notReadyBtn")
         const status = document.getElementById("status")
         const qrWrap = document.getElementById("qrWrap")
-
-        if (
-          !nameInput ||
-          !roomInput ||
-          !playersList ||
-          !joinBtn ||
-          !leaveBtn ||
-          !createBtn ||
-          !status ||
-          !qrWrap
-        ) {
-          console.error("Missing required HTML elements")
-          alert("Missing required HTML elements (check element IDs).")
-          return
-        }
-
-        function renderPlayers(players) {
-          playersList.innerHTML = ""
-          players.forEach((p) => {
-            const li = document.createElement("li")
-            li.textContent = p.name
-            playersList.appendChild(li)
-          })
-        }
 
         function setStatus(text) {
           status.textContent = text
@@ -140,14 +127,24 @@
           qrWrap.innerHTML = ""
         }
 
-        // Connection debug (helps on mobile)
+        function renderPlayers(players, hostId) {
+          playersList.innerHTML = ""
+          players.forEach((p) => {
+            const li = document.createElement("li")
+            const hostTag = p.id === hostId ? " (HOST)" : ""
+            const deadTag = p.alive ? "" : " (dead)"
+            li.textContent = `${p.name}${hostTag}${deadTag} — role: ${p.role} — status: ${p.status}`
+            playersList.appendChild(li)
+          })
+        }
+
         socket.on("connect", () => {
-          setStatus(`Connected ✅`)
+          setStatus(`Connected ✅ (id: ${socket.id})`)
         })
 
         socket.on("connect_error", (err) => {
           setStatus(`Connect error: ${err.message}`)
-          console.error("connect_error", err)
+          console.error(err)
         })
 
         socket.on("disconnect", (reason) => {
@@ -159,24 +156,19 @@
         const roomFromQr = (params.get("room") || "").trim().toUpperCase()
         if (roomFromQr) {
           roomInput.value = roomFromQr
-          setStatus(
-            `Room code loaded: ${roomFromQr}. Enter your name and press Join.`
-          )
+          setStatus(`Room code loaded: ${roomFromQr}. Enter your name and press Join.`)
         }
 
         // Create room
         createBtn.addEventListener("click", () => {
           const playerName = nameInput.value.trim()
-          if (!playerName) {
-            alert("Enter your name first.")
-            return
-          }
+          if (!playerName) return alert("Enter your name first.")
 
           setStatus("Creating room…")
 
           socket.emit("createRoom", {
             playerName,
-            baseUrl: window.location.origin
+            baseUrl: window.location.origin,
           })
         })
 
@@ -185,26 +177,46 @@
           const playerName = nameInput.value.trim()
           const roomId = roomInput.value.trim().toUpperCase()
 
-          if (!playerName || !roomId) {
-            alert("Enter a name and room code.")
-            return
-          }
-
-          setStatus(`Joining ${roomId}…`)
-          clearQr()
+          if (!playerName || !roomId) return alert("Enter a name and room code.")
 
           currentRoom = roomId
+          clearQr()
+          setStatus(`Joining ${roomId}…`)
+
           socket.emit("joinRoom", { roomId, playerName })
         })
 
         // Leave room
         leaveBtn.addEventListener("click", () => {
           if (!currentRoom) return
+
           socket.emit("leaveRoom", currentRoom)
           currentRoom = ""
           playersList.innerHTML = ""
           clearQr()
           setStatus("Left room")
+        })
+
+        // Test: kill / revive self
+        killMeBtn.addEventListener("click", () => {
+          if (!currentRoom) return alert("Join a room first")
+          socket.emit("setAlive", { roomId: currentRoom, playerId: socket.id, alive: false })
+        })
+
+        reviveMeBtn.addEventListener("click", () => {
+          if (!currentRoom) return alert("Join a room first")
+          socket.emit("setAlive", { roomId: currentRoom, playerId: socket.id, alive: true })
+        })
+
+        // Test: ready / not-ready
+        readyBtn.addEventListener("click", () => {
+          if (!currentRoom) return alert("Join a room first")
+          socket.emit("setPlayerStatus", { roomId: currentRoom, playerId: socket.id, status: "READY" })
+        })
+
+        notReadyBtn.addEventListener("click", () => {
+          if (!currentRoom) return alert("Join a room first")
+          socket.emit("setPlayerStatus", { roomId: currentRoom, playerId: socket.id, status: "NOT_READY" })
         })
 
         // Server events
@@ -219,16 +231,16 @@
               <img src="${qrDataUrl}" alt="Room QR Code" />
               <div id="joinUrl">${joinUrl}</div>
             `
-          } else {
-            clearQr()
           }
         })
 
         // Use roomState as the single source of truth
         socket.on("roomState", ({ roomId, hostId, players }) => {
+          lastRoomState = { roomId, hostId, players }
+
           currentRoom = roomId
           roomInput.value = roomId
-          renderPlayers(players)
+          renderPlayers(players, hostId)
 
           const amIHost = socket.id === hostId
           setStatus(`In room: ${roomId}${amIHost ? " (Host)" : ""}`)
@@ -237,18 +249,12 @@
         socket.on("roomClosed", ({ roomId }) => {
           if (currentRoom === roomId) {
             currentRoom = ""
-            renderPlayers([])
+            playersList.innerHTML = ""
             clearQr()
             setStatus("Room closed")
           }
         })
 
-        socket.on("roomFull", ({ roomId, max }) => {
-          setStatus(`Room ${roomId} is full (max ${max} players).`)
-          alert(`Room ${roomId} is full (max ${max} players).`)
-        })
-
-        // Optional: clean leave on refresh (helps prevent duplicates)
         window.addEventListener("beforeunload", () => {
           if (currentRoom) socket.emit("leaveRoom", currentRoom)
           socket.disconnect()

@@ -1,10 +1,10 @@
 import type { Server as SocketIOServer } from "socket.io"
+import type { Socket } from "socket.io"
+import {  mergePlayerState, removePlayer, setAlive as setAliveList,  setRole as setRoleList,  setStatus as setStatusList, } from "./players.js"
+import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 
-// Room types
-type Player = {
-  id: string
-  name: string
-}
+
+
 
 type Room = {
   hostId: string
@@ -14,9 +14,24 @@ type Room = {
 export const createRoomsManager = (io: SocketIOServer) => {
   const rooms: Record<string, Room> = {}
 
+  const normalizeRoomId = (roomId: string) => (roomId || "").trim().toUpperCase()
+  const normalizeName = (name: string) => (name || "").trim()
+
+  // Helper: broadcast room state
+  const emitRoomState = (roomId: string) => {
+    const room = rooms[roomId]
+    if (!room) return
+
+    io.to(roomId).emit("roomState", {
+      roomId,
+      hostId: room.hostId,
+      players: room.players,
+    })
+  }
+
   // Helper: removes socket from all rooms
   const removeFromAllRooms = (socketId: string, skipRoomId?: string) => {
-    const skip = skipRoomId ? skipRoomId.trim().toUpperCase() : undefined
+    const skip = skipRoomId ? normalizeRoomId(skipRoomId) : undefined
 
     for (const roomId of Object.keys(rooms)) {
       if (skip && roomId === skip) continue
@@ -26,8 +41,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
       const before = room.players.length
 
-      // Remove player
-      room.players = room.players.filter((p) => p.id !== socketId)
+      room.players = removePlayer(room.players, socketId)
 
       // If host leaves, assign new host
       if (room.hostId === socketId) {
@@ -46,19 +60,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
     }
   }
 
-  // Helper: broadcast room state
-  const emitRoomState = (roomId: string) => {
-    const room = rooms[roomId]
-    if (!room) return
-
-    io.to(roomId).emit("roomState", {
-      roomId,
-      hostId: room.hostId,
-      players: room.players
-    })
-  }
-
-  const handleDisconnecting = (socket: any) => {
+  const handleDisconnecting = (socket: Socket) => {
     for (const roomId of socket.rooms) {
       // socket.rooms always includes socket.id — ignore it
       if (roomId === socket.id) continue
@@ -67,7 +69,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
       if (!room) continue
 
       // Remove player
-      room.players = room.players.filter((p) => p.id !== socket.id)
+      room.players = removePlayer(room.players, socket.id)
 
       // If host left, transfer host to first remaining player
       if (room.hostId === socket.id) {
@@ -86,10 +88,9 @@ export const createRoomsManager = (io: SocketIOServer) => {
     }
   }
 
-  const createRoomLocal = (socket: any, roomId: string, playerName: string) => {
-    const cleanRoomId = (roomId || "").trim().toUpperCase()
-    const cleanName = (playerName || "").trim()
-
+  const createRoomLocal = (socket: Socket, roomId: string, playerName: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
     // remove from other rooms FIRST (skip the one we are creating/joining)
@@ -103,17 +104,17 @@ export const createRoomsManager = (io: SocketIOServer) => {
     // join room
     socket.join(cleanRoomId)
 
-    // add player as first member
+    // avoid duplicates if user hits join twice / reconnects
+    const existing = room.players.find((p) => p.id === socket.id)
     room.players = room.players.filter((p) => p.id !== socket.id)
-    room.players.push({ id: socket.id, name: cleanName })
+    room.players.push(mergePlayerState(existing, socket.id, cleanName))
 
     emitRoomState(cleanRoomId)
   }
 
-  const joinRoomLocal = (socket: any, roomId: string, playerName: string) => {
-    const cleanRoomId = (roomId || "").trim().toUpperCase()
-    const cleanName = (playerName || "").trim()
-
+  const joinRoomLocal = (socket: Socket, roomId: string, playerName: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
     // remove from other rooms FIRST (skip the one we are joining)
@@ -129,23 +130,23 @@ export const createRoomsManager = (io: SocketIOServer) => {
     socket.join(cleanRoomId)
 
     // avoid duplicates if user hits join twice / reconnects
+    const existing = room.players.find((p) => p.id === socket.id)
     room.players = room.players.filter((p) => p.id !== socket.id)
-    room.players.push({ id: socket.id, name: cleanName })
+    room.players.push(mergePlayerState(existing, socket.id, cleanName))
 
     emitRoomState(cleanRoomId)
   }
 
-  const leaveRoomLocal = (socket: any, roomId: string) => {
+  const leaveRoomLocal = (socket: Socket, roomId: string) => {
     if (!roomId) return
-
-    const cleanRoomId = roomId.trim().toUpperCase()
+    const cleanRoomId = normalizeRoomId(roomId)
 
     socket.leave(cleanRoomId)
 
     const room = rooms[cleanRoomId]
     if (!room) return
 
-    room.players = room.players.filter((p) => p.id !== socket.id)
+    room.players = removePlayer(room.players, socket.id)
 
     if (room.hostId === socket.id) {
       room.hostId = room.players[0]?.id ?? ""
@@ -162,13 +163,44 @@ export const createRoomsManager = (io: SocketIOServer) => {
     emitRoomState(cleanRoomId)
   }
 
+  // --- New: player state mutations (server-authoritative) ---
+  const setPlayerAlive = (roomId: string, playerId: string, alive: boolean) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    room.players = setAliveList(room.players, playerId, alive)
+    emitRoomState(cleanRoomId)
+  }
+
+  const setPlayerRole = (roomId: string, playerId: string, role: PlayerRole) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    room.players = setRoleList(room.players, playerId, role)
+    emitRoomState(cleanRoomId)
+  }
+
+  const setPlayerStatus = (roomId: string, playerId: string, status: PlayerStatus) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    room.players = setStatusList(room.players, playerId, status)
+    emitRoomState(cleanRoomId)
+  }
+
   return {
     rooms,
-    removeFromAllRooms,
     emitRoomState,
+    removeFromAllRooms,
     handleDisconnecting,
     createRoomLocal,
     joinRoomLocal,
-    leaveRoomLocal
+    leaveRoomLocal,
+    setPlayerAlive,
+    setPlayerRole,
+    setPlayerStatus,
   }
 }

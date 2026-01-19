@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from "socket.io"
 import { generateRoomCode, generateRoomJoinQrDataUrl } from "./utils/generateRoomCode.js"
 import os from "os"
 import { createRoomsManager } from "./rooms.js"
+import type { PlayerRole, PlayerStatus } from "./players.js"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -17,17 +18,11 @@ const app = express()
 const server = http.createServer(app)
 
 const io = new SocketIOServer(server, {
-  cors: { origin: "*" }
-})
-
-// Middleware to force no-cahing for Safari
-app.use((req, res, next) => {
-  res.setHeader("Cache-Control", "no-store")
-  next()
+  cors: { origin: "*" },
 })
 
 // serve static files from the "public" directory
-app.use(express.static("public", { etag: false, maxAge: 0 }))
+app.use(express.static("public"))
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -35,7 +30,7 @@ app.get("/health", (req, res) => {
 })
 
 // Helper:
-function getLanIp(): string { 
+function getLanIp(): string {
   const nets = os.networkInterfaces()
 
   for (const name of Object.keys(nets)) {
@@ -67,15 +62,12 @@ io.on("connection", (socket) => {
     async ({ playerName, baseUrl }: { playerName: string; baseUrl: string }) => {
       const cleanName = (playerName || "").trim()
       const cleanBaseUrl = (baseUrl || "").trim()
-      
+
       if (!cleanName) return
       if (!cleanBaseUrl) return
 
       // Create a new unique room code
       const roomId = generateRoomCode(roomsManager.rooms)
-
-      // remove from other rooms FIRST (skip the one we are creating/joining)
-      roomsManager.removeFromAllRooms(socket.id, roomId)
 
       // ensure room exists + join + add player + emit state
       roomsManager.createRoomLocal(socket, roomId, cleanName)
@@ -88,16 +80,59 @@ io.on("connection", (socket) => {
     }
   )
 
-  socket.on(
-    "joinRoom",
-    ({ roomId, playerName }: { roomId: string; playerName: string }) => {
-      roomsManager.joinRoomLocal(socket, roomId, playerName)
-    }
-  )
+  socket.on("joinRoom", ({ roomId, playerName }: { roomId: string; playerName: string }) => {
+    roomsManager.joinRoomLocal(socket, roomId, playerName)
+  })
 
   socket.on("leaveRoom", (roomId: string) => {
     roomsManager.leaveRoomLocal(socket, roomId)
   })
+
+  // --- New: Player state updates ---
+
+  // For testing: allow player to kill/revive themselves.
+  // Later: restrict to host only / game rules.
+  socket.on(
+    "setAlive",
+    ({ roomId, playerId, alive }: { roomId: string; playerId: string; alive: boolean }) => {
+      roomsManager.setPlayerAlive(roomId, playerId, alive)
+    }
+  )
+
+  // Host-only role assignment (recommended)
+  socket.on(
+    "setRole",
+    ({ roomId, playerId, role }: { roomId: string; playerId: string; role: PlayerRole }) => {
+      const cleanRoomId = (roomId || "").trim().toUpperCase()
+      const room = roomsManager.rooms[cleanRoomId]
+      if (!room) return
+
+      if (room.hostId !== socket.id) return // host-only
+      roomsManager.setPlayerRole(cleanRoomId, playerId, role)
+    }
+  )
+
+  // Status can be used for ready/not-ready etc.
+  socket.on(
+    "setPlayerStatus",
+    ({
+      roomId,
+      playerId,
+      status,
+    }: {
+      roomId: string
+      playerId: string
+      status: PlayerStatus
+    }) => {
+      // For now allow host or self
+      const cleanRoomId = (roomId || "").trim().toUpperCase()
+      const room = roomsManager.rooms[cleanRoomId]
+      if (!room) return
+
+      if (room.hostId !== socket.id && playerId !== socket.id) return
+      roomsManager.setPlayerStatus(cleanRoomId, playerId, status)
+    }
+  )
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id)
