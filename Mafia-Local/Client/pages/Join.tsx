@@ -19,9 +19,20 @@ export default function Join({ onEnterLobby }: Props) {
     const baseUrll = useMemo(() => window.location.origin, [])
 
     useEffect(() => {
-        const onConnect = () => (`Connected to server with ID: ${socket.id}`)
-        const onDisconnect = (reason: string) => (`Disconnected from server: ${reason}`)
-        const onConnectError = (error: Error) => (`Connection error: ${error.message}`)
+        const onConnect = () => {
+            console.log(`Connected to server with ID: ${socket.id}`)
+            setStatus(`Connected to server with ID: ${socket.id}`)
+        }
+
+        const onDisconnect = (reason: string) => {
+            console.log(`Disconnected from server: ${reason}`)
+            setStatus(`Disconnected from server: ${reason}`)
+        }
+
+        const onConnectError = (error: Error) => {
+            console.log(`Connection error: ${error.message}`)
+            setStatus(`Connection error: ${error.message}`)
+        }
 
         const onRoomCreated = ({ roomId, joinUrl, qrDataUrl }: { roomId: string, joinUrl: string, qrDataUrl: string }) => {
             setRoom(roomId)
@@ -52,6 +63,7 @@ export default function Join({ onEnterLobby }: Props) {
             setStatus(reason)
         }
 
+        
         socket.on("connect", onConnect)
         socket.on("disconnect", onDisconnect)
         socket.on("connect_error", onConnectError)
