@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Web game based on the party game mafia and its different variations",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host 0.0.0.0 --port 5173"
   },
   "keywords": [],
   "author": "",

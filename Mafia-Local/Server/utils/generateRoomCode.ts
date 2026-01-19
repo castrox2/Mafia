@@ -22,7 +22,7 @@ export async function generateRoomJoinQrDataUrl(baseUrl: string, roomId: string)
   const cleanBaseUrl = (baseUrl || "").trim().replace(/\/+$/, "")
   const cleanRoomId = (roomId || "").trim().toUpperCase()
 
-  const joinUrl = `${cleanBaseUrl}/join?room=${encodeURIComponent(cleanRoomId)}`
+  const joinUrl = `${cleanBaseUrl}/?room=${encodeURIComponent(cleanRoomId)}`
   const qrDataUrl = await QRCode.toDataURL(joinUrl)
 
   return { joinUrl, qrDataUrl }

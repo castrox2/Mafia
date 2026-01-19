@@ -72,8 +72,8 @@ io.on("connection", (socket) => {
       // ensure room exists + join + add player + emit state
       roomsManager.createRoomLocal(socket, roomId, cleanName)
 
-      const lanBaseUrl = `http://${getLanIp()}:3000`
-      const { joinUrl, qrDataUrl } = await generateRoomJoinQrDataUrl(lanBaseUrl, roomId)
+      const lanClientBaseUrl = `http://${getLanIp()}:5173`
+      const { joinUrl, qrDataUrl } = await generateRoomJoinQrDataUrl(lanClientBaseUrl, roomId)
 
       // Tell ONLY this socket what the room code is
       socket.emit("roomCreated", { roomId, joinUrl, qrDataUrl })
@@ -141,6 +141,6 @@ io.on("connection", (socket) => {
 })
 
 // server starts listening
-server.listen(3000, () => {
+server.listen(3000, "0.0.0.0", () => {
   console.log("Server listening on http://localhost:3000")
 })
