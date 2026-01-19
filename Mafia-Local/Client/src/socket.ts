@@ -1,8 +1,8 @@
-import { io } from "socket.io-client"
+import { io, Socket } from "socket.io-client";
 
-const socket = io("http://localhost:3000")
+const SERVER_URL = "http://localhost:3000";
 
-socket.on("connect", () => {
-    console.log("Connected to server with ID:", socket.id)
+export const socket: Socket = io(window.location.origin, {
+    transports: ["websocket", "polling"],
 })
 

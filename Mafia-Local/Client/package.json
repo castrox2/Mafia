@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Web game based on the party game mafia and its different variations",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
@@ -11,7 +14,8 @@
   "type": "module",
   "dependencies": {
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "vite": "^7.3.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.11",

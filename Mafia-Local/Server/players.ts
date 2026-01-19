@@ -10,8 +10,8 @@ export type PlayerRole=
 export type PlayerStatus =
     | "DISCONNECTED"
     | "CONNECTED"
-    | "NOT_READY" // Checks if player is ready to start not if dead or alive
-    | "RADY"
+    | "NOT_READY" // Checks if player is ready to start 
+    | "RADY" // not if dead or alive
 
 export type Player = {
     id: string // Socket ID
