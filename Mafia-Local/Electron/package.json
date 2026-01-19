@@ -12,6 +12,10 @@
   "type": "module",
   "devDependencies": {
     "electron": "^39.2.7",
-    "electron-reloader": "^1.2.3"
+    "electron-reloader": "^1.2.3",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@types/node": "^25.0.9"
   }
 }
