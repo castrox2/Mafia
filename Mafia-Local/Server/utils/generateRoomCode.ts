@@ -1,49 +1,29 @@
 import * as QRCode from "qrcode"
 import { encode } from "punycode"
 
+const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+const CODE_LENGTH = 5
+
 export function generateRoomCode(
-    rooms: Record<string, unknown>,
-    length: number = 4
+    existingRooms: Record<string, any>, 
 ): string { 
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 
-    const generateCode = () => {
-        let code = ""
-        for (let i = 0; i < length; i++) {
-            code += characters[Math.floor(Math.random() * characters.length)]
-        }
-        return code
-    }
+    let code = ""
     
-    // Try a few times at current length, then increase length if collisions happen
-    let tries = 0
-    let code = generateCode()
-
-    while (rooms[code] && tries < 50) {
-        code = generateCode()
-        tries++
-    }
-
-    if (rooms[code]) {
-        return generateRoomCode(rooms, length + 1)
-    }
+    do {
+        code = Array.from({ length: CODE_LENGTH }, () =>
+            CHARS[Math.floor(Math.random() * CHARS.length)]).join("")
+    } while (existingRooms[code])
 
     return code
 }
 
+export async function generateRoomJoinQrDataUrl(baseUrl: string, roomId: string): Promise<{ joinUrl: string; qrDataUrl: string }> {
+  const cleanBaseUrl = (baseUrl || "").trim().replace(/\/+$/, "")
+  const cleanRoomId = (roomId || "").trim().toUpperCase()
 
-export async function generateRoomJoinQrDataUrl(
-  baseUrl: string,
-  roomId: string
-): Promise<{ joinUrl: string; qrDataUrl: string }> {
-  const cleanBase = baseUrl.replace(/\/+$/, "") // remove trailing slashes
-  const joinUrl = `${cleanBase}/?room=${encodeURIComponent(roomId)}`
-
-  const qrDataUrl = await QRCode.toDataURL(joinUrl, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    scale: 6,
-  })
+  const joinUrl = `${cleanBaseUrl}/join?room=${encodeURIComponent(cleanRoomId)}`
+  const qrDataUrl = await QRCode.toDataURL(joinUrl)
 
   return { joinUrl, qrDataUrl }
 }

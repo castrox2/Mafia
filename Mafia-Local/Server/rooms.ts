@@ -117,14 +117,26 @@ export const createRoomsManager = (io: SocketIOServer) => {
     const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
+    // Limits room codes to 5 characters
+    if (cleanRoomId.length !== 5) {
+      socket.emit("roomInvalid", { reason: "Room Code MUST Be 5 Characters Long" })
+      return
+    }
+
+    if (!/^[A-Z0-9]{5}$/.test(cleanRoomId)) {
+      socket.emit("roomInvalid", { reason: "Room Code MUST Be Alphanumeric (A-Z, 0-9)" })
+      return
+    }
+
+    // Room MUST exist
+    const room = rooms[cleanRoomId]
+    if (!room) {
+      socket.emit("roomInvalid", { reason: "Room Does Not Exist" })
+      return
+    }
+
     // remove from other rooms FIRST (skip the one we are joining)
     removeFromAllRooms(socket.id, cleanRoomId)
-
-    // ensure room exists
-    if (!rooms[cleanRoomId]) rooms[cleanRoomId] = { hostId: socket.id, players: [] }
-
-    const room = rooms[cleanRoomId]
-    if (!room) return // extra safety
 
     // join room
     socket.join(cleanRoomId)

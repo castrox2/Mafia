@@ -5,10 +5,12 @@ import type { RoomState } from "../src/types.js"
 type Props = {
     roomId: string
     playerName: string
+    joinUrl: string
+    qrDataUrl: string
     onExit: () => void
 }
 
-export default function Lobby({ roomId, playerName, onExit }: Props) {
+export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }: Props) {
     const [state, setState] = useState<RoomState | null>(null)
     const [status, setStatus] = useState("")
 
@@ -52,7 +54,7 @@ export default function Lobby({ roomId, playerName, onExit }: Props) {
     socket.emit("setPlayerStatus", {
       roomId: cleanRoomId,
       playerId: socket.id,
-      status: ready ? "READY" : "NOT_READY",
+      status: ready ? "READY" : "NOT READY",
     })
   }
 
@@ -64,6 +66,30 @@ export default function Lobby({ roomId, playerName, onExit }: Props) {
         <div><strong>Room:</strong> {cleanRoomId}</div>
         <div><strong>You:</strong> {cleanPlayerName}</div>
       </div>
+
+        {/* QR code for joining (handy for local play) */}
+        {qrDataUrl && state?.hostId === socket.id && (
+        <div style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            Scan to join this room:
+            </div>
+
+            <img
+            src={qrDataUrl}
+            alt="Room QR Code"
+            style={{ width: 220, height: 220 }}
+            />
+
+            {joinUrl && (
+            <div style={{ marginTop: 6, fontSize: 12 }}>
+                Link:{" "}
+                <a href={joinUrl} target="_blank" rel="noreferrer">
+                {joinUrl}
+                </a>
+            </div>
+            )}
+        </div>
+        )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={() => setReady(true)}>
