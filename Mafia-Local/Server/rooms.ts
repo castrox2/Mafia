@@ -4,8 +4,6 @@ import {  mergePlayerState, removePlayer, setAlive as setAliveList,  setRole as 
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 
 
-
-
 type Room = {
   hostId: string
   players: Player[]
