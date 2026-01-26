@@ -29,7 +29,7 @@ Play this with friends to find out who the best liar, detective, or maybe even t
 * NOTE: You may have your own rules, scripts, or different way of running the game, this app is only meant to help with the flow
       of the game, or teach new players how to play the game.
       
-      I will eventually add different scripts / modes that adds more roles and more complex and intersting gameplay.
+      I will eventually add different scripts / modes that adds more roles and more complex and interesting gameplay.
 
 # How To Play❓
 
