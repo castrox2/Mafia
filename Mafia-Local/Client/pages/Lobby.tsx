@@ -152,7 +152,6 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
               roomId: cleanRoomId,
               settings,
             })
-            setSettingsOpen(false)
           }}
         />
       )}

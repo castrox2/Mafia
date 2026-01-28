@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import type { RoomState } from "../src/types.js"
 
 type Props = {
@@ -14,28 +14,52 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
   const [daySec, setDaySec] = useState(s?.timers?.daySec ?? 60)
   const [voteSec, setVoteSec] = useState(s?.timers?.voteSec ?? 30)
   const [nightSec, setNightSec] = useState(s?.timers?.nightSec ?? 45)
+  const [discussionSec, setDiscussionSec] = useState(s?.timers?.discussionSec ?? 60)
+  const [pubDiscussionSec, setPubDiscussionSec] = useState(s?.timers?.pubDiscussionSec ?? 30)
 
   const [mafia, setMafia] = useState(s?.roles?.mafia ?? 1)
   const [doctor, setDoctor] = useState(s?.roles?.doctor ?? 0)
   const [detective, setDetective] = useState(s?.roles?.detective ?? 0)
   const [sheriff, setSheriff] = useState(s?.roles?.sheriff ?? 0)
 
-  // if the host re-opens later after updates, keep inputs in sync
-  React.useEffect(() => {
-    setDaySec(s?.timers?.daySec ?? 60)
-    setVoteSec(s?.timers?.voteSec ?? 30)
-    setNightSec(s?.timers?.nightSec ?? 45)
+//   useEffect(() => {
+//     if (!open) return
 
-    setMafia(s?.roles?.mafia ?? 1)
-    setDoctor(s?.roles?.doctor ?? 0)
-    setDetective(s?.roles?.detective ?? 0)
-    setSheriff(s?.roles?.sheriff ?? 0)
-  }, [open]) // intentional: reset when opening
+//     const t = window.setTimeout(() => {
+//         onSave({
+//             timers: { daySec, voteSec, nightSec },
+//             roles: { mafia, doctor, detective, sheriff },
+//         })
+//     }, 200)
+
+//     return () => window.clearTimeout(t)
+//   }, [open, daySec, voteSec, nightSec, mafia, doctor, detective, sheriff, onSave])
+
+  // if the host re-opens later after updates, keep inputs in sync
+//   React.useEffect(() => {
+//     setDaySec(s?.timers?.daySec ?? 60)
+//     setVoteSec(s?.timers?.voteSec ?? 30)
+//     setNightSec(s?.timers?.nightSec ?? 45)
+
+//     setMafia(s?.roles?.mafia ?? 1)
+//     setDoctor(s?.roles?.doctor ?? 0)
+//     setDetective(s?.roles?.detective ?? 0)
+//     setSheriff(s?.roles?.sheriff ?? 0)
+//   }, [open]) // intentional: reset when opening
+
+const handleSave = () => {
+    onSave({
+        timers: { daySec, voteSec, nightSec, discussionSec, pubDiscussionSec, },
+        roleCount: { mafia, doctor, detective, sheriff }, // roleCount ** NOT ROLES **
+    })
+    onClose()
+}
+
 
   const playerCount = roomState.players.length
 
   const helpText = useMemo(() => {
-    return `Players: ${playerCount}\nMafia is always at least 1.\nDetective+Sheriff share the same "Cop" cap from your chart.`
+    return `Players: ${playerCount}\nThere Will Always Be At Least 1 Mafia.`
   }, [playerCount])
 
   if (!open) return null
@@ -179,9 +203,6 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
               />
             </label>
 
-            <div style={{ fontSize: 12, color: "#555" }}>
-              Note: Detective + Sheriff share the “Cop” cap from your chart.
-            </div>
           </div>
         </div>
 
@@ -190,12 +211,7 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
             Cancel
           </button>
           <button
-            onClick={() =>
-              onSave({
-                timers: { daySec, voteSec, nightSec },
-                roles: { mafia, doctor, detective, sheriff },
-              })
-            }
+            onClick={handleSave}
             style={{ padding: "10px 12px", fontWeight: 700 }}
           >
             Save Settings
