@@ -5,6 +5,7 @@ import { generateRoomCode, generateRoomJoinQrDataUrl } from "./utils/generateRoo
 import os from "os"
 import { createRoomsManager } from "./rooms.js"
 import type { PlayerRole, PlayerStatus } from "./players.js"
+import { createTimersManager } from "./utils/timers.js"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -49,6 +50,11 @@ function getLanIp(): string {
 }
 
 const roomsManager = createRoomsManager(io)
+
+const timers = createTimersManager(io, ({ roomId, phase }) => {
+  // For later: can use roomId + phase to trigger game state changes
+  io.to(roomId).emit("timerEnded", { roomId, phase })
+})
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
