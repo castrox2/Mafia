@@ -9,7 +9,7 @@ export type PlayerStatus =
     | "DISCONNECTED"
     | "CONNECTED"
     | "NOT_READY" // Checks if player is ready to start 
-    | "RADY" // not if dead or alive
+    | "READY" // not if dead or alive
 
 export type Player = {
     id: string // Socket ID
@@ -24,4 +24,25 @@ export type RoomState = {
     roomId: string
     hostId: string
     players: Player[]
+    settings: GameSettings
+}
+
+export type PhaseTimers = {
+    daySec: number
+    nightSec: number
+    voteSec: number
+    discussionSec: number
+    pubDiscussionSec: number
+}
+
+export type RoleCounts = {
+    mafia: number
+    doctor: number
+    detective: number
+    sheriff: number
+}
+
+export type GameSettings = {
+    timers: PhaseTimers
+    roles: RoleCounts
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { socket } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
+import HostSettingsModal from "../components/HostSettings.js"
 
 type Props = {
     roomId: string
@@ -11,6 +12,7 @@ type Props = {
 }
 
 export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }: Props) {
+    const [settingsOpen, setSettingsOpen] = useState(false)
     const [state, setState] = useState<RoomState | null>(null)
     const [status, setStatus] = useState("")
 
@@ -61,6 +63,18 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
   return (
     <div style={{ padding: 20, maxWidth: 700, fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 8 }}>Lobby</h1>
+
+      {/* Host settings modal */}
+      {socket.id === state?.hostId && (
+        <div>
+          <button
+            style={{ padding: "10px 12px", fontSize: 16, marginBottom: 12 }}
+            onClick={() => setSettingsOpen(true)}
+          >
+            Host Settings
+          </button>
+        </div>
+        )}
 
       <div style={{ marginBottom: 10 }}>
         <div><strong>Room:</strong> {cleanRoomId}</div>
@@ -126,6 +140,23 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
           )
         })}
       </ul>
+
+      {/* Host Settings Modal */}
+      {state && socket.id === state.hostId && (
+        <HostSettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          roomState={state}
+          onSave={(settings) => {
+            socket.emit("updateSettings", {
+              roomId: cleanRoomId,
+              settings,
+            })
+            setSettingsOpen(false)
+          }}
+        />
+      )}
+
     </div>
   )
 }

@@ -118,6 +118,12 @@ io.on("connection", (socket) => {
     }
   )
 
+  socket.on(
+    "updateSettings",
+    ({ roomId, settings }: { roomId: string; settings: Partial<any> }) => {
+      roomsManager.updateRoomSettings(socket, roomId, settings)
+    })
+
   // Status can be used for ready/not-ready etc.
   socket.on(
     "setPlayerStatus",

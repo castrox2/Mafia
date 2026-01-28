@@ -1,21 +1,148 @@
 import type { Server as SocketIOServer } from "socket.io"
 import type { Socket } from "socket.io"
-import {  mergePlayerState, removePlayer, setAlive as setAliveList,  setRole as setRoleList,  setStatus as setStatusList, } from "./players.js"
+
+import {
+  mergePlayerState,
+  removePlayer,
+  setAlive as setAliveList,
+  setRole as setRoleList,
+  setStatus as setStatusList,
+} from "./players.js"
+
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 
+/* ======================================================
+                          Types
+====================================================== */
+
+export type PhaseTimers = {
+  daySec: number
+  nightSec: number
+  voteSec: number
+  discussionSec: number
+  pubDiscussionSec: number
+}
+
+export type RoleCount = {
+  mafia: number
+  doctor: number
+  detective: number
+  sheriff: number
+}
+
+export type GameSettings = {
+  timers: PhaseTimers
+  roleCount: RoleCount
+}
 
 type Room = {
   hostId: string
   players: Player[]
+  settings: GameSettings
 }
+
+/* ======================================================
+                    Rooms Manager
+====================================================== */
 
 export const createRoomsManager = (io: SocketIOServer) => {
   const rooms: Record<string, Room> = {}
 
-  const normalizeRoomId = (roomId: string) => (roomId || "").trim().toUpperCase()
-  const normalizeName = (name: string) => (name || "").trim()
+  /* ------------------------------------------------------
+                  Normalization helpers
+  ------------------------------------------------------ */
 
-  // Helper: broadcast room state
+  const normalizeRoomId = (roomId: string) =>
+    (roomId || "").trim().toUpperCase()
+
+  const normalizeName = (name: string) =>
+    (name || "").trim()
+
+  /* ------------------------------------------------------
+                  Default Game Settings
+  ------------------------------------------------------ */
+
+  const defaultSettings = (): GameSettings => ({
+    timers: {
+      daySec: 300,
+      nightSec: 180,
+      voteSec: 120,
+      discussionSec: 180,
+      pubDiscussionSec: 120,
+    },
+    roleCount: {
+      mafia: 1,
+      doctor: 0,
+      detective: 0,
+      sheriff: 0,
+    },
+  })
+
+  /* ------------------------------------------------------
+            Role Bounds (based on player count)
+            - Mafia is ALWAYS at least 1
+            - Doctor / Detective / Sheriff can be 0+
+  ------------------------------------------------------ */
+
+  const getRoleBounds = (playerCount: number) => {
+    if (playerCount < 5) {
+      return {
+        mafia: { min: 1, max: 1 },
+        doctor: { min: 0, max: 1 },
+        detective: { min: 0, max: 1 },
+        sheriff: { min: 0, max: 1 },
+      }
+    }
+
+    if (playerCount <= 7) {
+      return {
+        mafia: { min: 1, max: 2 },
+        doctor: { min: 0, max: 1 },
+        detective: { min: 0, max: 1 },
+        sheriff: { min: 0, max: 1 },
+      }
+    }
+
+    if (playerCount <= 10) {
+      return {
+        mafia: { min: 2, max: 3 },
+        doctor: { min: 0, max: 1 },
+        detective: { min: 0, max: 1 },
+        sheriff: { min: 0, max: 1 },
+      }
+    }
+
+    if (playerCount <= 12) {
+      return {
+        mafia: { min: 3, max: 4 },
+        doctor: { min: 0, max: 1 },
+        detective: { min: 0, max: 1 },
+        sheriff: { min: 0, max: 1 },
+      }
+    }
+
+    if (playerCount <= 14) {
+      return {
+        mafia: { min: 4, max: 5 },
+        doctor: { min: 0, max: 1 },
+        detective: { min: 0, max: 1 },
+        sheriff: { min: 0, max: 1 },
+      }
+    }
+
+    // playerCount >= 15
+    return {
+      mafia: { min: 5, max: 6 },
+      doctor: { min: 0, max: 2 },
+      detective: { min: 0, max: 2 },
+      sheriff: { min: 0, max: 2 },
+    }
+  }
+
+  /* ------------------------------------------------------
+                Helper: broadcast room state
+  ------------------------------------------------------ */
+
   const emitRoomState = (roomId: string) => {
     const room = rooms[roomId]
     if (!room) return
@@ -24,10 +151,15 @@ export const createRoomsManager = (io: SocketIOServer) => {
       roomId,
       hostId: room.hostId,
       players: room.players,
+      settings: room.settings,
+      roleBounds: getRoleBounds(room.players.length),
     })
   }
 
-  // Helper: removes socket from all rooms
+  /* ------------------------------------------------------
+          Helper: removes socket from all rooms
+  ------------------------------------------------------ */
+
   const removeFromAllRooms = (socketId: string, skipRoomId?: string) => {
     const skip = skipRoomId ? normalizeRoomId(skipRoomId) : undefined
 
@@ -47,7 +179,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
       }
 
       if (before !== room.players.length) {
-        // If room is now empty, delete it and emit []
+        // If room is now empty, delete it
         if (room.players.length === 0) {
           delete rooms[roomId]
           io.to(roomId).emit("roomClosed", { roomId })
@@ -58,99 +190,117 @@ export const createRoomsManager = (io: SocketIOServer) => {
     }
   }
 
+  /* ------------------------------------------------------
+                Socket lifecycle cleanup
+  ------------------------------------------------------ */
+
   const handleDisconnecting = (socket: Socket) => {
     for (const roomId of socket.rooms) {
-      // socket.rooms always includes socket.id — ignore it
       if (roomId === socket.id) continue
 
       const room = rooms[roomId]
       if (!room) continue
 
-      // Remove player
       room.players = removePlayer(room.players, socket.id)
 
-      // If host left, transfer host to first remaining player
+      // Transfer host if needed
       if (room.hostId === socket.id) {
         room.hostId = room.players[0]?.id ?? ""
       }
 
-      // If room is empty, delete it
       if (room.players.length === 0) {
         delete rooms[roomId]
         io.to(roomId).emit("roomClosed", { roomId })
         continue
       }
 
-      // Otherwise, broadcast updated room state
       emitRoomState(roomId)
     }
   }
 
-  const createRoomLocal = (socket: Socket, roomId: string, playerName: string) => {
+  /* ------------------------------------------------------
+                        Create Room
+  ------------------------------------------------------ */
+
+  const createRoomLocal = (
+    socket: Socket,
+    roomId: string,
+    playerName: string
+  ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
-    // remove from other rooms FIRST (skip the one we are creating/joining)
+    rooms[cleanRoomId] = {
+      hostId: socket.id,
+      players: [],
+      settings: defaultSettings(),
+    }
+
     removeFromAllRooms(socket.id, cleanRoomId)
 
-    // ensure room exists
-    if (!rooms[cleanRoomId]) rooms[cleanRoomId] = { hostId: socket.id, players: [] }
-    const room = rooms[cleanRoomId]
-    if (!room) return
-
-    // join room
     socket.join(cleanRoomId)
 
-    // avoid duplicates if user hits join twice / reconnects
-    const existing = room.players.find((p) => p.id === socket.id)
-    room.players = room.players.filter((p) => p.id !== socket.id)
-    room.players.push(mergePlayerState(existing, socket.id, cleanName))
+    rooms[cleanRoomId].players.push(
+      mergePlayerState(undefined, socket.id, cleanName)
+    )
 
     emitRoomState(cleanRoomId)
   }
 
-  const joinRoomLocal = (socket: Socket, roomId: string, playerName: string) => {
+  /* ------------------------------------------------------
+                        Join Room
+  ------------------------------------------------------ */
+
+  const joinRoomLocal = (
+    socket: Socket,
+    roomId: string,
+    playerName: string
+  ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
-    // Limits room codes to 5 characters
+    // Room code validation
     if (cleanRoomId.length !== 5) {
-      socket.emit("roomInvalid", { reason: "Room Code MUST Be 5 Characters Long" })
+      socket.emit("roomInvalid", {
+        reason: "Room Code MUST Be 5 Characters Long",
+      })
       return
     }
 
     if (!/^[A-Z0-9]{5}$/.test(cleanRoomId)) {
-      socket.emit("roomInvalid", { reason: "Room Code MUST Be Alphanumeric (A-Z, 0-9)" })
+      socket.emit("roomInvalid", {
+        reason: "Room Code MUST Be Alphanumeric (A-Z, 0-9)",
+      })
       return
     }
 
-    // Room MUST exist
     const room = rooms[cleanRoomId]
     if (!room) {
       socket.emit("roomInvalid", { reason: "Room Does Not Exist" })
       return
     }
 
-    // remove from other rooms FIRST (skip the one we are joining)
     removeFromAllRooms(socket.id, cleanRoomId)
 
-    // join room
     socket.join(cleanRoomId)
 
-    // avoid duplicates if user hits join twice / reconnects
     const existing = room.players.find((p) => p.id === socket.id)
     room.players = room.players.filter((p) => p.id !== socket.id)
-    room.players.push(mergePlayerState(existing, socket.id, cleanName))
+    room.players.push(
+      mergePlayerState(existing, socket.id, cleanName)
+    )
 
     emitRoomState(cleanRoomId)
   }
 
-  const leaveRoomLocal = (socket: Socket, roomId: string) => {
-    if (!roomId) return
-    const cleanRoomId = normalizeRoomId(roomId)
+  /* ------------------------------------------------------
+                        Leave Room
+  ------------------------------------------------------ */
 
+  const leaveRoomLocal = (socket: Socket, roomId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
     socket.leave(cleanRoomId)
 
     const room = rooms[cleanRoomId]
@@ -162,44 +312,68 @@ export const createRoomsManager = (io: SocketIOServer) => {
       room.hostId = room.players[0]?.id ?? ""
     }
 
-    // If empty, delete FIRST, and emit an empty list safely
     if (room.players.length === 0) {
       delete rooms[cleanRoomId]
       io.to(cleanRoomId).emit("roomClosed", { roomId: cleanRoomId })
       return
     }
 
-    // Otherwise emit the updated list
     emitRoomState(cleanRoomId)
   }
 
-  // --- New: player state mutations (server-authoritative) ---
-  const setPlayerAlive = (roomId: string, playerId: string, alive: boolean) => {
-    const cleanRoomId = normalizeRoomId(roomId)
-    const room = rooms[cleanRoomId]
-    if (!room) return
+  /* ------------------------------------------------------
+        Player State Mutations (server-authoritative)
+  ------------------------------------------------------ */
 
+  const setPlayerAlive = (roomId: string, playerId: string, alive: boolean) => {
+    const room = rooms[normalizeRoomId(roomId)]
+    if (!room) return
     room.players = setAliveList(room.players, playerId, alive)
-    emitRoomState(cleanRoomId)
+    emitRoomState(roomId)
   }
 
   const setPlayerRole = (roomId: string, playerId: string, role: PlayerRole) => {
-    const cleanRoomId = normalizeRoomId(roomId)
-    const room = rooms[cleanRoomId]
+    const room = rooms[normalizeRoomId(roomId)]
     if (!room) return
-
     room.players = setRoleList(room.players, playerId, role)
-    emitRoomState(cleanRoomId)
+    emitRoomState(roomId)
   }
 
-  const setPlayerStatus = (roomId: string, playerId: string, status: PlayerStatus) => {
+  const setPlayerStatus = (
+    roomId: string,
+    playerId: string,
+    status: PlayerStatus
+  ) => {
+    const room = rooms[normalizeRoomId(roomId)]
+    if (!room) return
+    room.players = setStatusList(room.players, playerId, status)
+    emitRoomState(roomId)
+  }
+
+    const updateRoomSettings = (
+    socket: Socket,
+    roomId: string,
+    settings: Partial<GameSettings>
+  ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
 
-    room.players = setStatusList(room.players, playerId, status)
+    // Host-only
+    if (room.hostId !== socket.id) return
+
+    // Merge new settings with existing ones
+    room.settings = {
+      timers: { ...room.settings.timers, ...settings.timers },
+      roleCount: { ...room.settings.roleCount, ...settings.roleCount },
+    }
+
     emitRoomState(cleanRoomId)
   }
+
+  /* ------------------------------------------------------
+                        Public API
+  ------------------------------------------------------ */
 
   return {
     rooms,
@@ -212,5 +386,6 @@ export const createRoomsManager = (io: SocketIOServer) => {
     setPlayerAlive,
     setPlayerRole,
     setPlayerStatus,
+    updateRoomSettings,
   }
 }
