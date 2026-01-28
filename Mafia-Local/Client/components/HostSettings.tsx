@@ -22,31 +22,7 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
   const [detective, setDetective] = useState(s?.roles?.detective ?? 0)
   const [sheriff, setSheriff] = useState(s?.roles?.sheriff ?? 0)
 
-//   useEffect(() => {
-//     if (!open) return
-
-//     const t = window.setTimeout(() => {
-//         onSave({
-//             timers: { daySec, voteSec, nightSec },
-//             roles: { mafia, doctor, detective, sheriff },
-//         })
-//     }, 200)
-
-//     return () => window.clearTimeout(t)
-//   }, [open, daySec, voteSec, nightSec, mafia, doctor, detective, sheriff, onSave])
-
-  // if the host re-opens later after updates, keep inputs in sync
-//   React.useEffect(() => {
-//     setDaySec(s?.timers?.daySec ?? 60)
-//     setVoteSec(s?.timers?.voteSec ?? 30)
-//     setNightSec(s?.timers?.nightSec ?? 45)
-
-//     setMafia(s?.roles?.mafia ?? 1)
-//     setDoctor(s?.roles?.doctor ?? 0)
-//     setDetective(s?.roles?.detective ?? 0)
-//     setSheriff(s?.roles?.sheriff ?? 0)
-//   }, [open]) // intentional: reset when opening
-
+  
 const handleSave = () => {
     onSave({
         timers: { daySec, voteSec, nightSec, discussionSec, pubDiscussionSec, },
