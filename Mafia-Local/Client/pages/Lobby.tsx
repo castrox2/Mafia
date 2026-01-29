@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { socket } from "../src/socket.js"
+import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
 
@@ -22,7 +22,7 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
     useEffect(() => {
         const onRoomState = (s: RoomState) => {
             setState(s)
-            setStatus(`In room: ${s.roomId}${socket.id === s.hostId ? " (Host)" : "" }`)
+            setStatus(`In room: ${s.roomId}${clientId === s.hostId ? " (Host) " : "" }`)
         }
 
         const onRoomClosed = ({ roomId: closedRoomId }: { roomId: string }) => {
@@ -55,7 +55,7 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
   const setReady = (ready: boolean) => {
     socket.emit("setPlayerStatus", {
       roomId: cleanRoomId,
-      playerId: socket.id,
+      playerId: clientId,
       status: ready ? "READY" : "NOT READY",
     })
   }

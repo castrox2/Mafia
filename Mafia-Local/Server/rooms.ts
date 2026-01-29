@@ -275,8 +275,10 @@ const normalizeRoleCount = (
 
       room.players = removePlayer(room.players, socket.id)
 
+      const leavingClientId = String(socket.data.clientId || "")
+
       // Transfer host if needed
-      if (room.hostId === socket.id) {
+      if (room.hostId === leavingClientId) {
         room.hostId = room.players[0]?.id ?? ""
       }
 
@@ -297,14 +299,15 @@ const normalizeRoleCount = (
   const createRoomLocal = (
     socket: Socket,
     roomId: string,
-    playerName: string
+    playerName: string,
+    clientId: string
   ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
     rooms[cleanRoomId] = {
-      hostId: socket.id,
+      hostId: clientId, // Host is stable identity
       players: [],
       settings: defaultSettings(),
     }
@@ -314,7 +317,7 @@ const normalizeRoleCount = (
     socket.join(cleanRoomId)
 
     rooms[cleanRoomId].players.push(
-      mergePlayerState(undefined, socket.id, cleanName)
+      mergePlayerState(undefined, socket.id, clientId, cleanName)
     )
 
     emitRoomState(cleanRoomId)
@@ -334,7 +337,7 @@ const updateRoomSettings = (
   if (!room) return
 
   // Host-only
-  if (room.hostId !== socket.id) {
+  if (room.hostId !== socket.data.clientId) {
     socket.emit("settingsRefused", { reason: "Only the host can update settings." })
     return
   }
@@ -370,7 +373,8 @@ const updateRoomSettings = (
   const joinRoomLocal = (
     socket: Socket,
     roomId: string,
-    playerName: string
+    playerName: string,
+    clientId: string
   ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
@@ -401,10 +405,10 @@ const updateRoomSettings = (
 
     socket.join(cleanRoomId)
 
-    const existing = room.players.find((p) => p.id === socket.id)
-    room.players = room.players.filter((p) => p.id !== socket.id)
+    const existing = room.players.find((p) => p.id === clientId)
+    room.players = room.players.filter((p) => p.id !== clientId) // remove old entry if exists
     room.players.push(
-      mergePlayerState(existing, socket.id, cleanName)
+      mergePlayerState(existing, socket.id, clientId, cleanName) // re-add with updated socketId + name
     )
 
     emitRoomState(cleanRoomId)

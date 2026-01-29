@@ -59,6 +59,9 @@ const timers = createTimersManager(io, ({ roomId, phase }) => {
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
 
+  // Stable client id from browser/electron (persists across refresh/reconnect)
+  const clientId = String((socket.handshake as any).auth?.clientId || "").trim()
+  socket.data.clientId = clientId || socket.id // fallback (shouldn't happen, but keeps dev moving)
   socket.on("disconnecting", () => {
     roomsManager.handleDisconnecting(socket)
   })
@@ -76,7 +79,7 @@ io.on("connection", (socket) => {
       const roomId = generateRoomCode(roomsManager.rooms)
 
       // ensure room exists + join + add player + emit state
-      roomsManager.createRoomLocal(socket, roomId, cleanName)
+      roomsManager.createRoomLocal(socket, roomId, cleanName, socket.data.clientId)
 
       const lanClientBaseUrl = `http://${getLanIp()}:5173`
       const { joinUrl, qrDataUrl } = await generateRoomJoinQrDataUrl(lanClientBaseUrl, roomId)
@@ -87,7 +90,7 @@ io.on("connection", (socket) => {
   )
 
   socket.on("joinRoom", ({ roomId, playerName }: { roomId: string; playerName: string }) => {
-    roomsManager.joinRoomLocal(socket, roomId, playerName)
+    roomsManager.joinRoomLocal(socket, roomId, playerName, socket.data.clientId)
   })
 
   socket.on("leaveRoom", (roomId: string) => {
@@ -113,7 +116,7 @@ io.on("connection", (socket) => {
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
-      if (room.hostId !== socket.id) return // host-only
+      if (room.hostId !== socket.data.clientId) return // host-only
       roomsManager.setPlayerRole(cleanRoomId, playerId, role)
     }
   )
@@ -142,7 +145,7 @@ io.on("connection", (socket) => {
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
-      if (room.hostId !== socket.id && playerId !== socket.id) return
+      if (room.hostId !== socket.data.clientId && playerId !== socket.data.clientId) return
       roomsManager.setPlayerStatus(cleanRoomId, playerId, status)
     }
   )

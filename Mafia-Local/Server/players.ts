@@ -16,6 +16,7 @@ export type PlayerStatus =
 export type Player = {
     id: string // Socket ID
     name: string
+    socketId: string // Current socket ID (can change on reconnect)
     
     // Core Game State
     alive: boolean
@@ -32,6 +33,7 @@ export function createPlayer(id: string, name: string): Player {
     return {
         id,
         name,
+        socketId: id,
         alive: true,
         role: "UNASSIGNED",
         status: "CONNECTED",
@@ -39,30 +41,38 @@ export function createPlayer(id: string, name: string): Player {
     }
 }
 
-// Keep existing state if player already exists (e.g., reconnect / rejoin)
-export function mergePlayerState(existing: Player | undefined, id: string, name: string): Player {
-  if (!existing) return createPlayer(id, name)
-
+// Merges player state when same client rejoins (keeps role/alive/status)
+export const mergePlayerState = (
+  existing: Player | undefined,
+  socketId: string,
+  clientId: string,
+  name: string
+): Player => {
+    // Preserve player's role, status, dead or alive state if this is a reconnect
   return {
-    ...existing,
-    id,
-    name, // allow name updates on rejoin
-    status: "CONNECTED",
+    id: clientId,
+    socketId,
+    name,
+    alive: existing?.alive ?? true,
+    role: existing?.role ?? "CIVILIAN",
+    status: existing?.status ?? "NOT_READY",
+    joinedAt: existing?.joinedAt ?? Date.now(),
   }
 }
 
-export function setAlive(player: Player[], playerId: string, alive: boolean): Player[] {
-    return player.map((p) => (p.id === playerId ? { ...p, alive } : p))
+// Remove by socketId (because disconnect event is for a connection)
+export const removePlayer = (players: Player[], socketId: string): Player[] => {
+  return players.filter((p) => p.socketId !== socketId)
 }
 
-export function setRole(player: Player[], playerId: string, role: PlayerRole): Player[] {
-    return player.map((p) => (p.id === playerId ? { ...p, role } : p))
+export const setAlive = (players: Player[], clientId: string, alive: boolean): Player[] => {
+  return players.map((p) => (p.id === clientId ? { ...p, alive } : p))
 }
 
-export function setStatus(player: Player[], playerId: string, status: PlayerStatus): Player[] {
-    return player.map((p) => (p.id === playerId ? { ...p, status } : p))
+export const setRole = (players: Player[], clientId: string, role: PlayerRole): Player[] => {
+  return players.map((p) => (p.id === clientId ? { ...p, role } : p))
 }
 
-export function removePlayer(players: Player[], playerId: string): Player[] {
-    return players.filter((p) => p.id !== playerId)
+export const setStatus = (players: Player[], clientId: string, status: PlayerStatus): Player[] => {
+  return players.map((p) => (p.id === clientId ? { ...p, status } : p))
 }
