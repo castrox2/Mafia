@@ -276,7 +276,7 @@ const normalizeRoleCount = (
       const room = rooms[roomId]
       if (!room) continue
 
-      room.players = removePlayer(room.players, socket.id)
+      // room.players = removePlayer(room.players, socket.id)
 
       const leavingClientId = String(socket.data.clientId || "")
 
@@ -409,7 +409,7 @@ const updateRoomSettings = (
     socket.join(cleanRoomId)
 
     const existing = room.players.find((p) => p.clientId === clientId) ?? 
-                      room.players.find((p) => p.id === clientId)
+                      room.players.find((p) => p.clientId === clientId)
 
     room.players = room.players.filter((p) => p.clientId !== clientId && p.id !== clientId) // remove old entry if exists
     room.players.push(

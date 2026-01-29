@@ -1,5 +1,10 @@
 import { io, type Socket } from "socket.io-client"
 
+export type ReconnectedPayload = {
+    roomId: string
+    playerName: string
+}
+
 // Stable clientId (persists across refresh / reconnect)
 const STORAGE_KEY = "mafia_client_id"
 
@@ -8,7 +13,10 @@ const getOrCreateClientId = (): string => {
     if (existing) return existing
 
     const id =
-    (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID())
+    (typeof crypto !== "undefined" &&
+        "randomUUID" in crypto &&
+        typeof crypto.randomUUID === "function" &&
+        crypto.randomUUID())
         ? crypto.randomUUID()
         : `client_${Math.random().toString(16).slice(2)}_${Date.now()}`
 
@@ -26,3 +34,27 @@ export const socket: Socket = io(SERVER_URL, {
     auth: { clientId },
     transports: ["websocket", "polling"],
 })
+
+/* ------------------------------------------------------
+            Buffered "reconnected" event
+- Prevents missing the event if server emits immediately
+------------------------------------------------------ */
+
+let lastReconnected: ReconnectedPayload | null = null
+let reconnectedHandlers = new Set<(p: ReconnectedPayload) => void>()
+
+socket.on("reconnected", (p: ReconnectedPayload) => {
+    lastReconnected = p
+    for (const h of reconnectedHandlers) h(p)
+})
+
+export const onReconnected = (handler: (p: ReconnectedPayload) => void) => {
+    reconnectedHandlers.add(handler)
+
+  // If reconnect already happened before React mounted, deliver it immediately
+    if (lastReconnected) handler(lastReconnected)
+
+    return () => {
+        reconnectedHandlers.delete(handler)
+    }
+}

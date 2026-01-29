@@ -71,7 +71,7 @@ export default function Join({ onEnterLobby }: Props) {
         
         socket.on("connect", onConnect)
         socket.on("disconnect", onDisconnect)
-        socket.on("reconnected", onReconnected)
+        // socket.on("reconnected", onReconnected)
         socket.on("connect_error", onConnectError)
         socket.on("roomCreated", onRoomCreated)
         socket.on("roomState", onRoomState)
@@ -86,7 +86,7 @@ export default function Join({ onEnterLobby }: Props) {
         return () => {
             socket.off("connect", onConnect)
             socket.off("disconnect", onDisconnect)
-            socket.off("reconnected", onReconnected)
+            // socket.off("reconnected", onReconnected)
             socket.off("connect_error", onConnectError)
             socket.off("roomCreated", onRoomCreated)
             socket.off("roomState", onRoomState)

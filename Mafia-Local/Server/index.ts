@@ -152,9 +152,15 @@ io.on("connection", (socket) => {
     }
   )
 
-  socket.on("disconnect", () => {
+    socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id)
-    roomsManager.removeFromAllRooms(socket.id)
+
+    // IMPORTANT:
+    // Do NOT hard-remove on disconnect.
+    // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
+    // Cleanup should be handled by:
+    // - explicit leaveRoom (user intent)
+    // - a "disconnect grace period" (optional; can be added later)
   })
 })
 
