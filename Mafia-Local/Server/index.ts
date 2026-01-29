@@ -3,7 +3,7 @@ import http from "http"
 import { Server as SocketIOServer } from "socket.io"
 import { generateRoomCode, generateRoomJoinQrDataUrl } from "./utils/generateRoomCode.js"
 import os from "os"
-import { createRoomsManager } from "./rooms.js"
+import { createRoomsManager, type GameSettings } from "./rooms.js"
 import type { PlayerRole, PlayerStatus } from "./players.js"
 import { createTimersManager } from "./utils/timers.js"
 
@@ -120,7 +120,8 @@ io.on("connection", (socket) => {
 
   socket.on(
     "updateSettings",
-    ({ roomId, settings }: { roomId: string; settings: Partial<any> }) => {
+    ({ roomId, settings }: { roomId: string; settings: Partial<GameSettings> }) => {
+      console.log("DEBUG: updateSettings called", { roomId, settings })
       roomsManager.updateRoomSettings(socket, roomId, settings)
     })
 

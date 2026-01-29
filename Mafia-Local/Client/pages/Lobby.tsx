@@ -81,6 +81,17 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
         <div><strong>You:</strong> {cleanPlayerName}</div>
       </div>
 
+      {/* DEBUG: current room settings from server */}
+      {state?.settings && (
+        <div style={{ marginBottom: 12, fontSize: 12, color: "#444" }}>
+          <div><strong>Settings (server):</strong></div>
+          <div>
+            roles: mafia {state.settings.roleCount.mafia}, doctor {state.settings.roleCount.doctor},
+            detective {state.settings.roleCount.detective}, sheriff {state.settings.roleCount.sheriff}
+          </div>
+        </div>
+      )}
+
         {/* QR code for joining (handy for local play) */}
         {qrDataUrl && state?.hostId === socket.id && (
         <div style={{ marginBottom: 14 }}>
@@ -148,10 +159,13 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
           onClose={() => setSettingsOpen(false)}
           roomState={state}
           onSave={(settings) => {
+            console.log("DEBUG: saving settings", settings)
             socket.emit("updateSettings", {
               roomId: cleanRoomId,
               settings,
             })
+
+            setSettingsOpen(false)
           }}
         />
       )}

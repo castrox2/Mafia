@@ -139,58 +139,88 @@ export const createRoomsManager = (io: SocketIOServer) => {
     }
   }
 
-    /* ------------------------------------------------------
+  /* ------------------------------------------------------
                       Helper: Settings
   ------------------------------------------------------ */
 
   const clampInt = (n: number, min: number, max: number): number => {
+    const x = Number.isFinite(n) ? Math.floor(n) : min
     return Math.min(Math.max(n, min), max)
   }
 
-  const normalizeTimers = (timers: Partial<PhaseTimers> | undefined, current: PhaseTimers): PhaseTimers => ({
-      daySec: clampInt(timers?.daySec ?? current.daySec, 10, 3600),
-      nightSec: clampInt(timers?.nightSec ?? current.nightSec, 10, 3600),
-      voteSec: clampInt(timers?.voteSec ?? current.voteSec, 10, 3600),
-      discussionSec: clampInt(timers?.discussionSec ?? current.discussionSec, 10, 3600),
-      pubDiscussionSec: clampInt(timers?.pubDiscussionSec ?? current.pubDiscussionSec, 10, 3600),
+  const normalizeTimers = (
+    timers: Partial<PhaseTimers> | undefined,
+    current: PhaseTimers
+  ): PhaseTimers => ({
+    daySec: clampInt(timers?.daySec ?? current.daySec, 10, 3600),
+    nightSec: clampInt(timers?.nightSec ?? current.nightSec, 10, 3600),
+    voteSec: clampInt(timers?.voteSec ?? current.voteSec, 10, 3600),
+    discussionSec: clampInt(
+      timers?.discussionSec ?? current.discussionSec,
+      10,
+      3600
+    ),
+    pubDiscussionSec: clampInt(
+      timers?.pubDiscussionSec ?? current.pubDiscussionSec,
+      10,
+      3600
+    ),
   })
 
-  const normalizeRoleCount = (r: Partial<RoleCount> | undefined, current: RoleCount, playerCount: number, bounds: ReturnType<typeof getRoleBounds>): 
-  RoleCount => {
-    // Clamp each role count within bounds
-      let mafia = clampInt(r?.mafia ?? current.mafia, bounds.mafia.min, bounds.mafia.max)
-      let doctor = clampInt(r?.doctor ?? current.doctor, bounds.doctor.min, bounds.doctor.max)
-      let detective = clampInt(r?.detective ?? current.detective, bounds.detective.min, bounds.detective.max)
-      let sheriff = clampInt(r?.sheriff ?? current.sheriff, bounds.sheriff.min, bounds.sheriff.max)
+const normalizeRoleCount = (
+  r: Partial<RoleCount> | undefined,
+  current: RoleCount,
+  playerCount: number,
+  bounds: ReturnType<typeof getRoleBounds>
+): RoleCount => {
+  // Clamp each role count within bounds
+  let mafia = clampInt(r?.mafia ?? current.mafia, bounds.mafia.min, bounds.mafia.max)
+  let doctor = clampInt(r?.doctor ?? current.doctor, bounds.doctor.min, bounds.doctor.max)
+  let detective = clampInt(r?.detective ?? current.detective, bounds.detective.min, bounds.detective.max)
+  let sheriff = clampInt(r?.sheriff ?? current.sheriff, bounds.sheriff.min, bounds.sheriff.max)
 
-      // Ensure total roles do not exceed player count
-      // If they do, reduce each role proportionally
+  // Always Enforce at least 1 Mafia
+  mafia = Math.max(mafia, bounds.mafia.min)
 
-      const total = () => mafia + doctor + detective + sheriff
-      while (total() > playerCount) {
-        if (sheriff > bounds.sheriff.min) sheriff--
-        else if (detective > bounds.detective.min) detective--
-        else if (doctor > bounds.doctor.min) doctor--
-        else if (mafia > bounds.mafia.min) mafia--
-        else break
-      }
+  // Ensure total roles do not exceed player count
+  // If they do, reduce each role proportionally
+  const total = () => mafia + doctor + detective + sheriff
 
-      // Always Enforce at least 1 Mafia
-      mafia: Math.max(mafia, 1)
-
-      return { mafia, doctor, detective, sheriff }
+  while (total() > playerCount) {
+    // Reduce non-mafia first (so mafia doesn't get "mysteriously" lowered)
+    if (sheriff > bounds.sheriff.min) sheriff--
+    else if (detective > bounds.detective.min) detective--
+    else if (doctor > bounds.doctor.min) doctor--
+    else if (mafia > bounds.mafia.min) mafia--
+    else break
   }
+
+  // Re-enforce after reductions (just in case)
+  mafia = Math.max(mafia, bounds.mafia.min)
+
+  // If enforcing mafia pushed us over playerCount again, trim non-mafia again
+  while (total() > playerCount) {
+    if (sheriff > bounds.sheriff.min) sheriff--
+    else if (detective > bounds.detective.min) detective--
+    else if (doctor > bounds.doctor.min) doctor--
+    else break
+  }
+
+  return { mafia, doctor, detective, sheriff }
+}
+
 
   /* ------------------------------------------------------
                 Helper: broadcast room state
   ------------------------------------------------------ */
 
   const emitRoomState = (roomId: string) => {
-    const room = rooms[roomId]
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
     if (!room) return
 
-    io.to(roomId).emit("roomState", {
-      roomId,
+    io.to(cleanRoomId).emit("roomState", {
+      roomId: cleanRoomId,
       hostId: room.hostId,
       players: room.players,
       settings: room.settings,
@@ -294,6 +324,45 @@ export const createRoomsManager = (io: SocketIOServer) => {
                 Host Settings Update Live
   ------------------------------------------------------ */
 
+const updateRoomSettings = (
+  socket: Socket,
+  roomId: string,
+  settings: Partial<GameSettings>
+) => {
+  const cleanRoomId = normalizeRoomId(roomId)
+  const room = rooms[cleanRoomId]
+  if (!room) return
+
+  // Host-only
+  if (room.hostId !== socket.id) {
+    socket.emit("settingsRefused", { reason: "Only the host can update settings." })
+    return
+  }
+
+  const playerCount = room.players.length
+  const bounds = getRoleBounds(playerCount)
+
+  console.log("DEBUG: updateRoomSettings incoming", { cleanRoomId, playerCount, settings })
+  console.log("DEBUG: bounds", bounds)
+  console.log("DEBUG: current roleCount", room.settings.roleCount)
+
+  const next: GameSettings = {
+    timers: normalizeTimers(settings.timers, room.settings.timers),
+    roleCount: normalizeRoleCount(
+      settings.roleCount,
+      room.settings.roleCount,
+      playerCount,
+      bounds
+    ),
+  }
+
+  console.log("DEBUG: next roleCount", next.roleCount)
+
+  room.settings = next
+  emitRoomState(cleanRoomId)
+}
+
+
   /* ------------------------------------------------------
                         Join Room
   ------------------------------------------------------ */
@@ -394,30 +463,6 @@ export const createRoomsManager = (io: SocketIOServer) => {
     if (!room) return
     room.players = setStatusList(room.players, playerId, status)
     emitRoomState(roomId)
-  }
-
-    const updateRoomSettings = ( socket: Socket, roomId: string, settings: Partial<GameSettings> ) => {
-    const cleanRoomId = normalizeRoomId(roomId)
-    const room = rooms[cleanRoomId]
-    if (!room) return
-
-    // Host-only
-    if (room.hostId !== socket.id) {
-      socket.emit("settingsRefused", { reason: "Only the host can update settings." })
-      return
-    }
-
-    const playerCount = room.players.length
-    const bounds = getRoleBounds(playerCount)
-    if (!bounds) return
-
-    const next: GameSettings = {
-      timers: normalizeTimers(settings.timers, room.settings.timers),
-      roleCount: normalizeRoleCount(settings.roleCount, room.settings.roleCount, playerCount, bounds),
-    }
-
-    room.settings = next
-    emitRoomState(cleanRoomId)
   }
 
   /* ------------------------------------------------------

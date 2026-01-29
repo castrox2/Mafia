@@ -11,25 +11,65 @@ type Props = {
 export default function HostSettingsModal({ open, roomState, onClose, onSave }: Props) {
   const s = roomState.settings
 
-  const [daySec, setDaySec] = useState(s?.timers?.daySec ?? 60)
-  const [voteSec, setVoteSec] = useState(s?.timers?.voteSec ?? 30)
-  const [nightSec, setNightSec] = useState(s?.timers?.nightSec ?? 45)
-  const [discussionSec, setDiscussionSec] = useState(s?.timers?.discussionSec ?? 60)
-  const [pubDiscussionSec, setPubDiscussionSec] = useState(s?.timers?.pubDiscussionSec ?? 30)
+  // Local draft state (only saved when clicking "Save Settings")
+  const [daySec, setDaySec] = useState(60)
+  const [voteSec, setVoteSec] = useState(30)
+  const [nightSec, setNightSec] = useState(45)
+  const [discussionSec, setDiscussionSec] = useState(60)
+  const [pubDiscussionSec, setPubDiscussionSec] = useState(30)
 
-  const [mafia, setMafia] = useState(s?.roles?.mafia ?? 1)
-  const [doctor, setDoctor] = useState(s?.roles?.doctor ?? 0)
-  const [detective, setDetective] = useState(s?.roles?.detective ?? 0)
-  const [sheriff, setSheriff] = useState(s?.roles?.sheriff ?? 0)
+  const [mafia, setMafia] = useState(1)
+  const [doctor, setDoctor] = useState(0)
+  const [detective, setDetective] = useState(0)
+  const [sheriff, setSheriff] = useState(0)
 
-  
-const handleSave = () => {
-    onSave({
-        timers: { daySec, voteSec, nightSec, discussionSec, pubDiscussionSec, },
-        roleCount: { mafia, doctor, detective, sheriff }, // roleCount ** NOT ROLES **
+  // When the modal OPENS, reset draft values to the latest server values
+  useEffect(() => {
+    if (!open) return
+
+    setDaySec(s?.timers?.daySec ?? 60)
+    setVoteSec(s?.timers?.voteSec ?? 30)
+    setNightSec(s?.timers?.nightSec ?? 45)
+    setDiscussionSec(s?.timers?.discussionSec ?? 60)
+    setPubDiscussionSec(s?.timers?.pubDiscussionSec ?? 30)
+
+    // IMPORTANT: roomState.settings uses roleCount (not roles)
+    setMafia(s?.roleCount?.mafia ?? 1)
+    setDoctor(s?.roleCount?.doctor ?? 0)
+    setDetective(s?.roleCount?.detective ?? 0)
+    setSheriff(s?.roleCount?.sheriff ?? 0)
+  }, [open]) // intentionally only reset when opening
+
+  const handleSave = () => {
+    console.log("DEBUG: saving host settings", {
+      timers: { daySec, voteSec, nightSec, discussionSec, pubDiscussionSec },
+      roleCount: { mafia, doctor, detective, sheriff },
     })
+
+    onSave({
+      timers: { daySec, voteSec, nightSec, discussionSec, pubDiscussionSec },
+      roleCount: { mafia, doctor, detective, sheriff }, // roleCount ✅
+    })
+
     onClose()
-}
+  }
+
+    const discardAndClose = () => {
+    console.log("DEBUG: discarding host settings changes")
+    // Discard draft by resetting to server values
+    setDaySec(s?.timers?.daySec ?? 60)
+    setVoteSec(s?.timers?.voteSec ?? 30)
+    setNightSec(s?.timers?.nightSec ?? 45)
+    setDiscussionSec(s?.timers?.discussionSec ?? 60)
+    setPubDiscussionSec(s?.timers?.pubDiscussionSec ?? 30)
+
+    setMafia(s?.roleCount?.mafia ?? 1)
+    setDoctor(s?.roleCount?.doctor ?? 0)
+    setDetective(s?.roleCount?.detective ?? 0)
+    setSheriff(s?.roleCount?.sheriff ?? 0)
+
+    onClose()
+  }
 
 
   const playerCount = roomState.players.length
@@ -43,8 +83,8 @@ const handleSave = () => {
   return (
     <div
       onMouseDown={(e) => {
-        // click outside closes
-        if (e.target === e.currentTarget) onClose()
+        // click outside closes (discard changes)
+        if (e.target === e.currentTarget) discardAndClose()
       }}
       style={{
         position: "fixed",
@@ -69,7 +109,7 @@ const handleSave = () => {
       >
         {/* X close */}
         <button
-          onClick={onClose}
+          onClick={discardAndClose}
           style={{
             position: "absolute",
             top: 10,
@@ -130,6 +170,30 @@ const handleSave = () => {
                 style={{ marginLeft: 8, width: 100 }}
               />
             </label>
+
+            <label style={{ display: "block", marginBottom: 8 }}>
+              Discussion:
+              <input
+                type="number"
+                value={discussionSec}
+                min={5}
+                max={600}
+                onChange={(e) => setDiscussionSec(Number(e.target.value))}
+                style={{ marginLeft: 8, width: 100 }}
+              />
+            </label>
+
+            <label style={{ display: "block", marginBottom: 8 }}>
+              Public Discussion:
+              <input
+                type="number"
+                value={pubDiscussionSec}
+                min={5}
+                max={600}
+                onChange={(e) => setPubDiscussionSec(Number(e.target.value))}
+                style={{ marginLeft: 8, width: 100 }}
+              />
+            </label>
           </div>
 
           <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
@@ -178,18 +242,14 @@ const handleSave = () => {
                 style={{ marginLeft: 8, width: 100 }}
               />
             </label>
-
           </div>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
-          <button onClick={onClose} style={{ padding: "10px 12px" }}>
+          <button onClick={discardAndClose} style={{ padding: "10px 12px" }}>
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            style={{ padding: "10px 12px", fontWeight: 700 }}
-          >
+          <button onClick={handleSave} style={{ padding: "10px 12px", fontWeight: 700 }}>
             Save Settings
           </button>
         </div>
