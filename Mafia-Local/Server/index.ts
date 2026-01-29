@@ -62,6 +62,8 @@ io.on("connection", (socket) => {
   // Stable client id from browser/electron (persists across refresh/reconnect)
   const clientId = String((socket.handshake as any).auth?.clientId || "").trim()
   socket.data.clientId = clientId || socket.id // fallback (shouldn't happen, but keeps dev moving)
+  roomsManager.handleReconnect(socket, clientId)
+
   socket.on("disconnecting", () => {
     roomsManager.handleDisconnecting(socket)
   })
@@ -145,7 +147,7 @@ io.on("connection", (socket) => {
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
-      if (room.hostId !== socket.data.clientId && playerId !== socket.data.clientId) return
+      if (room.hostId !== socket.data.clientId && playerId !== clientId) return
       roomsManager.setPlayerStatus(cleanRoomId, playerId, status)
     }
   )

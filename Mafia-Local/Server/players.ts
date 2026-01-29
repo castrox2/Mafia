@@ -10,13 +10,13 @@ export type PlayerRole=
 export type PlayerStatus =
     | "DISCONNECTED"
     | "CONNECTED"
-    | "NOT_READY" // Checks if player is ready to start 
+    | "NOT READY" // Checks if player is ready to start 
     | "RADY" // not if dead or alive
 
 export type Player = {
     id: string // Socket ID
     name: string
-    socketId: string // Current socket ID (can change on reconnect)
+    clientId: string // Stable client ID (persists across reconnects)
     
     // Core Game State
     alive: boolean
@@ -33,7 +33,7 @@ export function createPlayer(id: string, name: string): Player {
     return {
         id,
         name,
-        socketId: id,
+        clientId: id,
         alive: true,
         role: "UNASSIGNED",
         status: "CONNECTED",
@@ -48,21 +48,23 @@ export const mergePlayerState = (
   clientId: string,
   name: string
 ): Player => {
+    const now = Date.now()
+
     // Preserve player's role, status, dead or alive state if this is a reconnect
   return {
-    id: clientId,
-    socketId,
+    id: socketId,
+    clientId,
     name,
     alive: existing?.alive ?? true,
     role: existing?.role ?? "CIVILIAN",
-    status: existing?.status ?? "NOT_READY",
-    joinedAt: existing?.joinedAt ?? Date.now(),
+    status: existing?.status ?? "NOT READY",
+    joinedAt: existing?.joinedAt ?? now,
   }
 }
 
 // Remove by socketId (because disconnect event is for a connection)
 export const removePlayer = (players: Player[], socketId: string): Player[] => {
-  return players.filter((p) => p.socketId !== socketId)
+  return players.filter((p) => p.clientId !== socketId)
 }
 
 export const setAlive = (players: Player[], clientId: string, alive: boolean): Player[] => {

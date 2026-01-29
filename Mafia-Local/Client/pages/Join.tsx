@@ -29,6 +29,11 @@ export default function Join({ onEnterLobby }: Props) {
             setStatus(`Disconnected from server: ${reason}`)
         }
 
+        const onReconnected = ({ roomId, playerName }: { roomId: string, playerName: string }) => {
+            setStatus(`Reconnected to room ${roomId} as ${playerName}`)
+            onEnterLobby(roomId, playerName, "", "")
+        }
+
         const onConnectError = (error: Error) => {
             console.log(`Connection error: ${error.message}`)
             setStatus(`Connection error: ${error.message}`)
@@ -66,6 +71,7 @@ export default function Join({ onEnterLobby }: Props) {
         
         socket.on("connect", onConnect)
         socket.on("disconnect", onDisconnect)
+        socket.on("reconnected", onReconnected)
         socket.on("connect_error", onConnectError)
         socket.on("roomCreated", onRoomCreated)
         socket.on("roomState", onRoomState)
@@ -80,6 +86,7 @@ export default function Join({ onEnterLobby }: Props) {
         return () => {
             socket.off("connect", onConnect)
             socket.off("disconnect", onDisconnect)
+            socket.off("reconnected", onReconnected)
             socket.off("connect_error", onConnectError)
             socket.off("roomCreated", onRoomCreated)
             socket.off("roomState", onRoomState)

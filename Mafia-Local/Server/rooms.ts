@@ -145,7 +145,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
   const clampInt = (n: number, min: number, max: number): number => {
     const x = Number.isFinite(n) ? Math.floor(n) : min
-    return Math.min(Math.max(n, min), max)
+    return Math.min(Math.max(x, min), max)
   }
 
   const normalizeTimers = (
@@ -228,12 +228,14 @@ const normalizeRoleCount = (
     })
   }
 
-  /* ------------------------------------------------------
-          Helper: removes socket from all rooms
+    /* ------------------------------------------------------
+          Helper: removes clientId from all rooms
   ------------------------------------------------------ */
 
-  const removeFromAllRooms = (socketId: string, skipRoomId?: string) => {
+  const removeFromAllRooms = (clientId: string, skipRoomId?: string) => {
     const skip = skipRoomId ? normalizeRoomId(skipRoomId) : undefined
+    const cleanClientId = (clientId || "").trim()
+    if (!cleanClientId) return
 
     for (const roomId of Object.keys(rooms)) {
       if (skip && roomId === skip) continue
@@ -243,15 +245,15 @@ const normalizeRoleCount = (
 
       const before = room.players.length
 
-      room.players = removePlayer(room.players, socketId)
+      // remove any player with same clientId
+      room.players = room.players.filter((p) => p.clientId !== cleanClientId)
 
       // If host leaves, assign new host
-      if (room.hostId === socketId) {
-        room.hostId = room.players[0]?.id ?? ""
+      if (room.hostId === cleanClientId) {
+        room.hostId = room.players[0]?.clientId ?? ""
       }
 
       if (before !== room.players.length) {
-        // If room is now empty, delete it
         if (room.players.length === 0) {
           delete rooms[roomId]
           io.to(roomId).emit("roomClosed", { roomId })
@@ -261,6 +263,7 @@ const normalizeRoleCount = (
       }
     }
   }
+
 
   /* ------------------------------------------------------
                 Socket lifecycle cleanup
@@ -279,7 +282,7 @@ const normalizeRoleCount = (
 
       // Transfer host if needed
       if (room.hostId === leavingClientId) {
-        room.hostId = room.players[0]?.id ?? ""
+        room.hostId = room.players[0]?.clientId ?? ""
       }
 
       if (room.players.length === 0) {
@@ -317,7 +320,7 @@ const normalizeRoleCount = (
     socket.join(cleanRoomId)
 
     rooms[cleanRoomId].players.push(
-      mergePlayerState(undefined, socket.id, clientId, cleanName)
+      mergePlayerState(undefined, socket.id, cleanName, clientId)
     )
 
     emitRoomState(cleanRoomId)
@@ -405,10 +408,12 @@ const updateRoomSettings = (
 
     socket.join(cleanRoomId)
 
-    const existing = room.players.find((p) => p.id === clientId)
-    room.players = room.players.filter((p) => p.id !== clientId) // remove old entry if exists
+    const existing = room.players.find((p) => p.clientId === clientId) ?? 
+                      room.players.find((p) => p.id === clientId)
+
+    room.players = room.players.filter((p) => p.clientId !== clientId && p.id !== clientId) // remove old entry if exists
     room.players.push(
-      mergePlayerState(existing, socket.id, clientId, cleanName) // re-add with updated socketId + name
+      mergePlayerState(existing, socket.id, cleanName, clientId) // re-add with updated socketId + name
     )
 
     emitRoomState(cleanRoomId)
@@ -425,10 +430,10 @@ const updateRoomSettings = (
     const room = rooms[cleanRoomId]
     if (!room) return
 
-    room.players = removePlayer(room.players, socket.id)
+    room.players = room.players.filter((p) => p.clientId !== socket.data.clientId)
 
-    if (room.hostId === socket.id) {
-      room.hostId = room.players[0]?.id ?? ""
+    if (room.hostId === socket.data.clientId) {
+      room.hostId = room.players[0]?.clientId ?? ""
     }
 
     if (room.players.length === 0) {
@@ -439,6 +444,45 @@ const updateRoomSettings = (
 
     emitRoomState(cleanRoomId)
   }
+
+    /* ------------------------------------------------------
+                  Reconnect handling
+      - If client reconnects, restore them to their room
+      - Prevent duplicates by matching clientId
+  ------------------------------------------------------ */
+  const handleReconnect = (socket: Socket, clientId: string) => {
+  const cleanClientId = (clientId || "").trim()
+  if (!cleanClientId) return
+
+  for (const roomId of Object.keys(rooms)) {
+    const room = rooms[roomId]
+    if (!room) continue
+
+    const idx = room.players.findIndex((p) => p.clientId === cleanClientId)
+    if (idx === -1) continue
+
+    // Grab the existing player first (prevents "possibly undefined" + keeps required fields)
+    const existingPlayer = room.players[idx]
+    if (!existingPlayer) continue
+
+    // Update socket id
+    room.players[idx] = { ...existingPlayer, id: socket.id }
+
+    // Re-join socket.io room
+    socket.join(roomId)
+
+    // Notify client UI that it was restored
+    socket.emit("reconnected", {
+      roomId,
+      playerName: existingPlayer.name,
+    })
+
+    // Broadcast updated room state
+    emitRoomState(roomId)
+    return
+  }
+}
+
 
   /* ------------------------------------------------------
         Player State Mutations (server-authoritative)
@@ -485,5 +529,6 @@ const updateRoomSettings = (
     setPlayerRole,
     setPlayerStatus,
     updateRoomSettings,
+    handleReconnect,
   }
 }
