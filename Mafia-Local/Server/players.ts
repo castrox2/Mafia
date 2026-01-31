@@ -11,7 +11,7 @@ export type PlayerStatus =
     | "DISCONNECTED"
     | "CONNECTED"
     | "NOT_READY" // Checks if player is ready to start 
-    | "RADY" // not if dead or alive
+    | "READY" // not if dead or alive
 
 export type Player = {
     id: string // Socket ID
@@ -23,6 +23,7 @@ export type Player = {
 
     // General Status
     status: PlayerStatus
+    voteCount: number 
 
     // Optioanl metadata
     joinedAt: number // timestamp for when player joined
@@ -33,8 +34,9 @@ export function createPlayer(id: string, name: string): Player {
         id,
         name,
         alive: true,
-        role: "UNASSIGNED",
+        role: "CIVILIAN",
         status: "CONNECTED",
+        voteCount: 0,
         joinedAt: Date.now(),
     }
 }
