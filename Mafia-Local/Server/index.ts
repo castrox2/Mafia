@@ -156,6 +156,10 @@ io.on("connection", (socket) => {
     }
   )
 
+  socket.on("requestRoomState", ({ roomId }: { roomId: string }) => {
+    roomsManager.emitRoomState(roomId)
+  })
+
     socket.on("startGame", ({ roomId }: { roomId: string }) => {
     roomsManager.startGameLocal(socket, roomId, { force: false })
   })
@@ -170,7 +174,6 @@ io.on("connection", (socket) => {
       roomsManager.kickPlayerLocal(socket, roomId, targetClientId)
     }
   )
-
 
     socket.on("disconnect", () => {
       console.log("Client disconnected:", socket.id)
