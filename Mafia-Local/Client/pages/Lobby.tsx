@@ -32,14 +32,20 @@ export default function Lobby({
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
 
   const isHost = state?.hostId === clientId
-  const allReady =
-    (state?.players ?? []).length > 0 &&
-    (state?.players ?? []).every((p) => p.status === "READY")
+  const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
+  const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
 
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
       setState(s)
       setStatus(`In room: ${s.roomId}${clientId === s.hostId ? " (Host) " : ""}`)
+
+      // IMPORTANT:
+      // If a player joins while a game is already running, they will land in Lobby first.
+      // Auto-switch to Game screen once we learn gameStarted=true from roomState.
+      if (s.gameStarted) {
+        onEnterGame()
+      }
     }
 
     const onRoomClosed = ({ roomId: closedRoomId }: { roomId: string }) => {
@@ -230,9 +236,7 @@ export default function Lobby({
               {hostTag}
               {deadTag}
               {" — "}
-              role: {p.role}
-              {" — "}
-              status: {p.status}
+              Status: {p.status}
               {isHost &&
                 p.clientId !== state?.hostId &&
                 p.clientId !== clientId && (

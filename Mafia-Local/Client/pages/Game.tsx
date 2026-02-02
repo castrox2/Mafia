@@ -51,15 +51,16 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         onExit()
     }
 
-    // Ask server to re-send the current state (safe: does not re-join)
-    if (cleanRoomId) {
-        socket.emit("requestRoomState", { roomId: cleanRoomId })
-    }
 
 
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("kicked", onKicked)
+
+    // Ask server to re-send the current state (safe: does not re-join)
+    if (cleanRoomId) {
+        socket.emit("requestRoomState", { roomId: cleanRoomId })
+    }
 
     // IMPORTANT:
     // Do NOT auto-emit joinRoom here.
@@ -82,6 +83,9 @@ export default function Game({ roomId, playerName, onExit }: Props) {
     }
 
     const isHost = state?.hostId === clientId
+    const me = state?.players?.find((p) => p.clientId === clientId) ?? null
+    const amSpectator = me?.isSpectator === true
+
 
     return (
     <div style={{ padding: 20, maxWidth: 900, fontFamily: "sans-serif" }}>
@@ -94,6 +98,7 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         <div>
             <strong>You:</strong> {cleanPlayerName}
             {isHost ? " (HOST)" : ""}
+            {amSpectator ? " (SPECTATOR)" : ""}
         </div>
         </div>
 
@@ -123,22 +128,26 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         </div>
 
       {/* Simple player list (still useful during development) */}
-        <h3>Players:</h3>
-        <ul style={{ paddingLeft: 18 }}>
-        {(state?.players ?? []).map((p) => {
-            const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
-            const deadTag = p.alive ? "" : " (dead)"
-            return (
-            <li key={p.clientId} style={{ marginBottom: 6 }}>
-                {p.name}
-                {hostTag}
-                {deadTag}
-                {" — "}
-                status: {p.status}
-            </li>
-            )
-        })}
-        </ul>
+        {!amSpectator && (
+            <>
+                <h3>Players:</h3>
+                <ul style={{ paddingLeft: 18 }}>
+                {(state?.players ?? []).map((p) => {
+                    const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
+                    const deadTag = p.alive ? "" : " (dead)"
+                    return (
+                    <li key={p.clientId} style={{ marginBottom: 6 }}>
+                        {p.name}
+                        {hostTag}
+                        {deadTag}
+                        {" — "}
+                        status: {p.status}
+                    </li>
+                    )
+                })}
+                </ul>
+            </>
+        )}
     </div>
     )
 }

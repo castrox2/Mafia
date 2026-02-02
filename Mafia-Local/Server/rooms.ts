@@ -177,48 +177,47 @@ export const createRoomsManager = (io: SocketIOServer) => {
     ),
   })
 
-const normalizeRoleCount = (
-  r: Partial<RoleCount> | undefined,
-  current: RoleCount,
-  playerCount: number,
-  bounds: ReturnType<typeof getRoleBounds>
-): RoleCount => {
-  // Clamp each role count within bounds
-  let mafia = clampInt(r?.mafia ?? current.mafia, bounds.mafia.min, bounds.mafia.max)
-  let doctor = clampInt(r?.doctor ?? current.doctor, bounds.doctor.min, bounds.doctor.max)
-  let detective = clampInt(r?.detective ?? current.detective, bounds.detective.min, bounds.detective.max)
-  let sheriff = clampInt(r?.sheriff ?? current.sheriff, bounds.sheriff.min, bounds.sheriff.max)
+  const normalizeRoleCount = (
+    r: Partial<RoleCount> | undefined,
+    current: RoleCount,
+    playerCount: number,
+    bounds: ReturnType<typeof getRoleBounds>
+  ): RoleCount => {
+    // Clamp each role count within bounds
+    let mafia = clampInt(r?.mafia ?? current.mafia, bounds.mafia.min, bounds.mafia.max)
+    let doctor = clampInt(r?.doctor ?? current.doctor, bounds.doctor.min, bounds.doctor.max)
+    let detective = clampInt(r?.detective ?? current.detective, bounds.detective.min, bounds.detective.max)
+    let sheriff = clampInt(r?.sheriff ?? current.sheriff, bounds.sheriff.min, bounds.sheriff.max)
 
-  // Always Enforce at least 1 Mafia
-  mafia = Math.max(mafia, bounds.mafia.min)
+    // Always Enforce at least 1 Mafia
+    mafia = Math.max(mafia, bounds.mafia.min)
 
-  // Ensure total roles do not exceed player count
-  // If they do, reduce each role proportionally
-  const total = () => mafia + doctor + detective + sheriff
+    // Ensure total roles do not exceed player count
+    // If they do, reduce each role proportionally
+    const total = () => mafia + doctor + detective + sheriff
 
-  while (total() > playerCount) {
-    // Reduce non-mafia first (so mafia doesn't get "mysteriously" lowered)
-    if (sheriff > bounds.sheriff.min) sheriff--
-    else if (detective > bounds.detective.min) detective--
-    else if (doctor > bounds.doctor.min) doctor--
-    else if (mafia > bounds.mafia.min) mafia--
-    else break
+    while (total() > playerCount) {
+      // Reduce non-mafia first (so mafia doesn't get "mysteriously" lowered)
+      if (sheriff > bounds.sheriff.min) sheriff--
+      else if (detective > bounds.detective.min) detective--
+      else if (doctor > bounds.doctor.min) doctor--
+      else if (mafia > bounds.mafia.min) mafia--
+      else break
+    }
+
+    // Re-enforce after reductions (just in case)
+    mafia = Math.max(mafia, bounds.mafia.min)
+
+    // If enforcing mafia pushed us over playerCount again, trim non-mafia again
+    while (total() > playerCount) {
+      if (sheriff > bounds.sheriff.min) sheriff--
+      else if (detective > bounds.detective.min) detective--
+      else if (doctor > bounds.doctor.min) doctor--
+      else break
+    }
+
+    return { mafia, doctor, detective, sheriff }
   }
-
-  // Re-enforce after reductions (just in case)
-  mafia = Math.max(mafia, bounds.mafia.min)
-
-  // If enforcing mafia pushed us over playerCount again, trim non-mafia again
-  while (total() > playerCount) {
-    if (sheriff > bounds.sheriff.min) sheriff--
-    else if (detective > bounds.detective.min) detective--
-    else if (doctor > bounds.doctor.min) doctor--
-    else break
-  }
-
-  return { mafia, doctor, detective, sheriff }
-}
-
 
   /* ------------------------------------------------------
                 Helper: broadcast room state
@@ -245,7 +244,15 @@ const normalizeRoleCount = (
     io.to(cleanRoomId).emit("roomState", {
       roomId: cleanRoomId,
       hostId: room.hostId,
-      players: room.players,
+
+      // IMPORTANT (anti-spoiler):
+      // Never broadcast real roles in roomState during a running game.
+      // Roles should be sent privately to each player later (separate event).
+      players: room.players.map((p) => ({
+        ...p,
+        role: room.gameStarted ? "UNASSIGNED" : p.role,
+      })),
+
       settings: room.settings,
       roleBounds: getRoleBounds(room.players.length),
       gameStarted: room.gameStarted,
@@ -481,17 +488,23 @@ const updateRoomSettings = (
       return
     }
 
+    const shouldSpectate = room.gameStarted === true
+
     removeFromAllRooms(clientId, cleanRoomId)
 
     socket.join(cleanRoomId)
 
     const existing = room.players.find((p) => p.clientId === clientId) ?? 
                       room.players.find((p) => p.clientId === clientId)
+    
+    const merged = mergePlayerState(existing, socket.id, clientId, cleanName)
+
+    // makes it so that Reconnects keep their prior spectator status
+    const nextPlayer = existing ?
+    merged : { ...merged, isSpectator: shouldSpectate }
 
     room.players = room.players.filter((p) => p.clientId !== clientId && p.id !== clientId) // remove old entry if exists
-    room.players.push(
-      mergePlayerState(existing, socket.id, clientId, cleanName) // re-add with updated socketId + name
-    )
+    room.players.push(nextPlayer)
 
     emitRoomState(cleanRoomId)
   }
@@ -523,7 +536,7 @@ const updateRoomSettings = (
   }
 
   /* ------------------------------------------------------
-                    Start Game (host-only)
+              Start Game (host-only)
       - Normal start: requires all players READY
       - Force start: host can start anytime
       - Does NOT assign roles (handled later)
@@ -556,6 +569,20 @@ const updateRoomSettings = (
         return
       }
     }
+
+        // Convert spectators into active players ONLY at new game boundary.
+    room.players = room.players.map((p) =>
+      p.isSpectator
+        ? {
+            ...p,
+            isSpectator: false,
+            alive: true,
+            status: "NOT READY",
+            // Do NOT assign role here; role assignment is handled later.
+            role: "UNASSIGNED",
+          }
+        : p
+    )
 
     room.gameStarted = true
     room.gameNumber += 1
@@ -617,8 +644,6 @@ const updateRoomSettings = (
       s.emit("kicked", { roomId: cleanRoomId, reason: "You were kicked by the host." })
     }
   }
-
-
 
     /* ------------------------------------------------------
                   Reconnect handling

@@ -18,6 +18,7 @@ export type Player = {
     alive: boolean
     role: PlayerRole
     status: PlayerStatus
+    isSpectator: boolean // True if player joins mid-game (duh tf)
     joinedAt: number // timestamp for when player joined
 }
 
