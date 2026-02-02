@@ -26,6 +26,11 @@ export type RoomState = {
     hostId: string
     players: Player[]
     settings: GameSettings
+    phase: "DAY" | "NIGHT" | "VOTE" | "DISCUSSION" | "PUB_DISCUSSION"
+    phaseEndTime: number | null
+    gameStarted: boolean
+    gameNumber: number
+
 }
 
 export type PhaseTimers = {

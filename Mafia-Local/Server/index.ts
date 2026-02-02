@@ -156,6 +156,22 @@ io.on("connection", (socket) => {
     }
   )
 
+    socket.on("startGame", ({ roomId }: { roomId: string }) => {
+    roomsManager.startGameLocal(socket, roomId, { force: false })
+  })
+
+  socket.on("forceStartGame", ({ roomId }: { roomId: string }) => {
+    roomsManager.startGameLocal(socket, roomId, { force: true })
+  })
+
+  socket.on(
+    "kickPlayer",
+    ({ roomId, targetClientId }: { roomId: string; targetClientId: string }) => {
+      roomsManager.kickPlayerLocal(socket, roomId, targetClientId)
+    }
+  )
+
+
     socket.on("disconnect", () => {
       console.log("Client disconnected:", socket.id)
 

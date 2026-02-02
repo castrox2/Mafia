@@ -30,6 +30,8 @@ export type RoleCount = {
   sheriff: number
 }
 
+export type Phase = "LOBBY" | "DAY" | "NIGHT" | "VOTE" | "DISCUSSION" | "PUB_DISCUSSION"
+
 export type GameSettings = {
   timers: PhaseTimers
   roleCount: RoleCount
@@ -39,6 +41,14 @@ type Room = {
   hostId: string
   players: Player[]
   settings: GameSettings
+
+  // Game State
+  gameStarted: boolean
+  gameNumber: number
+
+  // Current Phase
+  phase: Phase
+  phaseEndTime: number | null // timestamp ms
 }
 
 /* ======================================================
@@ -238,8 +248,57 @@ const normalizeRoleCount = (
       players: room.players,
       settings: room.settings,
       roleBounds: getRoleBounds(room.players.length),
+      gameStarted: room.gameStarted,
+      gameNumber: room.gameNumber,
+      phase: room.phase,
+      phaseEndTime: room.phaseEndTime,
     })
   }
+
+    const getPhaseDurationSec = (room: Room, phase: Phase): number => {
+    if (phase === "DAY") return room.settings.timers.daySec
+    if (phase === "NIGHT") return room.settings.timers.nightSec
+    if (phase === "VOTE") return room.settings.timers.voteSec
+    if (phase === "DISCUSSION") return room.settings.timers.discussionSec
+    if (phase === "PUB_DISCUSSION") return room.settings.timers.pubDiscussionSec
+    return 0
+  }
+
+  const nextPhase = (phase: Phase): Phase => {
+    // simple loop for now
+    if (phase === "LOBBY") return "DAY"
+    if (phase === "DAY") return "NIGHT"
+    if (phase === "NIGHT") return "VOTE"
+    if (phase === "VOTE") return "DAY"
+    return "DISCUSSION"
+  }
+
+  const startPhase = (roomId: string, phase: Phase) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    room.phase = phase
+    const sec = getPhaseDurationSec(room, phase)
+    room.phaseEndTime = sec > 0 ? Date.now() + sec * 1000 : null
+
+    emitRoomState(cleanRoomId)
+
+    // Schedule the next transition (server authoritative)
+    if (room.phaseEndTime) {
+      setTimeout(() => {
+        const r = rooms[cleanRoomId]
+        if (!r) return
+        if (!r.gameStarted) return
+
+        // If phase changed manually or game ended, do nothing
+        if (r.phase !== phase) return
+
+        startPhase(cleanRoomId, nextPhase(phase))
+      }, sec * 1000)
+    }
+  }
+
 
     /* ------------------------------------------------------
           Helper: removes clientId from all rooms
@@ -326,6 +385,11 @@ const normalizeRoleCount = (
       hostId: clientId, // Host is stable identity
       players: [],
       settings: defaultSettings(),
+
+      gameStarted: false,
+      gameNumber: 0,
+      phase: "LOBBY",
+      phaseEndTime: null,
     }
 
     removeFromAllRooms(clientId, cleanRoomId)
@@ -458,6 +522,104 @@ const updateRoomSettings = (
     emitRoomState(cleanRoomId)
   }
 
+  /* ------------------------------------------------------
+                    Start Game (host-only)
+      - Normal start: requires all players READY
+      - Force start: host can start anytime
+      - Does NOT assign roles (handled later)
+  ------------------------------------------------------ */
+
+  const startGameLocal = (
+    socket: Socket,
+    roomId: string,
+    opts: { force: boolean }
+  ) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    // Host-only
+    if (room.hostId !== socket.data.clientId) {
+      socket.emit("startRefused", { reason: "Only the host can start the game." })
+      return
+    }
+
+    if (room.gameStarted) {
+      socket.emit("startRefused", { reason: "Game already started." })
+      return
+    }
+
+    if (!opts.force) {
+      const allReady = room.players.length > 0 && room.players.every((p) => p.status === "READY")
+      if (!allReady) {
+        socket.emit("startRefused", { reason: "All players must be READY to start." })
+        return
+      }
+    }
+
+    room.gameStarted = true
+    room.gameNumber += 1
+
+    startPhase(cleanRoomId, "DISCUSSION")
+
+    // Broadcast state + a simple event (no role assignment here)
+    emitRoomState(cleanRoomId)
+    io.to(cleanRoomId).emit("gameStarted", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+    })
+  }
+
+  /* ------------------------------------------------------
+                      Kick Player (host-only)
+  ------------------------------------------------------ */
+
+  const kickPlayerLocal = (socket: Socket, roomId: string, targetClientId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    // Host-only
+    if (room.hostId !== socket.data.clientId) {
+      socket.emit("kickRefused", { reason: "Only the host can kick players." })
+      return
+    }
+
+    const cleanTarget = (targetClientId || "").trim()
+    if (!cleanTarget) return
+
+    // Host cannot kick themselves
+    if (cleanTarget === room.hostId) {
+      socket.emit("kickRefused", { reason: "Host cannot kick themselves." })
+      return
+    }
+
+    const targetPlayer = room.players.find((p) => p.clientId === cleanTarget)
+    if (!targetPlayer) return
+
+    // Remove from server state
+    room.players = room.players.filter((p) => p.clientId !== cleanTarget)
+
+    // If room empty, close; otherwise emit state
+    if (room.players.length === 0) {
+      delete rooms[cleanRoomId]
+      io.to(cleanRoomId).emit("roomClosed", { roomId: cleanRoomId })
+      return
+    }
+
+    emitRoomState(cleanRoomId)
+
+    // Try to notify + remove the target socket from the room
+    const targetSocketId = targetPlayer.id // current socket id
+    const s = io.sockets.sockets.get(targetSocketId)
+    if (s) {
+      s.leave(cleanRoomId)
+      s.emit("kicked", { roomId: cleanRoomId, reason: "You were kicked by the host." })
+    }
+  }
+
+
+
     /* ------------------------------------------------------
                   Reconnect handling
       - If client reconnects, restore them to their room
@@ -550,5 +712,7 @@ const updateRoomSettings = (
     setPlayerStatus,
     updateRoomSettings,
     handleReconnect,
+    startGameLocal,
+    kickPlayerLocal,
   }
 }
