@@ -35,10 +35,17 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
         socket.on("roomState", onRoomState)
         socket.on("roomClosed", onRoomClosed)
 
-        // If user navigates here directly, make sure we joined
-        if (cleanRoomId && cleanPlayerName) {
-            socket.emit("joinRoom", { roomId: cleanRoomId, playerName: cleanPlayerName })
+        /// If user navigates here directly, make sure we joined
+        // IMPORTANT (reconnect-safe):
+        // When resuming after refresh, the server may have already reattached this client.
+        // In that case, skip this one-time auto-join to avoid duplicate player entries.
+        const skipAutoJoin = window.sessionStorage.getItem("mafia_skip_lobby_autojoin") === "1"
+        if (skipAutoJoin) {
+          window.sessionStorage.removeItem("mafia_skip_lobby_autojoin")
+        } else if (cleanRoomId && cleanPlayerName) {
+          socket.emit("joinRoom", { roomId: cleanRoomId, playerName: cleanPlayerName })
         }
+
 
         return () => {
       socket.off("roomState", onRoomState)
@@ -136,10 +143,10 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
 
       <ul style={{ paddingLeft: 18 }}>
         {(state?.players ?? []).map((p) => {
-          const hostTag = p.id === state?.hostId ? " (HOST) " : ""
+          const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
           const deadTag = p.alive ? "" : " (dead)"
           return (
-            <li key={p.id}>
+            <li key={p.clientId && p.id}>
               {p.name}
               {hostTag}
               {deadTag}

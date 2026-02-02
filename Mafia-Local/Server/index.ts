@@ -61,8 +61,12 @@ io.on("connection", (socket) => {
 
   // Stable client id from browser/electron (persists across refresh/reconnect)
   const clientId = String((socket.handshake as any).auth?.clientId || "").trim()
-  socket.data.clientId = clientId || socket.id // fallback (shouldn't happen, but keeps dev moving)
-  roomsManager.handleReconnect(socket, clientId)
+  socket.data.clientId = clientId || socket.id
+  console.log("Client identity:", { socketId: socket.id, clientId: socket.data.clientId })
+
+  // Reconect / Resume lobby
+  // if this clientId was in a room before disconnect, re-add them
+  roomsManager.handleReconnect(socket, socket.data.clientId)
 
   socket.on("disconnecting", () => {
     roomsManager.handleDisconnecting(socket)
@@ -153,14 +157,14 @@ io.on("connection", (socket) => {
   )
 
     socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id)
+      console.log("Client disconnected:", socket.id)
 
-    // IMPORTANT:
-    // Do NOT hard-remove on disconnect.
-    // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
-    // Cleanup should be handled by:
-    // - explicit leaveRoom (user intent)
-    // - a "disconnect grace period" (optional; can be added later)
+      // IMPORTANT:
+      // Do NOT hard-remove on disconnect.
+      // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
+      // Cleanup should be handled by:
+      // - explicit leaveRoom (user intent)
+      // - a "disconnect grace period" (optional; can be added later)
   })
 })
 

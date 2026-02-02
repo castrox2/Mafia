@@ -5,24 +5,55 @@ export type ReconnectedPayload = {
     playerName: string
 }
 
-// Stable clientId (persists across refresh / reconnect)
-const STORAGE_KEY = "mafia_client_id"
+// Stable identity rules:
+// - deviceId: persists across browser restarts (localStorage)
+// - sessionId: unique per tab/window, persists across refresh (sessionStorage)
+// This prevents "two tabs become one player" while keeping reconnect stable.
+const DEVICE_KEY = "mafia_device_id"
+const SESSION_KEY = "mafia_session_id"
+const LEGACY_KEY = "mafia_client_id" // from older builds
 
-const getOrCreateClientId = (): string => {
-    const existing = window.localStorage.getItem(STORAGE_KEY)
+const makeId = (): string => {
+    return (typeof crypto !== "undefined" &&
+    "randomUUID" in crypto &&
+    typeof crypto.randomUUID === "function")
+    ? crypto.randomUUID()
+    : `id_${Math.random().toString(16).slice(2)}_${Date.now()}`
+}
+
+const getOrCreateDeviceId = (): string => {
+    const existing = window.localStorage.getItem(DEVICE_KEY)
     if (existing) return existing
 
-    const id =
-    (typeof crypto !== "undefined" &&
-        "randomUUID" in crypto &&
-        typeof crypto.randomUUID === "function" &&
-        crypto.randomUUID())
-        ? crypto.randomUUID()
-        : `client_${Math.random().toString(16).slice(2)}_${Date.now()}`
+  // Migrate legacy id if it exists (keeps existing installs stable)
+    const legacy = window.localStorage.getItem(LEGACY_KEY)
+    const next = legacy || makeId()
 
-    window.localStorage.setItem(STORAGE_KEY, id)
-    return id
+    window.localStorage.setItem(DEVICE_KEY, next)
+
+    // Remove legacy key if it existed
+    if (legacy) {
+        window.localStorage.removeItem(LEGACY_KEY)
+    }
+    
+    return next
 }
+
+const getOrCreateSessionId = (): string => {
+    const existing = window.sessionStorage.getItem(SESSION_KEY)
+    if (existing) return existing
+
+    const next = makeId()
+    window.sessionStorage.setItem(SESSION_KEY, next)
+    return next
+}
+
+const getOrCreateClientId = (): string => {
+    const deviceId = getOrCreateDeviceId()
+    const sessionId = getOrCreateSessionId()
+    return `${deviceId}:${sessionId}`
+}
+
 
 export const clientId = getOrCreateClientId()
 

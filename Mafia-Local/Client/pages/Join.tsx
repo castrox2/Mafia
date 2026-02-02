@@ -31,8 +31,15 @@ export default function Join({ onEnterLobby }: Props) {
 
         const onReconnected = ({ roomId, playerName }: { roomId: string, playerName: string }) => {
             setStatus(`Reconnected to room ${roomId} as ${playerName}`)
+
+            // IMPORTANT (reconnect-safe):
+            // Lobby auto-emits joinRoom on mount; during reconnect the server already reattached us.
+            // Set a one-time flag so Lobby can skip the auto-join emit.
+            window.sessionStorage.setItem("mafia_skip_lobby_autojoin", "1")
+
             onEnterLobby(roomId, playerName, "", "")
         }
+
 
         const onConnectError = (error: Error) => {
             console.log(`Connection error: ${error.message}`)
@@ -71,7 +78,7 @@ export default function Join({ onEnterLobby }: Props) {
         
         socket.on("connect", onConnect)
         socket.on("disconnect", onDisconnect)
-        // socket.on("reconnected", onReconnected)
+        socket.on("reconnected", onReconnected)
         socket.on("connect_error", onConnectError)
         socket.on("roomCreated", onRoomCreated)
         socket.on("roomState", onRoomState)
@@ -86,7 +93,7 @@ export default function Join({ onEnterLobby }: Props) {
         return () => {
             socket.off("connect", onConnect)
             socket.off("disconnect", onDisconnect)
-            // socket.off("reconnected", onReconnected)
+            socket.off("reconnected", onReconnected)
             socket.off("connect_error", onConnectError)
             socket.off("roomCreated", onRoomCreated)
             socket.off("roomState", onRoomState)

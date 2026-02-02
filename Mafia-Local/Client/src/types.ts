@@ -13,6 +13,7 @@ export type PlayerStatus =
 
 export type Player = {
     id: string // Socket ID
+    clientId: string // Persistent client ID
     name: string
     alive: boolean
     role: PlayerRole

@@ -214,10 +214,23 @@ const normalizeRoleCount = (
                 Helper: broadcast room state
   ------------------------------------------------------ */
 
+  const dedupePlayersByClientId = (players: Player[]) => {
+    const map = new Map<string, Player>()
+    for (const p of players) {
+      const key = (p.clientId || "").trim()
+      if (!key) continue
+      // Keep the latest instance for that clientId
+      map.set(key, p)
+    }
+    return Array.from(map.values())
+  }
+
   const emitRoomState = (roomId: string) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
+
+    room.players = dedupePlayersByClientId(room.players)
 
     io.to(cleanRoomId).emit("roomState", {
       roomId: cleanRoomId,
@@ -280,10 +293,10 @@ const normalizeRoleCount = (
 
       const leavingClientId = String(socket.data.clientId || "")
 
-      // Transfer host if needed
-      if (room.hostId === leavingClientId) {
-        room.hostId = room.players[0]?.clientId ?? ""
-      }
+      // IMPORTANT (reconnect-safe):
+      // Do NOT transfer host ownership on disconnecting.
+      // Refresh/reconnect should not cause host changes.
+      // Host is only transferred on explicit leave or room cleanup.
 
       if (room.players.length === 0) {
         delete rooms[roomId]
@@ -315,7 +328,7 @@ const normalizeRoleCount = (
       settings: defaultSettings(),
     }
 
-    removeFromAllRooms(socket.id, cleanRoomId)
+    removeFromAllRooms(clientId, cleanRoomId)
 
     socket.join(cleanRoomId)
 
@@ -404,7 +417,7 @@ const updateRoomSettings = (
       return
     }
 
-    removeFromAllRooms(socket.id, cleanRoomId)
+    removeFromAllRooms(clientId, cleanRoomId)
 
     socket.join(cleanRoomId)
 
@@ -454,6 +467,9 @@ const updateRoomSettings = (
   const cleanClientId = (clientId || "").trim()
   if (!cleanClientId) return
 
+  console.log("DEBUG: handleReconnect called", { clientId: cleanClientId })
+
+
   for (const roomId of Object.keys(rooms)) {
     const room = rooms[roomId]
     if (!room) continue
@@ -471,11 +487,15 @@ const updateRoomSettings = (
     // Re-join socket.io room
     socket.join(roomId)
 
+    console.log("DEBUG: reattached client to room", { roomId, clientId: cleanClientId, socketId: socket.id })
+
     // Notify client UI that it was restored
     socket.emit("reconnected", {
       roomId,
       playerName: existingPlayer.name,
     })
+    
+    console.log("DEBUG: handleReconnect found no room for clientId", { clientId: cleanClientId })
 
     // Broadcast updated room state
     emitRoomState(roomId)
