@@ -65,7 +65,7 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
       <h1 style={{ marginBottom: 8 }}>Lobby</h1>
 
       {/* Host settings modal */}
-      {socket.id === state?.hostId && (
+      {clientId === state?.hostId && (
         <div>
           <button
             style={{ padding: "10px 12px", fontSize: 16, marginBottom: 12 }}
@@ -93,7 +93,7 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
       )}
 
         {/* QR code for joining (handy for local play) */}
-        {qrDataUrl && state?.hostId === socket.id && (
+        {qrDataUrl && state?.hostId === clientId && (
         <div style={{ marginBottom: 14 }}>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>
             Scan to join this room:
@@ -153,7 +153,7 @@ export default function Lobby({ roomId, playerName, joinUrl, qrDataUrl, onExit }
       </ul>
 
       {/* Host Settings Modal */}
-      {state && socket.id === state.hostId && (
+      {state && clientId === state.hostId && (
         <HostSettingsModal
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
