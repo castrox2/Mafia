@@ -1,5 +1,3 @@
-import e from "express"
-
 export type PlayerRole=
     | "UNASSIGNED"
     | "MAFIA"
@@ -11,7 +9,7 @@ export type PlayerStatus =
     | "DISCONNECTED"
     | "CONNECTED"
     | "NOT READY" // Checks if player is ready to start 
-    | "RADY" // not if dead or alive
+    | "READY" // not if dead or alive
 
 export type Player = {
     id: string // Socket ID
@@ -64,17 +62,17 @@ export const mergePlayerState = (
 
 // Remove by socketId (because disconnect event is for a connection)
 export const removePlayer = (players: Player[], socketId: string): Player[] => {
-  return players.filter((p) => p.clientId !== socketId)
+  return players.filter((p) => p.id !== socketId)
 }
 
 export const setAlive = (players: Player[], clientId: string, alive: boolean): Player[] => {
-  return players.map((p) => (p.id === clientId ? { ...p, alive } : p))
+  return players.map((p) => (p.clientId === clientId ? { ...p, alive } : p))
 }
 
 export const setRole = (players: Player[], clientId: string, role: PlayerRole): Player[] => {
-  return players.map((p) => (p.id === clientId ? { ...p, role } : p))
+  return players.map((p) => (p.clientId === clientId ? { ...p, role } : p))
 }
 
 export const setStatus = (players: Player[], clientId: string, status: PlayerStatus): Player[] => {
-  return players.map((p) => (p.id === clientId ? { ...p, status } : p))
+  return players.map((p) => (p.clientId === clientId ? { ...p, status } : p))
 }

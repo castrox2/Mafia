@@ -333,7 +333,7 @@ const normalizeRoleCount = (
     socket.join(cleanRoomId)
 
     rooms[cleanRoomId].players.push(
-      mergePlayerState(undefined, socket.id, cleanName, clientId)
+      mergePlayerState(undefined, socket.id, clientId, cleanName)
     )
 
     emitRoomState(cleanRoomId)
@@ -426,7 +426,7 @@ const updateRoomSettings = (
 
     room.players = room.players.filter((p) => p.clientId !== clientId && p.id !== clientId) // remove old entry if exists
     room.players.push(
-      mergePlayerState(existing, socket.id, cleanName, clientId) // re-add with updated socketId + name
+      mergePlayerState(existing, socket.id, clientId, cleanName) // re-add with updated socketId + name
     )
 
     emitRoomState(cleanRoomId)
