@@ -157,6 +157,10 @@ io.on("connection", (socket) => {
     }
   )
 
+    socket.on("requestMyActions", ({ roomId }: { roomId: string }) => {
+    roomsManager.requestMyActionsLocal(socket, roomId)
+  })
+
   socket.on("requestRoomState", ({ roomId }: { roomId: string }) => {
     roomsManager.emitRoomState(roomId)
   })
@@ -168,6 +172,21 @@ io.on("connection", (socket) => {
   socket.on("forceStartGame", ({ roomId }: { roomId: string }) => {
     roomsManager.startGameLocal(socket, roomId, { force: true })
   })
+
+    socket.on(
+    "submitRoleAction",
+    ({
+      roomId,
+      kind,
+      targetClientId,
+    }: {
+      roomId: string
+      kind: string
+      targetClientId: string
+    }) => {
+      roomsManager.submitRoleActionLocal(socket, roomId, { kind, targetClientId })
+    }
+  )
 
   socket.on(
     "kickPlayer",

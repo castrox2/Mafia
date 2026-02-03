@@ -11,7 +11,14 @@ import {
   setStatus as setStatusList,
 } from "./players.js"
 
-import { getRoleActions, clearRoleActions } from "./roles/index.js"
+import {
+  getRoleActions,
+  clearRoleActions,
+  recordRoleAction,
+  getDoctorSelfSaveUsed,
+  markDoctorSelfSaveUsed,
+} from "./roles/index.js"
+
 import { resolveNightPhase } from "./roles/night.js"
 
 /* ======================================================
@@ -345,13 +352,27 @@ const doctorSaves: DoctorSaveAction[] = actions
     createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
   }))
 
+  // Enforce + spend doctor self-save at resolution time (final action only)
+  const finalDoctorSaves: DoctorSaveAction[] = doctorSaves.filter((a) => {
+    if (a.targetClientId !== a.fromClientId) return true
+
+    const used = getDoctorSelfSaveUsed(cleanRoomId, room.gameNumber, a.fromClientId)
+    if (used) {
+      // Self-save already used this game; ignore this save for resolution
+      return false
+    }
+
+    // Spend it now (final action set is known)
+    markDoctorSelfSaveUsed(cleanRoomId, room.gameNumber, a.fromClientId)
+    return true
+  })
 
     const res = resolveNightPhase(
       cleanRoomId,
       room.gameNumber,
       room.players,
       mafiaVotes,
-      doctorSaves
+      finalDoctorSaves
     )
 
     // Apply kill (if any)
@@ -951,6 +972,185 @@ const updateRoomSettings = (
     emitRoomState(roomId)
   }
 
+/* ------------------------------------------------------
+      Role Action Submission (server-authoritative)
+    - Validates action against:
+      - current room phase
+      - player role
+      - alive/spectator rules
+      - target validity
+      - special rules (doctor self-save once/game, mafia can't target mafia)
+    - Records into the in-memory buffer (roles/index.ts)
+    - Does NOT mutate room state here (resolution happens at phase boundary)
+------------------------------------------------------ */
+
+  const submitRoleActionLocal = (
+    socket: Socket,
+    roomId: string,
+    payload: { kind: string; targetClientId: string }
+  ) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) {
+      socket.emit("actionRefused", { reason: "Room does not exist." })
+      return
+    }
+
+    const fromClientId = String(socket.data.clientId || "").trim()
+    if (!fromClientId) {
+      socket.emit("actionRefused", { reason: "Missing client identity." })
+      return
+    }
+
+    const actor = room.players.find((p) => p.clientId === fromClientId)
+    if (!actor) {
+      socket.emit("actionRefused", { reason: "Player not found in room." })
+      return
+    }
+
+    const kind = String(payload.kind || "").trim()
+    const targetClientId = String(payload.targetClientId || "").trim()
+
+    if (!kind) {
+      socket.emit("actionRefused", { reason: "Missing action kind." })
+      return
+    }
+
+    if (!targetClientId) {
+      socket.emit("actionRefused", { reason: "Missing targetClientId." })
+      return
+    }
+
+    // Must be in-game for all actions except (optionally) CIVILIAN_VOTE;
+    // we still enforce phase rules below.
+    if (!room.gameStarted) {
+      socket.emit("actionRefused", { reason: "Game has not started." })
+      return
+    }
+
+    // Actor eligibility
+    if (actor.isSpectator === true) {
+      socket.emit("actionRefused", { reason: "Spectators cannot perform actions." })
+      return
+    }
+    if (actor.alive !== true) {
+      socket.emit("actionRefused", { reason: "Dead players cannot perform actions." })
+      return
+    }
+
+    // Target validity
+    const target = room.players.find((p) => p.clientId === targetClientId)
+    if (!target) {
+      socket.emit("actionRefused", { reason: "Target player not found." })
+      return
+    }
+    if (target.isSpectator === true) {
+      socket.emit("actionRefused", { reason: "Spectators cannot be targeted." })
+      return
+    }
+    if (target.alive !== true) {
+      socket.emit("actionRefused", { reason: "Target must be alive." })
+      return
+    }
+
+    // Phase rules (server authoritative)
+    const phase = room.phase
+
+    const refuse = (reason: string) => {
+      socket.emit("actionRefused", { kind, reason })
+    }
+
+    // Role gating + phase gating
+    if (kind === "MAFIA_KILL_VOTE") {
+      if (phase !== "NIGHT") return refuse("Mafia can only vote to kill during NIGHT.")
+      if (actor.role !== "MAFIA") return refuse("Only Mafia can submit mafia kill votes.")
+      if (target.role === "MAFIA") return refuse("Mafia cannot target fellow mafia.")
+    } else if (kind === "DOCTOR_SAVE") {
+      if (phase !== "NIGHT") return refuse("Doctor can only save during NIGHT.")
+      if (actor.role !== "DOCTOR") return refuse("Only Doctor can submit doctor saves.")
+
+      // Doctor self-save only once per game
+      if (targetClientId === fromClientId) {
+        const used = getDoctorSelfSaveUsed(cleanRoomId, room.gameNumber, fromClientId)
+        if (used) return refuse("Doctor self-save is only allowed once per game.")
+        // IMPORTANT:
+        // Do NOT mark self-save as used here; doctor may change their mind before NIGHT ends.
+        // We mark usage at resolution time based on the final NIGHT action set.
+      }
+
+
+    } else if (kind === "DETECTIVE_CHECK") {
+      if (phase !== "NIGHT") return refuse("Detective can only check during NIGHT.")
+      if (actor.role !== "DETECTIVE") return refuse("Only Detective can submit checks.")
+    } else if (kind === "SHERIFF_SHOOT") {
+      if (phase === "NIGHT") return refuse("Sheriff cannot shoot during NIGHT.")
+      if (actor.role !== "SHERIFF") return refuse("Only Sheriff can shoot.")
+    } else if (kind === "CIVILIAN_VOTE") {
+      if (phase !== "VOTING") return refuse("Votes can only be submitted during VOTING.")
+      // We allow any alive, non-spectator player to submit this (UI parity)
+    } else {
+      return refuse("Unknown action kind.")
+    }
+
+    // Record action into in-memory buffer (phase bucket is derived by kind)
+    recordRoleAction({
+      kind: kind as any,
+      roomId: cleanRoomId,
+      fromClientId,
+      targetClientId,
+      createdAtMs: Date.now(),
+    })
+
+    socket.emit("actionAccepted", { kind, targetClientId })
+  }
+
+    /* ------------------------------------------------------
+        Helper: get my recorded actions (private)
+    - Used by UI / reconnect flows to restore a player’s current selection
+    - Reads from the in-memory action buffer and emits ONLY to requesting socket
+    - Uses current phase to pick the correct bucket:
+      NIGHT -> NIGHT
+      VOTING -> VOTING
+      everything else -> DAY (covers DAY/DISCUSSION/PUBDISCUSSION for sheriff)
+  ------------------------------------------------------ */
+
+  const requestMyActionsLocal = (socket: Socket, roomId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) {
+      socket.emit("myActions", { roomId: cleanRoomId, actions: [] })
+      return
+    }
+
+    const fromClientId = String(socket.data.clientId || "").trim()
+    if (!fromClientId) {
+      socket.emit("myActions", { roomId: cleanRoomId, actions: [] })
+      return
+    }
+
+    // Map current room phase -> action bucket
+    const bucket =
+      room.phase === "NIGHT" ? "NIGHT" : room.phase === "VOTING" ? "VOTING" : "DAY"
+
+    const mine = getRoleActions(cleanRoomId, bucket).filter(
+      (a: any) => a?.fromClientId === fromClientId
+    )
+
+    // Emit only the minimal, safe info needed by client UI
+    socket.emit("myActions", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      phase: room.phase,
+      bucket,
+      actions: mine.map((a: any) => ({
+        kind: a.kind,
+        targetClientId: a.targetClientId,
+        createdAtMs: a.createdAtMs,
+      })),
+    })
+  }
+
+
   /* ------------------------------------------------------
                         Public API
   ------------------------------------------------------ */
@@ -970,5 +1170,7 @@ const updateRoomSettings = (
     handleReconnect,
     startGameLocal,
     kickPlayerLocal,
+    submitRoleActionLocal,
+    requestMyActionsLocal,
   }
 }
