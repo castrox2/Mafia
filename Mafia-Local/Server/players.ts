@@ -23,6 +23,7 @@ export type Player = {
     // General Status
     status: PlayerStatus
     isSpectator: boolean // True if player joins mid-game (duh tf)
+    voteCount: number 
 
     // Optioanl metadata
     joinedAt: number // timestamp for when player joined
@@ -34,9 +35,10 @@ export function createPlayer(id: string, name: string): Player {
         name,
         clientId: id,
         alive: true,
-        role: "UNASSIGNED",
+        role: "CIVILIAN",
         status: "CONNECTED",
         isSpectator: false,
+        voteCount: 0,
         joinedAt: Date.now(),
     }
 }
@@ -59,6 +61,7 @@ export const mergePlayerState = (
     alive: existing?.alive ?? true,
     role: existing?.role ?? "CIVILIAN",
     status: existing?.status ?? "NOT READY",
+    voteCount: existing?.voteCount ?? 0,
     joinedAt: existing?.joinedAt ?? now,
   }
 }
