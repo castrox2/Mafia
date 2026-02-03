@@ -1,6 +1,6 @@
 import type { Server as SocketIOServer } from "socket.io"
 import type { Socket } from "socket.io"
-import type { MafiaKillVoteAction, DoctorSaveAction } from "./roles/types.js"
+import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 
 import {
@@ -367,6 +367,17 @@ const doctorSaves: DoctorSaveAction[] = actions
     return true
   })
 
+    const detectiveChecks: DetectiveCheckAction[] = actions
+    .filter((a: any) => a?.kind === "DETECTIVE_CHECK")
+    .map((a: any) => ({
+      kind: "DETECTIVE_CHECK",
+      roomId: cleanRoomId,
+      fromClientId: String(a.fromClientId),
+      targetClientId: String(a.targetClientId),
+      createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
+    }))
+
+
     const res = resolveNightPhase(
       cleanRoomId,
       room.gameNumber,
@@ -382,6 +393,33 @@ const doctorSaves: DoctorSaveAction[] = actions
         target.alive = false
       }
     }
+
+    // Private detective results (anti-spoiler):
+    // Emit ONLY to the detective's socket. Never broadcast to the room.
+    for (const a of detectiveChecks) {
+      const detective = room.players.find((p) => p.clientId === a.fromClientId)
+      if (!detective || detective.isSpectator === true) continue
+
+      const target = room.players.find((p) => p.clientId === a.targetClientId)
+      if (!target || target.isSpectator === true) continue
+
+      const s = io.sockets.sockets.get(detective.id)
+      if (!s) continue
+
+      s.emit("privateMessage", {
+        type: "DETECTIVE_RESULT",
+        toClientId: detective.clientId,
+        checkedClientId: target.clientId,
+        isMafia: target.role === "MAFIA",
+      })
+    }
+
+        // Public night summary (anti-spoiler)
+    io.to(cleanRoomId).emit("nightSummary", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      someoneDied: Boolean(res.killedClientId),
+    })
 
     // Clear NIGHT actions at the phase boundary
     clearRoleActions(cleanRoomId, "NIGHT")
