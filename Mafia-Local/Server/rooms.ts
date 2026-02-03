@@ -16,7 +16,6 @@ import {
   clearRoleActions,
   recordRoleAction,
   getDoctorSelfSaveUsed,
-  markDoctorSelfSaveUsed,
 } from "./roles/index.js"
 
 import { resolveNightPhase } from "./roles/night.js"
@@ -332,40 +331,25 @@ export const createRoomsManager = (io: SocketIOServer) => {
   // Your existing store appears to use:
   // - actorClientId (instead of fromClientId)
   // - targetClientId (same)
-const mafiaVotes: MafiaKillVoteAction[] = actions
-  .filter((a: any) => a?.kind === "MAFIA_KILL_VOTE")
-  .map((a: any) => ({
-    kind: "MAFIA_KILL_VOTE",
-    roomId: cleanRoomId,
-    fromClientId: String(a.fromClientId),
-    targetClientId: String(a.targetClientId),
-    createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
+  const mafiaVotes: MafiaKillVoteAction[] = actions
+    .filter((a: any) => a?.kind === "MAFIA_KILL_VOTE")
+    .map((a: any) => ({
+      kind: "MAFIA_KILL_VOTE",
+      roomId: cleanRoomId,
+      fromClientId: String(a.fromClientId),
+      targetClientId: String(a.targetClientId),
+      createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
   }))
 
-const doctorSaves: DoctorSaveAction[] = actions
-  .filter((a: any) => a?.kind === "DOCTOR_SAVE")
-  .map((a: any) => ({
-    kind: "DOCTOR_SAVE",
-    roomId: cleanRoomId,
-    fromClientId: String(a.fromClientId),
-    targetClientId: String(a.targetClientId),
-    createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
+  const doctorSaves: DoctorSaveAction[] = actions
+    .filter((a: any) => a?.kind === "DOCTOR_SAVE")
+    .map((a: any) => ({
+      kind: "DOCTOR_SAVE",
+      roomId: cleanRoomId,
+      fromClientId: String(a.fromClientId),
+      targetClientId: String(a.targetClientId),
+      createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
   }))
-
-  // Enforce + spend doctor self-save at resolution time (final action only)
-  const finalDoctorSaves: DoctorSaveAction[] = doctorSaves.filter((a) => {
-    if (a.targetClientId !== a.fromClientId) return true
-
-    const used = getDoctorSelfSaveUsed(cleanRoomId, room.gameNumber, a.fromClientId)
-    if (used) {
-      // Self-save already used this game; ignore this save for resolution
-      return false
-    }
-
-    // Spend it now (final action set is known)
-    markDoctorSelfSaveUsed(cleanRoomId, room.gameNumber, a.fromClientId)
-    return true
-  })
 
     const detectiveChecks: DetectiveCheckAction[] = actions
     .filter((a: any) => a?.kind === "DETECTIVE_CHECK")
@@ -383,7 +367,7 @@ const doctorSaves: DoctorSaveAction[] = actions
       room.gameNumber,
       room.players,
       mafiaVotes,
-      finalDoctorSaves
+      doctorSaves
     )
 
     // Apply kill (if any)
@@ -393,6 +377,14 @@ const doctorSaves: DoctorSaveAction[] = actions
         target.alive = false
       }
     }
+
+    // Public night summary (anti-spoiler)
+    io.to(cleanRoomId).emit("nightSummary", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      someoneDied: Boolean(res.killedClientId),
+    })
+
 
     // Private detective results (anti-spoiler):
     // Emit ONLY to the detective's socket. Never broadcast to the room.
@@ -420,6 +412,25 @@ const doctorSaves: DoctorSaveAction[] = actions
       gameNumber: room.gameNumber,
       someoneDied: Boolean(res.killedClientId),
     })
+
+    // Private detective results (anti-spoiler)
+    for (const a of detectiveChecks) {
+      const detective = room.players.find((p) => p.clientId === a.fromClientId)
+      if (!detective || detective.isSpectator === true) continue
+
+      const target = room.players.find((p) => p.clientId === a.targetClientId)
+      if (!target || target.isSpectator === true) continue
+
+      const s = io.sockets.sockets.get(detective.id)
+      if (!s) continue
+
+      s.emit("privateMessage", {
+        type: "DETECTIVE_RESULT",
+        toClientId: detective.clientId,
+        checkedClientId: target.clientId,
+        isMafia: target.role === "MAFIA",
+      })
+    }
 
     // Clear NIGHT actions at the phase boundary
     clearRoleActions(cleanRoomId, "NIGHT")
