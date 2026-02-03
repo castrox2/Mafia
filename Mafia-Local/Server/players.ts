@@ -29,11 +29,11 @@ export type Player = {
     joinedAt: number // timestamp for when player joined
 }
 
-export function createPlayer(id: string, name: string): Player {
+export function createPlayer(id: string, name: string, clientId: string): Player {
     return {
         id,
         name,
-        clientId: id,
+        clientId,
         alive: true,
         role: "CIVILIAN",
         status: "CONNECTED",

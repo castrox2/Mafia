@@ -1,5 +1,7 @@
 import type { Server as SocketIOServer } from "socket.io"
 import type { Socket } from "socket.io"
+import type { MafiaKillVoteAction, DoctorSaveAction } from "./roles/types.js"
+import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 
 import {
   mergePlayerState,
@@ -9,7 +11,8 @@ import {
   setStatus as setStatusList,
 } from "./players.js"
 
-import type { Player, PlayerRole, PlayerStatus } from "./players.js"
+import { getRoleActions, clearRoleActions } from "./roles/index.js"
+import { resolveNightPhase } from "./roles/night.js"
 
 /* ======================================================
                           Types
@@ -30,7 +33,14 @@ export type RoleCount = {
   sheriff: number
 }
 
-export type Phase = "LOBBY" | "DAY" | "NIGHT" | "VOTE" | "DISCUSSION" | "PUB_DISCUSSION"
+export type Phase = 
+  | "LOBBY" 
+  | "DAY" 
+  | "DISCUSSION" 
+  | "PUBDISCUSSION" 
+  | "VOTING" 
+  | "NIGHT" 
+  | "GAMEOVER"
 
 export type GameSettings = {
   timers: PhaseTimers
@@ -49,6 +59,9 @@ type Room = {
   // Current Phase
   phase: Phase
   phaseEndTime: number | null // timestamp ms
+
+  // Phase Scheduling
+  phaseTimeoutId?: NodeJS.Timeout | null
 }
 
 /* ======================================================
@@ -262,22 +275,98 @@ export const createRoomsManager = (io: SocketIOServer) => {
     })
   }
 
-    const getPhaseDurationSec = (room: Room, phase: Phase): number => {
+  const getPhaseDurationSec = (room: Room, phase: Phase): number => {
     if (phase === "DAY") return room.settings.timers.daySec
-    if (phase === "NIGHT") return room.settings.timers.nightSec
-    if (phase === "VOTE") return room.settings.timers.voteSec
     if (phase === "DISCUSSION") return room.settings.timers.discussionSec
-    if (phase === "PUB_DISCUSSION") return room.settings.timers.pubDiscussionSec
+    if (phase === "PUBDISCUSSION") return room.settings.timers.pubDiscussionSec
+    if (phase === "VOTING") return room.settings.timers.voteSec
+    if (phase === "NIGHT") return room.settings.timers.nightSec
+    if (phase === "GAMEOVER") return 0
     return 0
   }
 
   const nextPhase = (phase: Phase): Phase => {
-    // simple loop for now
+    // Canonical loop:
+    // LOBBY → DAY → DISCUSSION → PUBDISCUSSION → VOTING → NIGHT → DAY ...
     if (phase === "LOBBY") return "DAY"
-    if (phase === "DAY") return "NIGHT"
-    if (phase === "NIGHT") return "VOTE"
-    if (phase === "VOTE") return "DAY"
-    return "DISCUSSION"
+    if (phase === "DAY") return "DISCUSSION"
+    if (phase === "DISCUSSION") return "PUBDISCUSSION"
+    if (phase === "PUBDISCUSSION") return "VOTING"
+    if (phase === "VOTING") return "NIGHT"
+    if (phase === "NIGHT") return "DAY"
+
+    // GAMEOVER stays GAMEOVER unless you manually restart a new game
+    return "GAMEOVER"
+  }
+
+    const clearPhaseTimeout = (room: Room) => {
+    if (room.phaseTimeoutId) {
+      clearTimeout(room.phaseTimeoutId)
+      room.phaseTimeoutId = null
+    }
+  }
+
+/* ------------------------------------------------------
+              Helper: apply night resolution
+  - Server-authoritative: applies the night kill to room state
+  - Anti-spoiler: roomState already masks roles during gameStarted
+  - Spectators cannot be targeted (resolver already filters)
+------------------------------------------------------ */
+
+  const applyNightResolution = (room: Room, cleanRoomId: string) => {
+  // Pull buffered NIGHT actions
+  // Pull buffered NIGHT actions (whatever shape your store uses)
+  const actions = getRoleActions(cleanRoomId, "NIGHT")
+
+  // Adapt to the minimal shape resolveNightPhase expects:
+  // - fromClientId
+  // - targetClientId
+
+  // Your existing store appears to use:
+  // - actorClientId (instead of fromClientId)
+  // - targetClientId (same)
+const mafiaVotes: MafiaKillVoteAction[] = actions
+  .filter((a: any) => a?.kind === "MAFIA_KILL_VOTE")
+  .map((a: any) => ({
+    kind: "MAFIA_KILL_VOTE",
+    roomId: cleanRoomId,
+    fromClientId: String(a.fromClientId),
+    targetClientId: String(a.targetClientId),
+    createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
+  }))
+
+const doctorSaves: DoctorSaveAction[] = actions
+  .filter((a: any) => a?.kind === "DOCTOR_SAVE")
+  .map((a: any) => ({
+    kind: "DOCTOR_SAVE",
+    roomId: cleanRoomId,
+    fromClientId: String(a.fromClientId),
+    targetClientId: String(a.targetClientId),
+    createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
+  }))
+
+
+    const res = resolveNightPhase(
+      cleanRoomId,
+      room.gameNumber,
+      room.players,
+      mafiaVotes,
+      doctorSaves
+    )
+
+    // Apply kill (if any)
+    if (res.killedClientId) {
+      const target = room.players.find((p) => p.clientId === res.killedClientId)
+      if (target && target.isSpectator !== true) {
+        target.alive = false
+      }
+    }
+
+    // Clear NIGHT actions at the phase boundary
+    clearRoleActions(cleanRoomId, "NIGHT")
+
+    // OPTIONAL: You can log debug server-side without affecting clients
+    // console.log("DEBUG: night resolution", { roomId: cleanRoomId, res })
   }
 
   const startPhase = (roomId: string, phase: Phase) => {
@@ -291,15 +380,26 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
     emitRoomState(cleanRoomId)
 
+    // IMPORTANT (timer safety):
+    // Only allow ONE scheduled transition at a time.
+    // This prevents "ghost transitions" when phases are changed manually or game ends.
+    clearPhaseTimeout(room)
+
     // Schedule the next transition (server authoritative)
     if (room.phaseEndTime) {
-      setTimeout(() => {
+      room.phaseTimeoutId = setTimeout(() => {
         const r = rooms[cleanRoomId]
         if (!r) return
         if (!r.gameStarted) return
 
         // If phase changed manually or game ended, do nothing
         if (r.phase !== phase) return
+
+        // If NIGHT just ended, resolve NIGHT actions BEFORE moving on
+        if (phase === "NIGHT") {
+          applyNightResolution(r, cleanRoomId)
+          emitRoomState(cleanRoomId)
+        }
 
         startPhase(cleanRoomId, nextPhase(phase))
       }, sec * 1000)
@@ -397,6 +497,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
       gameNumber: 0,
       phase: "LOBBY",
       phaseEndTime: null,
+      phaseTimeoutId: null,
     }
 
     removeFromAllRooms(clientId, cleanRoomId)
@@ -535,6 +636,103 @@ const updateRoomSettings = (
     emitRoomState(cleanRoomId)
   }
 
+/* ------------------------------------------------------
+        Helper: role assignment (server-only)
+    - Assign roles ONLY at the start of a new game
+    - Uses room.settings.roleCount
+    - Spectators are excluded (no role)
+    - Roles are stored on player.role but NEVER broadcast publicly
+      (emitRoomState masks role during gameStarted)
+------------------------------------------------------ */
+
+  const shuffleInPlace = <T,>(arr: T[]) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+
+      // TS-safe swap (i/j are always in range)
+      const tmp = arr[i]!
+      arr[i] = arr[j]!
+      arr[j] = tmp
+    }
+    return arr
+  }
+
+
+  const assignRolesForNewGame = (room: Room) => {
+    const activePlayers = room.players.filter((p) => p.isSpectator !== true)
+
+    // Safety: if no active players, nothing to do
+    if (activePlayers.length === 0) return
+
+    const rc = room.settings.roleCount
+
+    // Build the role pool (mafia/doctor/detective/sheriff), then fill rest as civilian
+    const pool: PlayerRole[] = []
+
+    for (let i = 0; i < rc.mafia; i++) pool.push("MAFIA")
+    for (let i = 0; i < rc.doctor; i++) pool.push("DOCTOR")
+    for (let i = 0; i < rc.detective; i++) pool.push("DETECTIVE")
+    for (let i = 0; i < rc.sheriff; i++) pool.push("SHERIFF")
+
+    // If pool is larger than player count (should be prevented by UI + normalizeRoleCount),
+    // trim safely anyway so we never crash or assign out-of-bounds.
+    const trimmedPool = pool.slice(0, activePlayers.length)
+
+    shuffleInPlace(activePlayers)
+    shuffleInPlace(trimmedPool)
+
+    // Assign pool roles first, remainder becomes CIVILIAN
+    let idx = 0
+    for (const p of activePlayers) {
+      const role = trimmedPool[idx] ?? "CIVILIAN"
+      p.role = role
+      idx++
+    }
+
+
+    // Spectators get no meaningful role (kept as CIVILIAN in state)
+    // but they will NEVER receive private role emits.
+    for (const p of room.players) {
+      if (p.isSpectator === true) {
+        p.role = "CIVILIAN"
+      }
+    }
+  }
+
+  /* ------------------------------------------------------
+            Helper: private role emit (anti-spoiler)
+    - Sends role ONLY to the player’s current socket
+    - Never broadcasts to the room
+  ------------------------------------------------------ */
+
+  const emitPrivateRoleToPlayer = (
+    roomId: string,
+    gameNumber: number,
+    player: Player
+  ) => {
+    if (player.isSpectator === true) return
+    const s = io.sockets.sockets.get(player.id)
+    if (!s) return
+
+    s.emit("yourRole", {
+      roomId,
+      gameNumber,
+      role: player.role,
+    })
+  }
+
+  const emitPrivateRolesToRoom = (roomId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+    if (!room.gameStarted) return
+
+    for (const p of room.players) {
+      emitPrivateRoleToPlayer(cleanRoomId, room.gameNumber, p)
+    }
+  }
+
+
   /* ------------------------------------------------------
               Start Game (host-only)
       - Normal start: requires all players READY
@@ -570,7 +768,7 @@ const updateRoomSettings = (
       }
     }
 
-        // Convert spectators into active players ONLY at new game boundary.
+      // Convert spectators into active players ONLY at new game boundary.
     room.players = room.players.map((p) =>
       p.isSpectator
         ? {
@@ -578,16 +776,35 @@ const updateRoomSettings = (
             isSpectator: false,
             alive: true,
             status: "NOT READY",
+            voteCount: 0,
             // Do NOT assign role here; role assignment is handled later.
             role: "CIVILIAN",
           }
-        : p
+        : {
+            ...p,
+            alive: true,
+            status: "NOT READY",
+            voteCount: 0,
+            // Do NOT assign role here; role assignment is handled later.
+            role: "CIVILIAN",
+          }
     )
+
 
     room.gameStarted = true
     room.gameNumber += 1
 
-    startPhase(cleanRoomId, "DISCUSSION")
+    // Clear any buffered actions from previous games (safety)
+    clearRoleActions(cleanRoomId, "NIGHT")
+    clearRoleActions(cleanRoomId, "DAY")
+    clearRoleActions(cleanRoomId, "VOTING")
+
+    // Assign roles now that the game is starting
+    assignRolesForNewGame(room)
+
+    startPhase(cleanRoomId, "DAY")
+
+    emitPrivateRolesToRoom(cleanRoomId)
 
     // Broadcast state + a simple event (no role assignment here)
     emitRoomState(cleanRoomId)
@@ -645,11 +862,12 @@ const updateRoomSettings = (
     }
   }
 
-    /* ------------------------------------------------------
+/* ------------------------------------------------------
                   Reconnect handling
       - If client reconnects, restore them to their room
       - Prevent duplicates by matching clientId
-  ------------------------------------------------------ */
+------------------------------------------------------ */
+
   const handleReconnect = (socket: Socket, clientId: string) => {
   const cleanClientId = (clientId || "").trim()
   if (!cleanClientId) return
@@ -674,20 +892,33 @@ const updateRoomSettings = (
     // Re-join socket.io room
     socket.join(roomId)
 
-    console.log("DEBUG: reattached client to room", { roomId, clientId: cleanClientId, socketId: socket.id })
+        console.log("DEBUG: reattached client to room", {
+      roomId,
+      clientId: cleanClientId,
+      socketId: socket.id,
+    })
 
     // Notify client UI that it was restored
     socket.emit("reconnected", {
       roomId,
       playerName: existingPlayer.name,
     })
-    
-    console.log("DEBUG: handleReconnect found no room for clientId", { clientId: cleanClientId })
+
+    // Re-send private role on reconnect (anti-spoiler, reconnect-safe)
+    if (room.gameStarted && existingPlayer.isSpectator !== true) {
+      socket.emit("yourRole", {
+        roomId,
+        gameNumber: room.gameNumber,
+        role: existingPlayer.role,
+      })
+    }
 
     // Broadcast updated room state
     emitRoomState(roomId)
     return
   }
+
+  console.log("DEBUG: no prior room found for client", { clientId: cleanClientId })
 }
 
 

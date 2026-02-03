@@ -52,9 +52,10 @@ function getLanIp(): string {
 const roomsManager = createRoomsManager(io)
 
 const timers = createTimersManager(io, ({ roomId, phase }) => {
-  // For later: can use roomId + phase to trigger game state changes
-  io.to(roomId).emit("timerEnded", { roomId, phase })
+  // Timer manager already emits "timerEnded".
+  // This callback should be used to advance game phase in roomsManager (wired later).
 })
+
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)

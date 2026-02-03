@@ -1,6 +1,6 @@
 import type { Server as SocketIOServer } from "socket.io"
 
-export type PhaseName = "LOBBY" | "DAY" | "NIGHT" | "DISCUSSION" | "PUBDISCUSSION" | "VOTING" | "GAMEOVER"
+export type PhaseName = "LOBBY" | "DAY" | "DISCUSSION" | "PUBDISCUSSION" | "VOTING" | "NIGHT" | "GAMEOVER"
 
 export type TimerState = {
     roomId: string
