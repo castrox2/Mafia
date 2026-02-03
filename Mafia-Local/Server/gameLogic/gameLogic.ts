@@ -100,41 +100,43 @@ export const randomizePlayerRoles = (
 
 // Count and register vote
 export const countPlayerVotes = (
-    rooms: Rooms,
-    roomId: string,
+  rooms: Rooms,
+  roomId: string,
 ): boolean => {
-    const room = rooms[normalizeRoomId(roomId)];
-    if (!room) return false;
-    const playerCount = room.players.length
-    if (playerCount === 0) return false;
+  const room = rooms[normalizeRoomId(roomId)]
+  if (!room) return false
 
-    const votedPlayers: Player[] = [];
-    let mostVotes = 0;
+  const playerCount = room.players.length
+  if (playerCount === 0) return false
 
-    for (const player of room.players) {
-        if (votedPlayers.length === 0) {
-            votedPlayers.push(player);
-            mostVotes = player.voteCount;
-        } else if (player.voteCount > mostVotes) {
-            votedPlayers.length = 0;
-            votedPlayers.push(player);
-            mostVotes = player.voteCount;
-        } else if (player.voteCount === mostVotes) {
-            votedPlayers.push(player);
-        }
+  const votedPlayers: Player[] = []
+  let mostVotes = 0
+
+  for (const player of room.players) {
+    if (votedPlayers.length === 0) {
+      votedPlayers.push(player)
+      mostVotes = player.voteCount
+    } else if (player.voteCount > mostVotes) {
+      votedPlayers.length = 0
+      votedPlayers.push(player)
+      mostVotes = player.voteCount
+    } else if (player.voteCount === mostVotes) {
+      votedPlayers.push(player)
     }
+  }
 
-    if (votedPlayers.length > 1) {
-        // Implement tie result logic
-    } else {
-        const player = getPlayerById(rooms, roomId, votedPlayers[0].id);
-        
-        player.alive = false;
-        return true;
-    }
-}
+  // Tie: currently no one dies (WIP)
+  if (votedPlayers.length > 1) {
+    return false
+  }
 
-// Test 
-export const emitPlayerStatus = (io: Server, playerId: string, status: "alive" | "dead"): void => {
-    io.emit("player:status", {playerId, status})
+  // No winner found (edge case)
+  const top = votedPlayers[0]
+  if (!top) return false
+
+  const target = getPlayerById(rooms, roomId, top.id)
+  if (!target) return false
+
+  target.alive = false
+  return true
 }

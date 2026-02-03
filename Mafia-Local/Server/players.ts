@@ -1,9 +1,9 @@
-export type PlayerRole=
-    | "UNASSIGNED"
+export type PlayerRole =
     | "MAFIA"
     | "CIVILIAN"
     | "DOCTOR"
-    | "POLICE"  
+    | "DETECTIVE"
+    | "SHERIFF"
 
 export type PlayerStatus =
     | "DISCONNECTED"

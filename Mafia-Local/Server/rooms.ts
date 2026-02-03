@@ -250,7 +250,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
       // Roles should be sent privately to each player later (separate event).
       players: room.players.map((p) => ({
         ...p,
-        role: room.gameStarted ? "UNASSIGNED" : p.role,
+        role: room.gameStarted ? "CIVILIAN" : p.role,
       })),
 
       settings: room.settings,
@@ -579,7 +579,7 @@ const updateRoomSettings = (
             alive: true,
             status: "NOT READY",
             // Do NOT assign role here; role assignment is handled later.
-            role: "UNASSIGNED",
+            role: "CIVILIAN",
           }
         : p
     )
