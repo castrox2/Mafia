@@ -471,11 +471,85 @@ export const createRoomsManager = (io: SocketIOServer) => {
           emitRoomState(cleanRoomId)
         }
 
+        // If VOTING just ended, resolve votes BEFORE moving on
+        if (phase === "VOTING") {
+          applyVotingResolution(r, cleanRoomId)
+          emitRoomState(cleanRoomId)
+        }
+
         startPhase(cleanRoomId, nextPhase(phase))
       }, sec * 1000)
     }
   }
 
+  /* ------------------------------------------------------
+              Helper: apply voting resolution
+  - Server-authoritative: applies vote elimination to room state
+  - Uses buffered CIVILIAN_VOTE actions from VOTING phase
+  - Spectators cannot vote or be targeted (validated here defensively)
+  - Tie/no votes => no elimination
+------------------------------------------------------ */
+
+  const applyVotingResolution = (room: Room, cleanRoomId: string) => {
+    const actions = getRoleActions(cleanRoomId, "VOTING")
+
+    // Build a map of targetClientId -> vote count
+    const tally = new Map<string, number>()
+
+    for (const a of actions) {
+      if ((a as any)?.kind !== "CIVILIAN_VOTE") continue
+
+      const fromClientId = String((a as any).fromClientId || "").trim()
+      const targetClientId = String((a as any).targetClientId || "").trim()
+      if (!fromClientId || !targetClientId) continue
+
+      const voter = room.players.find((p) => p.clientId === fromClientId)
+      const target = room.players.find((p) => p.clientId === targetClientId)
+
+      // Defensive eligibility checks (server truth)
+      if (!voter || voter.isSpectator === true || voter.alive !== true) continue
+      if (!target || target.isSpectator === true || target.alive !== true) continue
+
+      tally.set(targetClientId, (tally.get(targetClientId) ?? 0) + 1)
+    }
+
+    // Decide winner (if any)
+    let topCount = 0
+    let topTargets: string[] = []
+
+    for (const [targetClientId, count] of tally.entries()) {
+      if (count > topCount) {
+        topCount = count
+        topTargets = [targetClientId]
+      } else if (count === topCount && count > 0) {
+        topTargets.push(targetClientId)
+      }
+    }
+
+    let eliminatedClientId: string | null = null
+
+    // No votes OR tie => no elimination
+    if (topCount > 0 && topTargets.length === 1) {
+      eliminatedClientId = topTargets[0] ?? null
+    }
+
+    if (eliminatedClientId) {
+      const target = room.players.find((p) => p.clientId === eliminatedClientId)
+      if (target && target.isSpectator !== true) {
+        target.alive = false
+      }
+    }
+
+    // Clear VOTING actions at the phase boundary
+    clearRoleActions(cleanRoomId, "VOTING")
+
+    // Public vote summary (anti-spoiler)
+    io.to(cleanRoomId).emit("voteSummary", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      someoneDied: Boolean(eliminatedClientId),
+    })
+  }
 
     /* ------------------------------------------------------
           Helper: removes clientId from all rooms
@@ -726,7 +800,6 @@ const updateRoomSettings = (
     }
     return arr
   }
-
 
   const assignRolesForNewGame = (room: Room) => {
     const activePlayers = room.players.filter((p) => p.isSpectator !== true)

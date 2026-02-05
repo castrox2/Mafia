@@ -187,8 +187,8 @@ export const countPlayerVotes = (rooms: Rooms, roomId: string): boolean => {
 }
 
 /* ======================================================
-                        Test emit
-  - Use socket id to emit is fine; clientId is for identity.
+                      Test emit
+- Use socket id to emit is fine; clientId is for identity.
 ====================================================== */
 
 export const emitPlayerStatus = (
