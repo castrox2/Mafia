@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { socket, clientId } from "../src/socket.js"
+import { PhaseRouter } from "../components/phases/PhaseRouter.js"
 import type { RoomState } from "../src/types.js"
 
 type Props = {
@@ -127,27 +128,17 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         </button>
         </div>
 
-      {/* Simple player list (still useful during development) */}
-        {!amSpectator && (
-            <>
-                <h3>Players:</h3>
-                <ul style={{ paddingLeft: 18 }}>
-                {(state?.players ?? []).map((p) => {
-                    const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
-                    const deadTag = p.alive ? "" : " (dead)"
-                    return (
-                    <li key={p.clientId} style={{ marginBottom: 6 }}>
-                        {p.name}
-                        {hostTag}
-                        {deadTag}
-                        {" — "}
-                        status: {p.status}
-                    </li>
-                    )
-                })}
-                </ul>
-            </>
+      {/* Phase-specific screen (keeps styling/components isolated per phase) */}
+        {state && (
+            <PhaseRouter
+            phase={state.phase}
+            state={state}
+            me={me}
+            isHost={isHost}
+            isSpectator={amSpectator}
+            />
         )}
+
     </div>
     )
 }
