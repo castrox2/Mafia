@@ -73,6 +73,10 @@ io.on("connection", (socket) => {
     roomsManager.handleDisconnecting(socket)
   })
 
+  socket.on("requestMyActions", ({ roomId }: { roomId: string }) => {
+    roomsManager.requestMyActionsLocal(socket, roomId)
+  })
+
   socket.on(
     "createRoom",
     async ({ playerName, baseUrl }: { playerName: string; baseUrl: string }) => {

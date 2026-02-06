@@ -123,6 +123,42 @@ const phaseFromActionKind = (kind: RoleAction["kind"]): PhaseName => {
 }
 
 /* ------------------------------------------------------
+          Sheriff one-time-use tracker (per game)
+  - Keyed by (roomId, gameNumber, sheriffClientId)
+  - Memory-only; resets if server restarts (OK for LAN/dev)
+------------------------------------------------------ */
+
+type SheriffUsedKey = `${string}:game${number}:sheriff:${string}`
+
+const sheriffUsed = new Set<SheriffUsedKey>()
+
+const makeSheriffUsedKey = (
+  roomId: string,
+  gameNumber: number,
+  sheriffClientId: string
+): SheriffUsedKey => {
+  const cleanRoomId = (roomId || "").trim().toUpperCase()
+  const cleanSheriffId = (sheriffClientId || "").trim()
+  return `${cleanRoomId}:game${gameNumber}:sheriff:${cleanSheriffId}` as SheriffUsedKey
+}
+
+export const getSheriffUsed = (
+  roomId: string,
+  gameNumber: number,
+  sheriffClientId: string
+): boolean => {
+  return sheriffUsed.has(makeSheriffUsedKey(roomId, gameNumber, sheriffClientId))
+}
+
+export const markSheriffUsed = (
+  roomId: string,
+  gameNumber: number,
+  sheriffClientId: string
+) => {
+  sheriffUsed.add(makeSheriffUsedKey(roomId, gameNumber, sheriffClientId))
+}
+
+/* ------------------------------------------------------
           Doctor self-save tracker (per game)
   - Least invasive place to store this rule.
   - Keyed by (roomId, gameNumber, doctorClientId)
@@ -173,7 +209,16 @@ export const markDoctorSelfSaveUsed = (
 export const clearRoomRoleMemory = (roomId: string) => {
   clearAllRoomActions(roomId)
 
+  
+
   const cleanRoomId = (roomId || "").trim().toUpperCase()
+  
+    for (const key of sheriffUsed.keys()) {
+    if (key.startsWith(`${cleanRoomId}:`)) {
+      sheriffUsed.delete(key)
+    }
+  }
+
   for (const key of doctorSelfSaveUsed.keys()) {
     if (key.startsWith(`${cleanRoomId}:`)) {
       doctorSelfSaveUsed.delete(key)

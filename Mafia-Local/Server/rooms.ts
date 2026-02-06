@@ -1,8 +1,12 @@
 import type { Server as SocketIOServer } from "socket.io"
 import type { Socket } from "socket.io"
-import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction } from "./roles/types.js"
+import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction, SheriffShootAction } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
+import type { SheriffResolution } from "./roles/types.js"
 import { resolveNightPhase } from "./roles/night.js"
+import { resolveDetectiveChecks } from "./roles/detective.js"
+import { resolveSheriffShots } from "./roles/sheriff.js"
+import { markSheriffUsed } from "./roles/index.js"
 
 import {
   mergePlayerState,
@@ -17,6 +21,7 @@ import {
   clearRoleActions,
   recordRoleAction,
   getDoctorSelfSaveUsed,
+  getSheriffUsed,
 } from "./roles/index.js"
 
 // UI animation lead time: emit "phaseEnding" shortly before the phase actually switches.
@@ -382,34 +387,6 @@ export const createRoomsManager = (io: SocketIOServer) => {
       }
     }
 
-    // Public night summary (anti-spoiler)
-    io.to(cleanRoomId).emit("nightSummary", {
-      roomId: cleanRoomId,
-      gameNumber: room.gameNumber,
-      someoneDied: Boolean(res.killedClientId),
-    })
-
-
-    // Private detective results (anti-spoiler):
-    // Emit ONLY to the detective's socket. Never broadcast to the room.
-    for (const a of detectiveChecks) {
-      const detective = room.players.find((p) => p.clientId === a.fromClientId)
-      if (!detective || detective.isSpectator === true) continue
-
-      const target = room.players.find((p) => p.clientId === a.targetClientId)
-      if (!target || target.isSpectator === true) continue
-
-      const s = io.sockets.sockets.get(detective.id)
-      if (!s) continue
-
-      s.emit("privateMessage", {
-        type: "DETECTIVE_RESULT",
-        toClientId: detective.clientId,
-        checkedClientId: target.clientId,
-        isMafia: target.role === "MAFIA",
-      })
-    }
-
         // Public night summary (anti-spoiler)
     io.to(cleanRoomId).emit("nightSummary", {
       roomId: cleanRoomId,
@@ -417,27 +394,26 @@ export const createRoomsManager = (io: SocketIOServer) => {
       someoneDied: Boolean(res.killedClientId),
     })
 
-    // Private detective results (anti-spoiler)
-    for (const a of detectiveChecks) {
-      const detective = room.players.find((p) => p.clientId === a.fromClientId)
-      if (!detective || detective.isSpectator === true) continue
+    // Detective: resolve privately (anti-spoiler)
+    // - We do NOT broadcast results.
+    // - Each detective gets their own "DETECTIVE_RESULT".
+    const detectiveRes = resolveDetectiveChecks(room.players, detectiveChecks)
 
-      const target = room.players.find((p) => p.clientId === a.targetClientId)
-      if (!target || target.isSpectator === true) continue
+    for (const msg of detectiveRes.privateMessages) {
+      // msg.toClientId is the detective's clientId
+      const detective = room.players.find((p) => p.clientId === msg.toClientId)
+      if (!detective || detective.isSpectator === true) continue
 
       const s = io.sockets.sockets.get(detective.id)
       if (!s) continue
 
-      s.emit("privateMessage", {
-        type: "DETECTIVE_RESULT",
-        toClientId: detective.clientId,
-        checkedClientId: target.clientId,
-        isMafia: target.role === "MAFIA",
-      })
+      // Emit only to that detective
+      s.emit("privateMessage", msg)
     }
 
     // Clear NIGHT actions at the phase boundary
     clearRoleActions(cleanRoomId, "NIGHT")
+
 
     // OPTIONAL: You can log debug server-side without affecting clients
     // console.log("DEBUG: night resolution", { roomId: cleanRoomId, res })
@@ -516,8 +492,14 @@ export const createRoomsManager = (io: SocketIOServer) => {
         // If VOTING just ended, resolve votes BEFORE moving on
         if (phase === "VOTING") {
           applyVotingResolution(r, cleanRoomId)
+
+          // Sheriff resolves at end of VOTING (right before NIGHT)
+          applySheriffResolution(r, cleanRoomId)
+
           emitRoomState(cleanRoomId)
         }
+
+        startPhase(cleanRoomId, nextPhase(phase))
 
         startPhase(cleanRoomId, nextPhase(phase))
       }, sec * 1000)
@@ -591,6 +573,65 @@ export const createRoomsManager = (io: SocketIOServer) => {
       gameNumber: room.gameNumber,
       someoneDied: Boolean(eliminatedClientId),
     })
+  }
+
+  /* ------------------------------------------------------
+              Helper: apply sheriff resolution
+  - Resolves SHERIFF_SHOOT buffered under DAY bucket
+  - Applied at end of VOTING (right before NIGHT)
+  - Anti-spoiler: emits only the allowed public announcement
+------------------------------------------------------ */
+
+  const applySheriffResolution = (room: Room, cleanRoomId: string) => {
+    const actions = getRoleActions(cleanRoomId, "DAY")
+
+    const shots: SheriffShootAction[] = actions
+      .filter((a: any) => a?.kind === "SHERIFF_SHOOT")
+      .map((a: any) => ({
+        kind: "SHERIFF_SHOOT",
+        roomId: cleanRoomId,
+        fromClientId: String(a.fromClientId),
+        targetClientId: String(a.targetClientId),
+        createdAtMs: typeof a.createdAtMs === "number" ? a.createdAtMs : Date.now(),
+      }))
+
+    if (shots.length === 0) return
+
+    // Build "used" tracker from per-game memory
+    const usedMap: Record<string, boolean> = {}
+    for (const p of room.players) {
+      if (p.role !== "SHERIFF") continue
+      usedMap[p.clientId] = getSheriffUsed(cleanRoomId, room.gameNumber, p.clientId)
+    }
+
+    const res = resolveSheriffShots(room.players, shots, usedMap)
+
+    // Persist any consumed sheriff shots (one-time per game)
+    for (const sheriffId of res.usedByClientIds) {
+      if (!getSheriffUsed(cleanRoomId, room.gameNumber, sheriffId)) {
+        markSheriffUsed(cleanRoomId, room.gameNumber, sheriffId)
+      }
+    }
+
+    // Apply kill (if any)
+    if (res.killedClientId) {
+      const target = room.players.find((p) => p.clientId === res.killedClientId)
+      if (target && target.isSpectator !== true) {
+        target.alive = false
+      }
+    }
+
+    // Clear DAY bucket actions at boundary (this includes sheriff shots)
+    clearRoleActions(cleanRoomId, "DAY")
+
+    // Public announcement(s)
+    if (res.publicAnnouncements.length > 0) {
+      io.to(cleanRoomId).emit("publicAnnouncements", {
+        roomId: cleanRoomId,
+        gameNumber: room.gameNumber,
+        announcements: res.publicAnnouncements,
+      })
+    }
   }
 
     /* ------------------------------------------------------
@@ -1250,6 +1291,10 @@ const updateRoomSettings = (
     } else if (kind === "SHERIFF_SHOOT") {
       if (phase === "NIGHT") return refuse("Sheriff cannot shoot during NIGHT.")
       if (actor.role !== "SHERIFF") return refuse("Only Sheriff can shoot.")
+
+      // Sheriff one-time use per game
+      const used = getSheriffUsed(cleanRoomId, room.gameNumber, fromClientId)
+      if (used) return refuse("Sheriff can only shoot once per game.")
     } else if (kind === "CIVILIAN_VOTE") {
       if (phase !== "VOTING") return refuse("Votes can only be submitted during VOTING.")
       // We allow any alive, non-spectator player to submit this (UI parity)
