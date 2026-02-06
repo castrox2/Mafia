@@ -22,7 +22,7 @@ export type SheriffUsedTracker = Record<ClientId, boolean>
 
 export type SheriffResolveResult = {
   usedByClientIds: ClientId[] // who consumed their one-time use this resolution
-  killedClientId: ClientId[]
+  killedClientId: ClientId | null // if multiple shots kill mafia, we report all (room mutation happens outside)
   publicAnnouncements: PublicAnnouncement[]
   rejected: Array<{
     byClientId: ClientId
