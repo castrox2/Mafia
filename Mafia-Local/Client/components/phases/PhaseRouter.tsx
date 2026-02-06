@@ -6,7 +6,7 @@ type Phase =
     | "DAY"
     | "DISCUSSION"
     | "PUBDISCUSSION"
-    | "VOTE"
+    | "VOTING"
     | "NIGHT"
     | "GAMEOVER"
 
@@ -31,9 +31,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
         return <DayScreen state={state} me={me} isHost={isHost} isSpectator={isSpectator} />
         case "DISCUSSION":
         return <DiscussionScreen state={state} me={me} isHost={isHost} isSpectator={isSpectator} />
-        case "PUB_DISCUSSION":
+        case "PUBDISCUSSION":
         return <PubDiscussionScreen state={state} me={me} isHost={isHost} isSpectator={isSpectator} />
-        case "VOTE":
+        case "VOTING":
         return <VotingScreen state={state} me={me} isHost={isHost} isSpectator={isSpectator} />
         case "NIGHT":
         return <NightScreen state={state} me={me} isHost={isHost} isSpectator={isSpectator} />

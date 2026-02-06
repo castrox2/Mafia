@@ -27,7 +27,7 @@ export type RoomState = {
     hostId: string
     players: Player[]
     settings: GameSettings
-    phase: "LOBBY" | "DAY" | "NIGHT" | "VOTE" | "DISCUSSION" | "PUB_DISCUSSION" | "GAMEOVER"
+    phase: "LOBBY" | "DAY" | "NIGHT" | "VOTING" | "DISCUSSION" | "PUBDISCUSSION" | "GAMEOVER"
     phaseEndTime: number | null
     gameStarted: boolean
     gameNumber: number

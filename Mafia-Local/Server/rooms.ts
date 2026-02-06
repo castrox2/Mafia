@@ -2,6 +2,7 @@ import type { Server as SocketIOServer } from "socket.io"
 import type { Socket } from "socket.io"
 import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
+import { resolveNightPhase } from "./roles/night.js"
 
 import {
   mergePlayerState,
@@ -18,7 +19,9 @@ import {
   getDoctorSelfSaveUsed,
 } from "./roles/index.js"
 
-import { resolveNightPhase } from "./roles/night.js"
+// UI animation lead time: emit "phaseEnding" shortly before the phase actually switches.
+// This does NOT change game logic timing; it's just a client-friendly hint.
+const PHASE_ENDING_LEAD_MS = 500
 
 /* ======================================================
                           Types
@@ -68,6 +71,7 @@ type Room = {
 
   // Phase Scheduling
   phaseTimeoutId?: NodeJS.Timeout | null
+  phaseEndingTimeoutId?: NodeJS.Timeout | null
 }
 
 /* ======================================================
@@ -450,13 +454,51 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
     emitRoomState(cleanRoomId)
 
+    // UI-friendly phase transition hook (animations/screens can key off this)
+    io.to(cleanRoomId).emit("phaseStarted", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      phase: room.phase,
+      phaseEndTime: room.phaseEndTime,
+    })
+
+
     // IMPORTANT (timer safety):
     // Only allow ONE scheduled transition at a time.
     // This prevents "ghost transitions" when phases are changed manually or game ends.
     clearPhaseTimeout(room)
 
+    // Clear any previous "phaseEnding" timer too (avoid ghost events)
+    // (Add this property to Room type below.)
+    if (room.phaseEndingTimeoutId) {
+      clearTimeout(room.phaseEndingTimeoutId)
+      room.phaseEndingTimeoutId = null
+    }
+
+
     // Schedule the next transition (server authoritative)
     if (room.phaseEndTime) {
+
+            // Emit a UI hint slightly before the phase ends so clients can run exit animations.
+      // For very short phases, this may emit immediately.
+      const leadMs = Math.max(0, Math.min(PHASE_ENDING_LEAD_MS, sec * 1000))
+      const endingDelayMs = Math.max(0, sec * 1000 - leadMs)
+
+      room.phaseEndingTimeoutId = setTimeout(() => {
+        const r2 = rooms[cleanRoomId]
+        if (!r2) return
+        if (!r2.gameStarted) return
+        if (r2.phase !== phase) return
+
+        io.to(cleanRoomId).emit("phaseEnding", {
+          roomId: cleanRoomId,
+          gameNumber: r2.gameNumber,
+          fromPhase: phase,
+          toPhase: nextPhase(phase),
+          leadMs,
+        })
+      }, endingDelayMs)
+
       room.phaseTimeoutId = setTimeout(() => {
         const r = rooms[cleanRoomId]
         if (!r) return
@@ -642,6 +684,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
       phase: "LOBBY",
       phaseEndTime: null,
       phaseTimeoutId: null,
+      phaseEndingTimeoutId: null,
     }
 
     removeFromAllRooms(clientId, cleanRoomId)

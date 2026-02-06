@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/phases/PhaseRouter.js"
+import { PHASE_LABELS } from "../src/constants/phaseLabels.js"
 import type { RoomState } from "../src/types.js"
 
 type Props = {
@@ -77,6 +78,72 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         socket.off("kicked", onKicked)
     }
     }, [cleanRoomId, onExit])
+
+// ------------------------------------------------------
+// Phase transition listeners (UI-friendly)
+// - phaseEnding: emitted ~500ms before the server switches phases
+//   -> UI can start EXIT animations here (fade out, slide away, etc.)
+// - phaseStarted: emitted when the server has entered the new phase
+//   -> UI can swap to the new phase screen + start ENTER animations
+//
+// Notes for UI teammate:
+// - Do NOT rely on local timers for authoritative phase changes.
+// - Use roomState.phase / phaseStarted as the source of truth.
+// - phaseEnding is only a hint to start animations early.
+// ------------------------------------------------------
+
+useEffect(() => {
+    const onPhaseEnding = (payload: {
+        roomId: string
+        gameNumber: number
+        fromPhase: string
+        toPhase: string
+        leadMs: number
+    }) => {
+        // Ignore events for other rooms (important if you ever support multiple rooms)
+        if (payload.roomId !== cleanRoomId) return
+
+        // UI teammate idea:
+        // 1) Set a local "isTransitioning" flag to true
+        // 2) Set local "transitionDirection" or "toPhase" for animation variants
+        // 3) Begin exit animation for current phase screen
+        //
+        // Example:
+        // setTransition({ state: "exiting", toPhase: payload.toPhase })
+        //
+        // You do NOT change game state here. Server will do the actual switch.
+        console.log("phaseEnding", payload)
+    }
+
+    const onPhaseStarted = (payload: {
+        roomId: string
+        gameNumber: number
+        phase: string
+        phaseEndTime: number | null
+    }) => {
+        if (payload.roomId !== cleanRoomId) return
+
+        // UI teammate idea:
+        // 1) Swap rendered phase screen (if not already swapped by roomState)
+        // 2) Start enter animation for the new phase screen
+        // 3) Clear any per-phase UI selections (or requestMyActions to restore)
+        //
+        // Example:
+        // setTransition({ state: "entering", phase: payload.phase })
+        //
+        // Countdown should still be derived from roomState.phaseEndTime for accuracy.
+        console.log("phaseStarted", payload)
+    }
+
+    socket.on("phaseEnding", onPhaseEnding)
+    socket.on("phaseStarted", onPhaseStarted)
+
+    return () => {
+        socket.off("phaseEnding", onPhaseEnding)
+        socket.off("phaseStarted", onPhaseStarted)
+    }
+}, [cleanRoomId])
+
 
     const leaveRoom = () => {
     socket.emit("leaveRoom", cleanRoomId)

@@ -115,7 +115,7 @@ const phaseFromActionKind = (kind: RoleAction["kind"]): PhaseName => {
   // so resolution code can handle it when appropriate.
   if (kind === "SHERIFF_SHOOT") return "DAY"
 
-  // Civilian "vote" is intentionally non-functional; keep it in VOTING.
+  // Civilian "VOTING" is intentionally non-functional; keep it in VOTING.
   if (kind === "CIVILIAN_VOTE") return "VOTING"
 
   // Fallback (should never happen)

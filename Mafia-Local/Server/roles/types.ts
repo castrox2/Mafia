@@ -67,7 +67,7 @@ export type BaseRoleAction = {
   - Doctor: during NIGHT only
   - Detective: during NIGHT only
   - Sheriff: any time except NIGHT (your rule)
-  - Civilian: can "vote" but it doesn't do anything
+  - Civilian: can "VOTING" but it doesn't do anything
 ------------------------------------------------------ */
 
 export type MafiaKillVoteAction = BaseRoleAction &

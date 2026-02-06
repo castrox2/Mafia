@@ -7,7 +7,7 @@ import type { PlayerRole } from "../players.js"
   - IMPORTANT: keep these aligned with YOUR server phases.
 ====================================================== */
 
-export type GamePhase = "DISCUSSION" | "DAY" | "VOTE" | "NIGHT"
+export type GamePhase = "DISCUSSION" | "DAY" | "VOTING" | "NIGHT"
 
 /* ======================================================
                         Roles
@@ -16,7 +16,7 @@ export type GamePhase = "DISCUSSION" | "DAY" | "VOTE" | "NIGHT"
 export const ROLES: PlayerRole[] = ["MAFIA", "DOCTOR", "DETECTIVE", "SHERIFF", "CIVILIAN"]
 
 /* ======================================================
-                  UI metadata (server hints)
+                UI metadata (server hints)
   - Safe to expose because it contains no hidden info.
 ====================================================== */
 
@@ -42,7 +42,7 @@ export const ROLE_UI: Record<PlayerRole, RoleUiMeta> = {
 ====================================================== */
 
 export type RoleActionType =
-  | "MAFIA_KILL_VOTE"
+  | "MAFIA_KILL_VOTE" 
   | "DOCTOR_SAVE"
   | "DETECTIVE_CHECK"
   | "SHERIFF_SHOOT"
@@ -59,7 +59,7 @@ export const ROLE_ALLOWED_PHASES: Record<PlayerRole, GamePhase[]> = {
   DETECTIVE: ["NIGHT"],
 
   // Sheriff: can shoot anytime EXCEPT NIGHT
-  SHERIFF: ["DISCUSSION", "DAY", "VOTE"],
+  SHERIFF: ["DISCUSSION", "DAY", "VOTING"],
 
   // Civilians: can pick at night but it does nothing
   CIVILIAN: ["NIGHT"],
