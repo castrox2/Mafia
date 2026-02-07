@@ -73,10 +73,6 @@ io.on("connection", (socket) => {
     roomsManager.handleDisconnecting(socket)
   })
 
-  socket.on("requestMyActions", ({ roomId }: { roomId: string }) => {
-    roomsManager.requestMyActionsLocal(socket, roomId)
-  })
-
   socket.on(
     "createRoom",
     async ({ playerName, baseUrl }: { playerName: string; baseUrl: string }) => {
@@ -156,7 +152,7 @@ io.on("connection", (socket) => {
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
-      if (room.hostId !== socket.data.clientId && playerId !== clientId) return
+      if (room.hostId !== socket.data.clientId && playerId !== socket.data.clientId) return
       roomsManager.setPlayerStatus(cleanRoomId, playerId, status)
     }
   )

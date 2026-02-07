@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState, useRef } from "react"
 import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/phases/PhaseRouter.js"
 import { PHASE_LABELS } from "../src/constants/phaseLabels.js"
@@ -21,6 +21,20 @@ export default function Game({ roomId, playerName, onExit }: Props) {
     - Keeps UI in sync without asking server repeatedly
 ------------------------------------------------------ */
     const [nowMs, setNowMs] = useState(Date.now())
+
+    // Private role (anti-spoiler): set by server via "yourRole"
+    const [myRole, setMyRole] = useState<string | null>(null)
+
+    // UI-friendly transient banners (night/vote summaries)
+    const [banner, setBanner] = useState<null | { kind: "NIGHT" | "VOTING"; text: string }>(null)
+
+    // Private messages (ex: Detective result). UI teammate can turn into toast/modal later.
+    const [privateMessages, setPrivateMessages] = useState<any[]>([])
+
+    // Optional: restore my current selections for a phase (from requestMyActions)
+    const [myActions, setMyActions] = useState<any[]>([])
+
+    const bannerTimeoutRef = React.useRef<number | null>(null)
 
     useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 500)
@@ -144,6 +158,127 @@ useEffect(() => {
     }
 }, [cleanRoomId])
 
+// ------------------------------------------------------
+// Game event listeners (UI-friendly)
+// - yourRole: private role reveal (only to this socket)
+// - privateMessage: private info (ex: detective results)
+// - nightSummary / voteSummary: public, spoiler-safe summaries
+// - myActions: server echo of YOUR currently recorded action(s) for this phase
+//
+// Notes for UI teammate:
+// - These are the best "hooks" for banners/toasts/modals.
+// - They are *events*, not authoritative truth.
+//   Authoritative truth is still roomState (players alive, phase, etc.)
+// ------------------------------------------------------
+useEffect(() => {
+  const onYourRole = (payload: {
+    roomId: string
+    gameNumber: number
+    role: string
+  }) => {
+    if (payload.roomId !== cleanRoomId) return
+
+    // UI teammate idea:
+    // - Show a one-time modal: "You are the Detective"
+    // - Or show a small badge near the player name
+    setMyRole(payload.role)
+    console.log("yourRole", payload)
+  }
+
+  const onPrivateMessage = (payload: any) => {
+    // This event is already private by design, but still room-filter it.
+    // (Good habit if you ever support multiple rooms per client.)
+    if ((payload as any)?.roomId && (payload as any).roomId !== cleanRoomId) return
+
+    // UI teammate idea:
+    // - Show toast/modal
+    // - Or add to an "Inbox" panel for the player
+    setPrivateMessages((prev) => [...prev, payload])
+    console.log("privateMessage", payload)
+  }
+
+  const onNightSummary = (payload: {
+    roomId: string
+    gameNumber: number
+    someoneDied: boolean
+  }) => {
+    if (payload.roomId !== cleanRoomId) return
+
+    // UI teammate idea:
+    // - Show a full-screen overlay or banner for 1-2 seconds
+    // - Fade out automatically
+    setBanner({
+        kind: "NIGHT",
+        text: payload.someoneDied ? "Night ended: someone died." : "Night ended: no one died.",
+    })
+
+    if (bannerTimeoutRef.current) {
+        window.clearTimeout(bannerTimeoutRef.current)
+        }
+
+        bannerTimeoutRef.current = window.setTimeout(() => {
+        setBanner(null)
+    }, 1500)
+
+    console.log("nightSummary", payload)
+  }
+
+  const onVoteSummary = (payload: {
+    roomId: string
+    gameNumber: number
+    someoneDied: boolean
+  }) => {
+    if (payload.roomId !== cleanRoomId) return
+
+    setBanner({
+      kind: "VOTING",
+      text: payload.someoneDied ? "Voting ended: someone was eliminated." : "Voting ended: no one was eliminated.",
+    })
+    if (bannerTimeoutRef.current) {
+        window.clearTimeout(bannerTimeoutRef.current)
+        }
+
+        bannerTimeoutRef.current = window.setTimeout(() => {
+        setBanner(null)
+    }, 1500)
+
+    console.log("voteSummary", payload)
+  }
+
+  const onMyActions = (payload: {
+    roomId: string
+    gameNumber: number
+    phase: string
+    bucket: string
+    actions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
+  }) => {
+    if (payload.roomId !== cleanRoomId) return
+
+    // UI teammate idea:
+    // - Pre-select buttons/radios based on existing action
+    // - Show "You selected X" status
+    setMyActions(payload.actions ?? [])
+    console.log("myActions", payload)
+  }
+
+  socket.on("yourRole", onYourRole)
+  socket.on("privateMessage", onPrivateMessage)
+  socket.on("nightSummary", onNightSummary)
+  socket.on("voteSummary", onVoteSummary)
+  socket.on("myActions", onMyActions)
+
+  return () => {
+      if (bannerTimeoutRef.current) {
+    window.clearTimeout(bannerTimeoutRef.current)
+      }
+
+    socket.off("yourRole", onYourRole)
+    socket.off("privateMessage", onPrivateMessage)
+    socket.off("nightSummary", onNightSummary)
+    socket.off("voteSummary", onVoteSummary)
+    socket.off("myActions", onMyActions)
+  }
+}, [cleanRoomId])
 
     const leaveRoom = () => {
     socket.emit("leaveRoom", cleanRoomId)
@@ -198,14 +333,20 @@ useEffect(() => {
       {/* Phase-specific screen (keeps styling/components isolated per phase) */}
         {state && (
             <PhaseRouter
-            phase={state.phase}
-            state={state}
-            me={me}
-            isHost={isHost}
-            isSpectator={amSpectator}
+                phase={state.phase}
+                state={state}
+                me={me}
+                isHost={isHost}
+                isSpectator={amSpectator}
+                myRole={myRole}
+                myActions={myActions}
+                privateMessages={privateMessages}
+                banner={banner}
             />
         )}
 
     </div>
     )
 }
+
+
