@@ -1,5 +1,3 @@
-// Server/gameLogic/roles.ts
-
 import type { PlayerRole } from "../players.js"
 
 /* ======================================================

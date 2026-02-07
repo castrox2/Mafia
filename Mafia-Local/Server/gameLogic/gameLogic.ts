@@ -9,9 +9,9 @@ const normalizeRoomId = (roomId: string): string => (roomId || "").trim().toUppe
 
 /* ======================================================
         Identity Note (Reconnect-safe)
-  - player.id = socket.id (changes on refresh/reconnect)
-  - player.clientId = stable identity (persists)
-  - All game logic should use clientId.
+- player.id = socket.id (changes on refresh/reconnect)
+- player.clientId = stable identity (persists)
+- All game logic should use clientId.
 ====================================================== */
 
 /* ------------------------------------------------------
@@ -43,8 +43,8 @@ export const getPlayerByClientId = (
 }
 
 /* ======================================================
-                  Player state updates
-  - All functions below use clientId.
+                Player state updates
+- All functions below use clientId.
 ====================================================== */
 
 // Set/update player's alive status

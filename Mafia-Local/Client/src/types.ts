@@ -58,7 +58,6 @@ export type RoleCounts = {
 }
 
 export type GameSettings = {
-    roleCount: any
+    roleCount: RoleCounts
     timers: PhaseTimers
-    roles: RoleCounts
 }

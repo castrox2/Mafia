@@ -408,7 +408,11 @@ export const createRoomsManager = (io: SocketIOServer) => {
       if (!s) continue
 
       // Emit only to that detective
-      s.emit("privateMessage", msg)
+      s.emit("privateMessage", {
+        roomId: cleanRoomId,
+        gameNumber: room.gameNumber,
+        ...msg,
+      })
     }
 
     // Clear NIGHT actions at the phase boundary
@@ -498,8 +502,6 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
           emitRoomState(cleanRoomId)
         }
-
-        startPhase(cleanRoomId, nextPhase(phase))
 
         startPhase(cleanRoomId, nextPhase(phase))
       }, sec * 1000)
@@ -823,8 +825,7 @@ const updateRoomSettings = (
 
     socket.join(cleanRoomId)
 
-    const existing = room.players.find((p) => p.clientId === clientId) ?? 
-                      room.players.find((p) => p.clientId === clientId)
+    const existing = room.players.find((p) => p.clientId === clientId)
     
     const merged = mergePlayerState(existing, socket.id, clientId, cleanName)
 
