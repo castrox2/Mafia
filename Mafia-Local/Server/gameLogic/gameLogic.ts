@@ -1,4 +1,3 @@
-import type { Server } from "socket.io"
 import type { Player, PlayerRole } from "../players.js"
 
 type Room = { players: Player[] }
@@ -43,12 +42,12 @@ export const getPlayerByClientId = (
 }
 
 /* ======================================================
-                Player state updates
-- All functions below use clientId.
+Simple Player state updates
+    - Functions below are foundation for role logic
 ====================================================== */
 
 // Set/update player's alive status
-export const setPlayerAlive = (
+export const setPlayerAliveStatus = (
   rooms: Rooms,
   roomId: string,
   clientId: string,
@@ -102,15 +101,47 @@ export const setPlayerRole = (
   return true
 }
 
+export const returnPlayerRole = (
+    rooms: Rooms,
+    roomId: string,
+    clientId: string,
+): string | boolean => {
+    const player = getPlayerByClientId(rooms, roomId, clientId)
+    if (!player) return false
+
+    return player.role
+}
+
+export const returnPlayerAliveStatus = (
+    rooms: Rooms,
+    roomId: string,
+    clientId: string,
+): string | boolean => {
+    const player = getPlayerByClientId(rooms, roomId, clientId)
+    if (!player) return false
+
+    return player.alive
+}
+
+export const returnPlayerVoteCount = (
+    rooms: Rooms,
+    roomId: string,
+    clientId: string,
+): number | boolean => {
+    const player = getPlayerByClientId(rooms, roomId, clientId)
+    if (!player) return false
+
+    return player.voteCount
+}
+
+
 /* ======================================================
-                  Role assignment (prototype)
-  - NOTE: This is still a simple prototype:
-    mafiaMax = floor(players/4)
-  - You will likely replace this with your roleCount logic.
-  - Uses stable clientId identity automatically.
+Role assignment (prototype)
+    - mafiaMax = floor(players/4)
+    - doctor, sheriff and detective roles added based on boolean parameter
 ====================================================== */
 
-export const randomizePlayerRoles = (rooms: Rooms, roomId: string): boolean => {
+export const randomizePlayerRoles = (rooms: Rooms, roomId: string, addDoctorRole:boolean, addSheriffRole: boolean, addDetectiveRole: boolean): boolean => {
   const room = rooms[normalizeRoomId(roomId)]
   if (!room) return false
 
@@ -121,15 +152,54 @@ export const randomizePlayerRoles = (rooms: Rooms, roomId: string): boolean => {
   if (playerCount === 0) return false
 
   const mafiaMax = Math.floor(playerCount / 4)
+  let mafiaCount = 0
 
-  for (let mafiaCount = 0; mafiaCount < mafiaMax; mafiaCount++) {
+  while (mafiaCount < mafiaMax) {
     const player = activePlayers[Math.floor(Math.random() * playerCount)]
     if (!player) return false
 
     if (player.role === "CIVILIAN") {
-      player.role = "MAFIA"
-    } else {
-      mafiaCount--
+        player.role = "MAFIA"
+        mafiaCount++;
+    } 
+  }
+
+  if (addDoctorRole) {
+    let doctorCount = 0;
+    while (doctorCount < 1) {
+        const player = activePlayers[Math.floor(Math.random() * playerCount)]
+        if (!player) return false
+
+        if (player.role === "CIVILIAN") {
+            player.role = "DOCTOR"
+            doctorCount++;
+        } 
+    }
+  }
+
+  if (addSheriffRole) {
+    let sheriffCount = 0;
+    while (sheriffCount < 1) {
+        const player = activePlayers[Math.floor(Math.random() * playerCount)]
+        if (!player) return false
+
+        if (player.role === "CIVILIAN") {
+            player.role = "SHERIFF"
+            sheriffCount++;
+        } 
+    }
+  }
+
+  if (addDetectiveRole) {
+    let detectiveCount = 0;
+    while (detectiveCount < 1) {
+        const player = activePlayers[Math.floor(Math.random() * playerCount)]
+        if (!player) return false
+
+        if (player.role === "CIVILIAN") {
+            player.role = "DETECTIVE"
+            detectiveCount++;
+        } 
     }
   }
 
@@ -137,64 +207,21 @@ export const randomizePlayerRoles = (rooms: Rooms, roomId: string): boolean => {
 }
 
 /* ======================================================
-                  Vote counting (prototype)
-  - Fixes TS errors
-  - Uses stable clientId identity
-  - Current behavior:
-    * tie => no one dies (returns false)
-    * single winner => that player dies
+Basic Vote Function
+    - Feed a player list, then return most voted player(s)
 ====================================================== */
 
-export const countPlayerVotes = (rooms: Rooms, roomId: string): boolean => {
-  const room = rooms[normalizeRoomId(roomId)]
-  if (!room) return false
+export const countPlayerVotes = (players: Player[]): Player[] | boolean => {
 
-  const activePlayers = room.players.filter((p) => (p as any).isSpectator !== true)
+  const activePlayers = players.filter((p) => (p as any).isSpectator !== true)
 
   const playerCount = activePlayers.length
   if (playerCount === 0) return false
 
-  const votedPlayers: Player[] = []
-  let mostVotes = 0
+  let votedPlayers: Player[] = []
+  const maxVotes = Math.max(...players.map(player => player.voteCount));
 
-  for (const player of activePlayers) {
-    if (votedPlayers.length === 0) {
-      votedPlayers.push(player)
-      mostVotes = player.voteCount
-    } else if (player.voteCount > mostVotes) {
-      votedPlayers.length = 0
-      votedPlayers.push(player)
-      mostVotes = player.voteCount
-    } else if (player.voteCount === mostVotes) {
-      votedPlayers.push(player)
-    }
-  }
+  votedPlayers = players.filter(player => player.voteCount === maxVotes);
 
-  // Tie: no one dies (WIP)
-  if (votedPlayers.length > 1) {
-    return false
-  }
-
-  const top = votedPlayers[0]
-  if (!top) return false
-
-  // Re-fetch by clientId (stable) before mutating
-  const target = getPlayerByClientId(rooms, roomId, top.clientId)
-  if (!target) return false
-
-  target.alive = false
-  return true
-}
-
-/* ======================================================
-                      Test emit
-- Use socket id to emit is fine; clientId is for identity.
-====================================================== */
-
-export const emitPlayerStatus = (
-  io: Server,
-  clientId: string,
-  status: "alive" | "dead"
-): void => {
-  io.emit("player:status", { clientId, status })
+  return votedPlayers;
 }
