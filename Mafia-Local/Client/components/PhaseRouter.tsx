@@ -32,6 +32,7 @@ type PhaseRouterProps = {
 
   // UI-supporting, non-authoritative (sent by events; roomState is the truth)
   myRole: string | null
+  rolemateClientIds: string[]
   myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
   privateMessages: any[]
   banner: Banner
@@ -47,6 +48,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
   isHost,
   isSpectator,
   myRole,
+  rolemateClientIds,
   myActions,
   privateMessages,
   banner,
@@ -63,6 +65,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -80,6 +83,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -97,6 +101,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -114,6 +119,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -131,6 +137,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -148,6 +155,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -165,6 +173,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isHost={isHost}
           isSpectator={isSpectator}
           myRole={myRole}
+          rolemateClientIds={rolemateClientIds}
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
@@ -191,6 +200,7 @@ type ScreenProps = {
   isHost: boolean
   isSpectator: boolean
   myRole: string | null
+  rolemateClientIds: string[]
   myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
   privateMessages: any[]
   banner: Banner
@@ -321,6 +331,7 @@ const NightScreen = ({
   me,
   isSpectator,
   myRole,
+  rolemateClientIds,
   myActions,
   privateMessages,
   banner,
@@ -341,6 +352,14 @@ const NightScreen = ({
           ? { kind: "DETECTIVE_CHECK", actionLabel: "Investigate", skipLabel: "Skip Check" }
           : null
 
+  const rolemateSet = new Set(rolemateClientIds)
+  const rolemateIconSrc =
+    myRole === "MAFIA"
+      ? "/assets/icons/Mafia.ico"
+      : myRole === "DOCTOR"
+        ? "/assets/icons/Doctor.ico"
+        : null
+
   return (
     <div>
       <h2>Night</h2>
@@ -356,14 +375,28 @@ const NightScreen = ({
         {canActAtNight && actionByRole && (
           <div style={{ marginTop: 10 }}>
             <ul>
-              {aliveTargets.map((p) => (
-                <li key={p.clientId}>
-                  {p.name}{" "}
-                  <button onClick={() => submitRoleAction(actionByRole.kind, p.clientId)}>
-                    {actionByRole.actionLabel}
-                  </button>
-                </li>
-              ))}
+              {aliveTargets.map((p) => {
+                const isRolemate = rolemateSet.has(p.clientId)
+
+                return (
+                  <li key={p.clientId}>
+                    {p.name}{" "}
+                    {isRolemate && rolemateIconSrc && (
+                      <img
+                        src={rolemateIconSrc}
+                        alt={myRole === "MAFIA" ? "Mafia rolemate" : "Doctor rolemate"}
+                        style={{ width: 16, height: 16, objectFit: "contain", marginRight: 6 }}
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none"
+                        }}
+                      />
+                    )}
+                    <button onClick={() => submitRoleAction(actionByRole.kind, p.clientId)}>
+                      {actionByRole.actionLabel}
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
 
             <button onClick={() => submitRoleAction(actionByRole.kind, SKIP_TARGET_CLIENT_ID)}>

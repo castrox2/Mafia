@@ -32,8 +32,25 @@ export default function Lobby({
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
 
   const isHost = state?.hostId === clientId
+  const me = state?.players?.find((p) => p.clientId === clientId) ?? null
+  const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
+
+  const actionButtonStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    fontSize: 16,
+    borderRadius: 8,
+    border: "1px solid #bdbdbd",
+    background: "#fff",
+    cursor: "pointer",
+  }
+
+  const readyToggleButtonStyle: React.CSSProperties = {
+    ...actionButtonStyle,
+    border: amReady ? "1px solid #d46a6a" : "1px solid #5ea66d",
+    background: amReady ? "#fff2f2" : "#f2fff4",
+  }
 
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
@@ -105,23 +122,33 @@ export default function Lobby({
     onExit()
   }
 
-  const setReady = (ready: boolean) => {
+  const toggleReady = () => {
     socket.emit("setPlayerStatus", {
       roomId: cleanRoomId,
       playerId: clientId,
-      status: ready ? "READY" : "NOT READY",
+      status: amReady ? "NOT READY" : "READY",
     })
   }
 
   return (
     <div style={{ padding: 20, maxWidth: 700, fontFamily: "sans-serif" }}>
-      <h1 style={{ marginBottom: 8 }}>Lobby</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <img
+          src="/assets/Mafia-Icon.png"
+          alt="Mafia Local logo"
+          style={{ width: 56, height: 56, objectFit: "contain" }}
+          onError={(event) => {
+            event.currentTarget.style.display = "none"
+          }}
+        />
+        <h1 style={{ marginBottom: 0, marginTop: 0 }}>Lobby</h1>
+      </div>
 
       {/* Host settings modal */}
       {clientId === state?.hostId && (
         <div>
           <button
-            style={{ padding: "10px 12px", fontSize: 16, marginBottom: 12 }}
+            style={{ ...actionButtonStyle, marginBottom: 12 }}
             onClick={() => setSettingsOpen(true)}
           >
             Host Settings
@@ -180,7 +207,7 @@ export default function Lobby({
       {isHost && (
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <button
-            style={{ padding: "10px 12px", fontSize: 16 }}
+            style={actionButtonStyle}
             disabled={!allReady}
             onClick={() => socket.emit("startGame", { roomId: cleanRoomId })}
           >
@@ -188,7 +215,7 @@ export default function Lobby({
           </button>
 
           <button
-            style={{ padding: "10px 12px", fontSize: 16 }}
+            style={actionButtonStyle}
             onClick={() =>
               socket.emit("forceStartGame", { roomId: cleanRoomId })
             }
@@ -200,19 +227,13 @@ export default function Lobby({
 
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <button
-          style={{ padding: "10px 12px", fontSize: 16 }}
-          onClick={() => setReady(true)}
+          style={readyToggleButtonStyle}
+          onClick={toggleReady}
         >
-          Ready
+          {amReady ? "Unready" : "Ready"}
         </button>
         <button
-          style={{ padding: "10px 12px", fontSize: 16 }}
-          onClick={() => setReady(false)}
-        >
-          Not Ready
-        </button>
-        <button
-          style={{ padding: "10px 12px", fontSize: 16 }}
+          style={actionButtonStyle}
           onClick={leaveRoom}
         >
           Leave Room

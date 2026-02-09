@@ -27,6 +27,7 @@ export default function Game({ roomId, playerName, onExit }: Props) {
 
     // Private role (anti-spoiler): set by server via "yourRole"
     const [myRole, setMyRole] = useState<string | null>(null)
+    const [rolemateClientIds, setRolemateClientIds] = useState<string[]>([])
 
     // UI-friendly transient banners (night/vote summaries)
     const [banner, setBanner] = useState<null | { kind: "NIGHT" | "VOTING"; text: string }>(null)
@@ -63,6 +64,9 @@ export default function Game({ roomId, playerName, onExit }: Props) {
     useEffect(() => {
     const onRoomState = (s: RoomState) => {
         setState(s)
+        if (!s.gameStarted) {
+            setRolemateClientIds([])
+        }
         if (s.phase !== "GAMEOVER") {
             setWinner(null)
         }
@@ -205,6 +209,7 @@ useEffect(() => {
     roomId: string
     gameNumber: number
     role: string
+    rolemateClientIds?: string[]
   }) => {
     if (payload.roomId !== cleanRoomId) return
 
@@ -212,6 +217,7 @@ useEffect(() => {
     // - Show a one-time modal: "You are the Detective"
     // - Or show a small badge near the player name
     setMyRole(payload.role)
+    setRolemateClientIds(Array.isArray(payload.rolemateClientIds) ? payload.rolemateClientIds : [])
     console.log("yourRole", payload)
   }
 
@@ -363,7 +369,17 @@ useEffect(() => {
 
     return (
     <div style={{ padding: 20, maxWidth: 900, fontFamily: "sans-serif" }}>
-        <h1 style={{ marginBottom: 8 }}>Game</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <img
+            src="/assets/Mafia-Icon.png"
+            alt="Mafia Local logo"
+            style={{ width: 56, height: 56, objectFit: "contain" }}
+            onError={(event) => {
+                event.currentTarget.style.display = "none"
+            }}
+            />
+            <h1 style={{ marginBottom: 0, marginTop: 0 }}>Game</h1>
+        </div>
 
         <div style={{ marginBottom: 10 }}>
         <div>
@@ -410,6 +426,7 @@ useEffect(() => {
                 isHost={isHost}
                 isSpectator={amSpectator}
                 myRole={myRole}
+                rolemateClientIds={rolemateClientIds}
                 myActions={myActions}
                 privateMessages={privateMessages}
                 banner={banner}

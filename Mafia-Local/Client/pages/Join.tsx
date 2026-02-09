@@ -128,8 +128,20 @@ export default function Join({ onEnterLobby }: Props) {
 
     return (
         <div style={{ padding: 20, maxWidth: 560, fontFamily: "sans-serif" }}>
-        <h1 style={{ marginBottom: 8 }}>Mafia Local – Join</h1>
-        <p style={{ marginTop: 0 }}>Create a room or join an existing room!</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+            <img
+            src="/assets/Mafia-Icon.png"
+            alt="Mafia Local logo"
+            style={{ width: 72, height: 72, objectFit: "contain" }}
+            onError={(event) => {
+                event.currentTarget.style.display = "none"
+            }}
+            />
+            <div>
+            <h1 style={{ marginBottom: 8, marginTop: 0 }}>Mafia Local - Join</h1>
+            <p style={{ marginTop: 0 }}>Create a room or join an existing room!</p>
+            </div>
+        </div>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
             <input

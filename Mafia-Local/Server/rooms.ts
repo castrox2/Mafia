@@ -992,7 +992,22 @@ const updateRoomSettings = (
     - Never broadcasts to the room
   ------------------------------------------------------ */
 
+  const getPrivateRolemateClientIds = (room: Room, player: Player): string[] => {
+    if (player.isSpectator === true) return []
+    if (player.role !== "MAFIA" && player.role !== "DOCTOR") return []
+
+    return room.players
+      .filter(
+        (p) =>
+          p.isSpectator !== true &&
+          p.clientId !== player.clientId &&
+          p.role === player.role
+      )
+      .map((p) => p.clientId)
+  }
+
   const emitPrivateRoleToPlayer = (
+    room: Room,
     roomId: string,
     gameNumber: number,
     player: Player
@@ -1005,6 +1020,7 @@ const updateRoomSettings = (
       roomId,
       gameNumber,
       role: player.role,
+      rolemateClientIds: getPrivateRolemateClientIds(room, player),
     })
   }
 
@@ -1015,7 +1031,7 @@ const updateRoomSettings = (
     if (!room.gameStarted) return
 
     for (const p of room.players) {
-      emitPrivateRoleToPlayer(cleanRoomId, room.gameNumber, p)
+      emitPrivateRoleToPlayer(room, cleanRoomId, room.gameNumber, p)
     }
   }
 
@@ -1197,6 +1213,7 @@ const updateRoomSettings = (
         roomId,
         gameNumber: room.gameNumber,
         role: existingPlayer.role,
+        rolemateClientIds: getPrivateRolemateClientIds(room, existingPlayer),
       })
     }
 
