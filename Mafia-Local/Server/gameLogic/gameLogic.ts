@@ -117,7 +117,7 @@ export const returnPlayerRole = (
     rooms: Rooms,
     roomId: string,
     clientId: string,
-): string | boolean => {
+): PlayerRole | false => {
     const player = getPlayerByClientId(rooms, roomId, clientId)
     if (!player) return false
 
@@ -128,7 +128,7 @@ export const returnPlayerAliveStatus = (
     rooms: Rooms,
     roomId: string,
     clientId: string,
-): string | boolean => {
+): boolean => {
     const player = getPlayerByClientId(rooms, roomId, clientId)
     if (!player) return false
 
@@ -139,7 +139,7 @@ export const returnPlayerVoteCount = (
     rooms: Rooms,
     roomId: string,
     clientId: string,
-): number | boolean => {
+): number | false => {
     const player = getPlayerByClientId(rooms, roomId, clientId)
     if (!player) return false
 

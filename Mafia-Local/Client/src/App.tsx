@@ -62,7 +62,14 @@ export default function App() {
     - Game.tsx should NOT auto-join (prevents duplicates).
   ------------------------------------------------------ */
   if (screen === "GAME") {
-    return <Game roomId={roomId} playerName={playerName} onExit={onExit} />
+    return (
+      <Game
+        roomId={roomId}
+        playerName={playerName}
+        onExit={onExit}
+        onBackToLobby={() => setScreen("LOBBY")}
+      />
+    )
   }
 
   /* ------------------------------------------------------

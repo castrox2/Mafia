@@ -8,12 +8,13 @@ type Props = {
     roomId: string
     playerName: string
     onExit: () => void
+    onBackToLobby: () => void
 }
 
 type Winner = "MAFIA" | "CIVILIANS"
 type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
 
-export default function Game({ roomId, playerName, onExit }: Props) {
+export default function Game({ roomId, playerName, onExit, onBackToLobby }: Props) {
     const [state, setState] = useState<RoomState | null>(null)
 
     const cleanRoomId = useMemo(() => roomId.trim().toUpperCase(), [roomId])
@@ -84,15 +85,21 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         onExit()
     }
 
+    const onStartRefused = ({ reason }: { reason: string }) => {
+        alert(reason || "Unable to start a new game.")
+    }
+
 
 
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("kicked", onKicked)
+    socket.on("startRefused", onStartRefused)
 
     // Ask server to re-send the current state (safe: does not re-join)
     if (cleanRoomId) {
         socket.emit("requestRoomState", { roomId: cleanRoomId })
+        socket.emit("requestMyRole", { roomId: cleanRoomId })
     }
 
     // IMPORTANT:
@@ -107,6 +114,7 @@ export default function Game({ roomId, playerName, onExit }: Props) {
         socket.off("roomState", onRoomState)
         socket.off("roomClosed", onRoomClosed)
         socket.off("kicked", onKicked)
+        socket.off("startRefused", onStartRefused)
     }
     }, [cleanRoomId, onExit])
 
@@ -164,6 +172,7 @@ useEffect(() => {
         //
         // Countdown should still be derived from roomState.phaseEndTime for accuracy.
         setMyActions([])
+        socket.emit("requestMyRole", { roomId: cleanRoomId })
         socket.emit("requestMyActions", { roomId: cleanRoomId })
         console.log("phaseStarted", payload)
     }
@@ -176,6 +185,23 @@ useEffect(() => {
         socket.off("phaseStarted", onPhaseStarted)
     }
 }, [cleanRoomId])
+
+// ------------------------------------------------------
+// Role reliability fallback
+// - If game is running and role is still unknown, re-request once shortly.
+// - Covers edge timing where Game mounts right after role emit.
+// ------------------------------------------------------
+useEffect(() => {
+  if (!cleanRoomId) return
+  if (state?.gameStarted !== true) return
+  if (myRole != null) return
+
+  const t = window.setTimeout(() => {
+    socket.emit("requestMyRole", { roomId: cleanRoomId })
+  }, 120)
+
+  return () => window.clearTimeout(t)
+}, [cleanRoomId, state?.gameStarted, myRole])
 
 // ------------------------------------------------------
 // Game event listeners (UI-friendly)
@@ -335,6 +361,10 @@ useEffect(() => {
   socket.on("actionRefused", onActionRefused)
   socket.on("myActions", onMyActions)
 
+  // Re-request role AFTER listeners are attached to avoid missing
+  // fast server responses during initial Game mount.
+  socket.emit("requestMyRole", { roomId: cleanRoomId })
+
   return () => {
     if (bannerTimeoutRef.current) {
       window.clearTimeout(bannerTimeoutRef.current)
@@ -352,14 +382,55 @@ useEffect(() => {
   }
 }, [cleanRoomId])
 
-    const leaveRoom = () => {
-    socket.emit("leaveRoom", cleanRoomId)
-    onExit()
-    }
-
     const isHost = state?.hostId === clientId
     const me = state?.players?.find((p) => p.clientId === clientId) ?? null
     const amSpectator = me?.isSpectator === true
+    const isGameOverPhase = state?.phase === "GAMEOVER"
+
+    const baseActionButtonStyle: React.CSSProperties = {
+      padding: "10px 12px",
+      fontSize: 16,
+      borderRadius: 8,
+      border: "1px solid #bdbdbd",
+      background: "#fff",
+      cursor: "pointer",
+    }
+
+    const leaveButtonStyle: React.CSSProperties = {
+      ...baseActionButtonStyle,
+      border: "1px solid #c47c7c",
+      background: "#fff4f4",
+    }
+
+    const backToLobbyButtonStyle: React.CSSProperties = {
+      ...baseActionButtonStyle,
+      border: "1px solid #7ea0c4",
+      background: "#f3f8ff",
+    }
+
+    const startNewGameButtonStyle: React.CSSProperties = {
+      ...baseActionButtonStyle,
+      border: "1px solid #5ea66d",
+      background: "#f2fff4",
+      opacity: isHost ? 1 : 0.65,
+      cursor: isHost ? "pointer" : "not-allowed",
+    }
+
+    const leaveRoom = () => {
+      socket.emit("leaveRoom", cleanRoomId)
+      onExit()
+    }
+
+    const backToLobby = () => {
+      // Important: moving from Game -> Lobby should not auto-emit joinRoom again.
+      window.sessionStorage.setItem("mafia_skip_lobby_autojoin", "1")
+      onBackToLobby()
+    }
+
+    const startNewGame = () => {
+      if (!isHost) return
+      socket.emit("forceStartGame", { roomId: cleanRoomId })
+    }
 
     const submitRoleAction = (kind: string, targetClientId: string) => {
       socket.emit("submitRoleAction", { roomId: cleanRoomId, kind, targetClientId })
@@ -412,9 +483,28 @@ useEffect(() => {
 
       {/* Minimal actions (no flashy UI) */}
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={leaveRoom}>
+        {isGameOverPhase ? (
+          <>
+            <button style={leaveButtonStyle} onClick={leaveRoom}>
+              Leave Room
+            </button>
+            <button style={backToLobbyButtonStyle} onClick={backToLobby}>
+              Back to Lobby
+            </button>
+            <button
+              style={startNewGameButtonStyle}
+              onClick={startNewGame}
+              disabled={!isHost}
+              title={isHost ? "Start a fresh game immediately." : "Only the host can start a new game."}
+            >
+              Start New Game
+            </button>
+          </>
+        ) : (
+          <button style={leaveButtonStyle} onClick={leaveRoom}>
             Leave Room
-        </button>
+          </button>
+        )}
         </div>
 
       {/* Phase-specific screen (keeps styling/components isolated per phase) */}
