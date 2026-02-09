@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
 import { socket, clientId } from "../src/socket.js"
-import { PhaseRouter } from "../components/phases/PhaseRouter.js"
+import { PhaseRouter } from "../components/PhaseRouter.js"
 import { PHASE_LABELS } from "../src/constants/phaseLabels.js"
 import type { RoomState } from "../src/types.js"
 
@@ -9,6 +9,9 @@ type Props = {
     playerName: string
     onExit: () => void
 }
+
+type Winner = "MAFIA" | "CIVILIANS"
+type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
 
 export default function Game({ roomId, playerName, onExit }: Props) {
     const [state, setState] = useState<RoomState | null>(null)
@@ -34,7 +37,14 @@ export default function Game({ roomId, playerName, onExit }: Props) {
     // Optional: restore my current selections for a phase (from requestMyActions)
     const [myActions, setMyActions] = useState<any[]>([])
 
-    const bannerTimeoutRef = React.useRef<number | null>(null)
+    // End-game winner (authoritative event from server)
+    const [winner, setWinner] = useState<Winner | null>(null)
+
+    // Short-lived action feedback ("accepted"/"refused")
+    const [actionFeedback, setActionFeedback] = useState<ActionFeedback>(null)
+
+    const bannerTimeoutRef = useRef<number | null>(null)
+    const actionFeedbackTimeoutRef = useRef<number | null>(null)
 
     useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 500)
@@ -53,6 +63,9 @@ export default function Game({ roomId, playerName, onExit }: Props) {
     useEffect(() => {
     const onRoomState = (s: RoomState) => {
         setState(s)
+        if (s.phase !== "GAMEOVER") {
+            setWinner(null)
+        }
     }
 
     const onRoomClosed = ({ roomId: closedRoomId }: { roomId: string }) => {
@@ -146,6 +159,8 @@ useEffect(() => {
         // setTransition({ state: "entering", phase: payload.phase })
         //
         // Countdown should still be derived from roomState.phaseEndTime for accuracy.
+        setMyActions([])
+        socket.emit("requestMyActions", { roomId: cleanRoomId })
         console.log("phaseStarted", payload)
     }
 
@@ -171,6 +186,21 @@ useEffect(() => {
 //   Authoritative truth is still roomState (players alive, phase, etc.)
 // ------------------------------------------------------
 useEffect(() => {
+  const clearActionFeedbackTimer = () => {
+    if (actionFeedbackTimeoutRef.current) {
+      window.clearTimeout(actionFeedbackTimeoutRef.current)
+      actionFeedbackTimeoutRef.current = null
+    }
+  }
+
+  const showActionFeedback = (next: Exclude<ActionFeedback, null>) => {
+    setActionFeedback(next)
+    clearActionFeedbackTimer()
+    actionFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setActionFeedback(null)
+    }, 1500)
+  }
+
   const onYourRole = (payload: {
     roomId: string
     gameNumber: number
@@ -245,6 +275,35 @@ useEffect(() => {
     console.log("voteSummary", payload)
   }
 
+  const onGameOver = (payload: {
+    roomId: string
+    gameNumber: number
+    winner: Winner
+  }) => {
+    if (payload.roomId !== cleanRoomId) return
+
+    setWinner(payload.winner)
+    console.log("gameOver", payload)
+  }
+
+  const onActionAccepted = (payload: { kind: string; targetClientId: string }) => {
+    const actionKind = String(payload?.kind || "ACTION").replaceAll("_", " ")
+    showActionFeedback({
+      kind: "ACCEPTED",
+      text: `${actionKind} recorded.`,
+    })
+    console.log("actionAccepted", payload)
+  }
+
+  const onActionRefused = (payload: { kind?: string; reason: string }) => {
+    const reason = String(payload?.reason || "Action was refused.")
+    showActionFeedback({
+      kind: "REFUSED",
+      text: reason,
+    })
+    console.log("actionRefused", payload)
+  }
+
   const onMyActions = (payload: {
     roomId: string
     gameNumber: number
@@ -265,17 +324,24 @@ useEffect(() => {
   socket.on("privateMessage", onPrivateMessage)
   socket.on("nightSummary", onNightSummary)
   socket.on("voteSummary", onVoteSummary)
+  socket.on("gameOver", onGameOver)
+  socket.on("actionAccepted", onActionAccepted)
+  socket.on("actionRefused", onActionRefused)
   socket.on("myActions", onMyActions)
 
   return () => {
-      if (bannerTimeoutRef.current) {
-    window.clearTimeout(bannerTimeoutRef.current)
-      }
+    if (bannerTimeoutRef.current) {
+      window.clearTimeout(bannerTimeoutRef.current)
+    }
+    clearActionFeedbackTimer()
 
     socket.off("yourRole", onYourRole)
     socket.off("privateMessage", onPrivateMessage)
     socket.off("nightSummary", onNightSummary)
     socket.off("voteSummary", onVoteSummary)
+    socket.off("gameOver", onGameOver)
+    socket.off("actionAccepted", onActionAccepted)
+    socket.off("actionRefused", onActionRefused)
     socket.off("myActions", onMyActions)
   }
 }, [cleanRoomId])
@@ -347,6 +413,8 @@ useEffect(() => {
                 myActions={myActions}
                 privateMessages={privateMessages}
                 banner={banner}
+                winner={winner}
+                actionFeedback={actionFeedback}
                 submitRoleAction={submitRoleAction}
             />
         )}

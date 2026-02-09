@@ -1,5 +1,5 @@
 import React from "react"
-import type { RoomState, Player } from "../../src/types.js"
+import type { RoomState, Player } from "../src/types.js"
 
 /* ======================================================
                     PhaseRouter.tsx
@@ -19,6 +19,8 @@ import type { RoomState, Player } from "../../src/types.js"
 type Phase = RoomState["phase"]
 
 type Banner = null | { kind: "NIGHT" | "VOTING"; text: string }
+type Winner = "MAFIA" | "CIVILIANS"
+type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
 const SKIP_TARGET_CLIENT_ID = "__SKIP__"
 
 type PhaseRouterProps = {
@@ -33,6 +35,8 @@ type PhaseRouterProps = {
   myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
   privateMessages: any[]
   banner: Banner
+  winner: Winner | null
+  actionFeedback: ActionFeedback
   submitRoleAction: (kind: string, targetClientId: string) => void
 }
 
@@ -46,6 +50,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
   myActions,
   privateMessages,
   banner,
+  winner,
+  actionFeedback,
   submitRoleAction,
 }) => {
   switch (phase) {
@@ -60,6 +66,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -75,6 +83,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -90,6 +100,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -105,6 +117,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -120,6 +134,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -135,6 +151,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -150,6 +168,8 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          winner={winner}
+          actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
         />
       )
@@ -174,6 +194,8 @@ type ScreenProps = {
   myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
   privateMessages: any[]
   banner: Banner
+  winner: Winner | null
+  actionFeedback: ActionFeedback
   submitRoleAction: (kind: string, targetClientId: string) => void
 }
 
@@ -186,10 +208,24 @@ const BannerView = ({ banner }: { banner: Banner }) => {
   )
 }
 
-const LobbyScreen = ({ isHost, isSpectator, myRole, banner }: ScreenProps) => (
+const ActionFeedbackView = ({ actionFeedback }: { actionFeedback: ActionFeedback }) => {
+  if (!actionFeedback) return null
+
+  const isRefused = actionFeedback.kind === "REFUSED"
+  const borderColor = isRefused ? "#c1121f" : "#2a9d8f"
+
+  return (
+    <div style={{ marginBottom: 10, padding: 10, border: `1px solid ${borderColor}` }}>
+      <strong>{isRefused ? "Action refused" : "Action recorded"}:</strong> {actionFeedback.text}
+    </div>
+  )
+}
+
+const LobbyScreen = ({ isHost, isSpectator, myRole, banner, actionFeedback }: ScreenProps) => (
   <div>
     <h2>Lobby</h2>
     <BannerView banner={banner} />
+    <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Waiting for host to start…</div>
     <div style={{ marginTop: 8 }}>
       <div>Host: {isHost ? "Yes" : "No"}</div>
@@ -199,10 +235,11 @@ const LobbyScreen = ({ isHost, isSpectator, myRole, banner }: ScreenProps) => (
   </div>
 )
 
-const DayScreen = ({ isSpectator, myRole, banner }: ScreenProps) => (
+const DayScreen = ({ isSpectator, myRole, banner, actionFeedback }: ScreenProps) => (
   <div>
     <h2>Day</h2>
     <BannerView banner={banner} />
+    <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Daytime phase content goes here.</div>
     <div style={{ marginTop: 8 }}>
       <div>Spectator: {isSpectator ? "Yes" : "No"}</div>
@@ -211,26 +248,37 @@ const DayScreen = ({ isSpectator, myRole, banner }: ScreenProps) => (
   </div>
 )
 
-const DiscussionScreen = ({ banner }: ScreenProps) => (
+const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
   <div>
     <h2>Discussion</h2>
     <BannerView banner={banner} />
+    <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Discussion phase content goes here.</div>
   </div>
 )
 
-const PubDiscussionScreen = ({ banner }: ScreenProps) => (
+const PubDiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
   <div>
     <h2>Public Discussion</h2>
     <BannerView banner={banner} />
+    <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Public discussion content goes here.</div>
   </div>
 )
 
-const VotingScreen = ({ state, me, isSpectator, myActions, banner, submitRoleAction }: ScreenProps) => (
+const VotingScreen = ({
+  state,
+  me,
+  isSpectator,
+  myActions,
+  banner,
+  actionFeedback,
+  submitRoleAction,
+}: ScreenProps) => (
   <div>
     <h2>Voting</h2>
     <BannerView banner={banner} />
+    <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Cast your vote or skip this round.</div>
 
     {!isSpectator && me?.alive === true && (
@@ -276,6 +324,7 @@ const NightScreen = ({
   myActions,
   privateMessages,
   banner,
+  actionFeedback,
   submitRoleAction,
 }: ScreenProps) => {
   const canActAtNight = isSpectator !== true && me?.alive === true
@@ -296,6 +345,7 @@ const NightScreen = ({
     <div>
       <h2>Night</h2>
       <BannerView banner={banner} />
+      <ActionFeedbackView actionFeedback={actionFeedback} />
       <div>Night role action UI goes here.</div>
 
       <div style={{ marginTop: 10 }}>
@@ -348,11 +398,12 @@ const NightScreen = ({
   )
 }
 
-const GameOverScreen = ({ isHost, banner }: ScreenProps) => (
+const GameOverScreen = ({ isHost, banner, winner, actionFeedback }: ScreenProps) => (
   <div>
     <h2>Game Over</h2>
     <BannerView banner={banner} />
-    <div>Winner + restart options go here.</div>
+    <ActionFeedbackView actionFeedback={actionFeedback} />
+    <div>Winner: {winner ?? "(pending)"}</div>
     <div style={{ marginTop: 8 }}>Host: {isHost ? "Yes" : "No"}</div>
   </div>
 )
