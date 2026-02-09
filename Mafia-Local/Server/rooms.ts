@@ -21,6 +21,7 @@ import {
   recordRoleAction,
   getDoctorSelfSaveUsed,
   getSheriffUsed,
+  clearRoomRoleMemory,
 } from "./roles/index.js"
 
 // UI animation lead time: emit "phaseEnding" shortly before the phase actually switches.
@@ -613,13 +614,8 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
         // If VOTING just ended, resolve votes BEFORE moving on
         if (phase === "VOTING") {
-          applyVotingResolution(r, cleanRoomId)
-
-          // Sheriff resolves at end of VOTING (right before NIGHT)
-          applySheriffResolution(r, cleanRoomId)
-          if (maybeEndGameFromAliveState(r, cleanRoomId)) return
-
-          emitRoomState(cleanRoomId)
+          finalizeVotingPhase(r, cleanRoomId)
+          return
         }
 
         if (maybeEndGameFromAliveState(r, cleanRoomId)) return
@@ -698,6 +694,55 @@ export const createRoomsManager = (io: SocketIOServer) => {
       gameNumber: room.gameNumber,
       someoneDied: Boolean(eliminatedClientId),
     })
+  }
+
+  /* ------------------------------------------------------
+            Helper: check voting completion
+  - All alive, non-spectator players must submit one CIVILIAN_VOTE
+  - Skip votes count as valid submitted votes
+------------------------------------------------------ */
+
+  const allEligibleVotersSubmitted = (room: Room, cleanRoomId: string): boolean => {
+    if (room.phase !== "VOTING") return false
+
+    const eligibleVoterIds = room.players
+      .filter((p) => p.isSpectator !== true && p.alive === true)
+      .map((p) => p.clientId)
+
+    if (eligibleVoterIds.length === 0) return false
+
+    const votedClientIds = new Set(
+      getRoleActions(cleanRoomId, "VOTING")
+        .filter((a: any) => a?.kind === "CIVILIAN_VOTE")
+        .map((a: any) => String(a.fromClientId || "").trim())
+        .filter((id: string) => id.length > 0)
+    )
+
+    return eligibleVoterIds.every((clientId) => votedClientIds.has(clientId))
+  }
+
+  /* ------------------------------------------------------
+            Helper: resolve + advance from voting
+  - Resolves VOTING outcomes immediately
+  - Clears remaining phase timer and moves to NIGHT
+------------------------------------------------------ */
+
+  const finalizeVotingPhase = (room: Room, cleanRoomId: string) => {
+    if (!room.gameStarted) return
+    if (room.phase !== "VOTING") return
+
+    clearPhaseTimeout(room)
+    clearPhaseEndingTimeout(room)
+
+    applyVotingResolution(room, cleanRoomId)
+
+    // Sheriff resolves at end of VOTING (right before NIGHT)
+    applySheriffResolution(room, cleanRoomId)
+    if (maybeEndGameFromAliveState(room, cleanRoomId)) return
+
+    emitRoomState(cleanRoomId)
+    if (maybeEndGameFromAliveState(room, cleanRoomId)) return
+    startPhase(cleanRoomId, nextPhase("VOTING"))
   }
 
   /* ------------------------------------------------------
@@ -786,6 +831,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
       if (before !== room.players.length) {
         if (room.players.length === 0) {
+          clearRoomRoleMemory(roomId)
           delete rooms[roomId]
           io.to(roomId).emit("roomClosed", { roomId })
         } else {
@@ -813,6 +859,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
       // Host is only transferred on explicit leave or room cleanup.
 
       if (room.players.length === 0) {
+        clearRoomRoleMemory(roomId)
         delete rooms[roomId]
         io.to(roomId).emit("roomClosed", { roomId })
         continue
@@ -976,6 +1023,7 @@ const updateRoomSettings = (
     }
 
     if (room.players.length === 0) {
+      clearRoomRoleMemory(cleanRoomId)
       delete rooms[cleanRoomId]
       io.to(cleanRoomId).emit("roomClosed", { roomId: cleanRoomId })
       return
@@ -1261,6 +1309,7 @@ const updateRoomSettings = (
 
     // If room empty, close; otherwise emit state
     if (room.players.length === 0) {
+      clearRoomRoleMemory(cleanRoomId)
       delete rooms[cleanRoomId]
       io.to(cleanRoomId).emit("roomClosed", { roomId: cleanRoomId })
       return
@@ -1502,7 +1551,12 @@ const updateRoomSettings = (
       if (used) return refuse("Sheriff can only shoot once per game.")
     } else if (kind === "CIVILIAN_VOTE") {
       if (phase !== "VOTING") return refuse("Votes can only be submitted during VOTING.")
-      // We allow any alive, non-spectator player to submit this (UI parity)
+      // One vote per player in voting phase.
+      // Once submitted, player must wait for the phase to resolve.
+      const alreadyVoted = getRoleActions(cleanRoomId, "VOTING").some(
+        (a: any) => a?.kind === "CIVILIAN_VOTE" && String(a.fromClientId || "").trim() === fromClientId
+      )
+      if (alreadyVoted) return refuse("You already voted. Waiting for others.")
     } else {
       return refuse("Unknown action kind.")
     }
@@ -1517,6 +1571,11 @@ const updateRoomSettings = (
     })
 
     socket.emit("actionAccepted", { kind, targetClientId })
+
+    // If everyone has submitted a vote, skip remaining timer and resolve now.
+    if (kind === "CIVILIAN_VOTE" && allEligibleVotersSubmitted(room, cleanRoomId)) {
+      finalizeVotingPhase(room, cleanRoomId)
+    }
   }
 
     /* ------------------------------------------------------

@@ -284,47 +284,92 @@ const VotingScreen = ({
   banner,
   actionFeedback,
   submitRoleAction,
-}: ScreenProps) => (
-  <div>
-    <h2>Voting</h2>
-    <BannerView banner={banner} />
-    <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Cast your vote or skip this round.</div>
+}: ScreenProps) => {
+  const voteAction = myActions.find((a) => a.kind === "CIVILIAN_VOTE") ?? null
+  const hasVoted = voteAction != null
+  const votedTargetClientId = voteAction?.targetClientId ?? null
 
-    {!isSpectator && me?.alive === true && (
+  const votedTargetName =
+    votedTargetClientId === SKIP_TARGET_CLIENT_ID
+      ? "Skip Vote"
+      : state.players.find((p) => p.clientId === votedTargetClientId)?.name ?? "(unknown)"
+
+  const actionButtonStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    fontSize: 16,
+    borderRadius: 8,
+    border: "1px solid #bdbdbd",
+    background: "#fff",
+    cursor: "pointer",
+  }
+
+  const skipVoteButtonStyle: React.CSSProperties = {
+    ...actionButtonStyle,
+    border: "1px solid #7ea0c4",
+    background: "#f3f8ff",
+  }
+
+  return (
+    <div>
+      <h2>Voting</h2>
+      <BannerView banner={banner} />
+      <ActionFeedbackView actionFeedback={actionFeedback} />
+      <div>Cast your vote or skip this round.</div>
+
+      {!isSpectator && me?.alive === true && !hasVoted && (
+        <div style={{ marginTop: 10 }}>
+          <ul>
+            {state.players
+              .filter((p) => p.alive && p.isSpectator !== true && p.clientId !== me.clientId)
+              .map((p) => (
+                <li key={p.clientId} style={{ marginBottom: 8 }}>
+                  {p.name}{" "}
+                  <button
+                    style={actionButtonStyle}
+                    onClick={() => submitRoleAction("CIVILIAN_VOTE", p.clientId)}
+                  >
+                    Vote
+                  </button>
+                </li>
+              ))}
+          </ul>
+
+          <button
+            style={skipVoteButtonStyle}
+            onClick={() => submitRoleAction("CIVILIAN_VOTE", SKIP_TARGET_CLIENT_ID)}
+          >
+            Skip Vote
+          </button>
+        </div>
+      )}
+
+      {!isSpectator && me?.alive === true && hasVoted && (
+        <div style={{ marginTop: 10 }}>
+          <div>
+            <strong>You voted:</strong> {votedTargetName}
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>
+            Waiting for others...
+          </div>
+        </div>
+      )}
+
       <div style={{ marginTop: 10 }}>
-        <ul>
-          {state.players
-            .filter((p) => p.alive && p.isSpectator !== true && p.clientId !== me.clientId)
-            .map((p) => (
-              <li key={p.clientId}>
-                {p.name}{" "}
-                <button onClick={() => submitRoleAction("CIVILIAN_VOTE", p.clientId)}>Vote</button>
-              </li>
-            ))}
-        </ul>
-
-        <button onClick={() => submitRoleAction("CIVILIAN_VOTE", SKIP_TARGET_CLIENT_ID)}>
-          Skip Vote
-        </button>
+        <strong>My recorded action(s):</strong>
+        <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(myActions, null, 2)}</pre>
+        <div style={{ fontSize: 12, opacity: 0.8 }}>
+          (UI teammate: use this to pre-select the player you voted for.)
+        </div>
       </div>
-    )}
 
-    <div style={{ marginTop: 10 }}>
-      <strong>My recorded action(s):</strong>
-      <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(myActions, null, 2)}</pre>
-      <div style={{ fontSize: 12, opacity: 0.8 }}>
-        (UI teammate: use this to pre-select the player you voted for.)
-      </div>
+      {isSpectator && (
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+          Spectators can view, but not vote.
+        </div>
+      )}
     </div>
-
-    {isSpectator && (
-      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-        Spectators can view, but not vote.
-      </div>
-    )}
-  </div>
-)
+  )
+}
 
 const NightScreen = ({
   state,

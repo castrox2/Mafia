@@ -1,0 +1,34 @@
+{
+  "appId": "com.mafialocal.app",
+  "productName": "Mafia Local",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "main.js",
+    "package.json",
+    "assets/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "../Client/dist",
+      "to": "Client/dist",
+      "filter": [
+        "**/*"
+      ]
+    },
+    {
+      "from": "../Server/dist",
+      "to": "Server/dist",
+      "filter": [
+        "**/*"
+      ]
+    }
+  ],
+  "win": {
+    "target": [
+      "nsis"
+    ],
+    "signAndEditExecutable": false
+  }
+}

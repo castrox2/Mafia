@@ -61,8 +61,13 @@ export const clientId = getOrCreateClientId()
 // - Use env override if provided.
 // - Default to a dedicated local server port to avoid common 3000 conflicts.
 const env = (import.meta as any).env ?? {}
-const SERVER_HOST =
-  window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
+const rawLocationHost = String(window.location.hostname || "").trim()
+const locationHost = rawLocationHost
+  ? rawLocationHost === "localhost"
+    ? "127.0.0.1"
+    : rawLocationHost
+  : "127.0.0.1"
+const SERVER_HOST = String(env.VITE_MAFIA_SERVER_HOST || locationHost)
 const SERVER_PORT = String(env.VITE_MAFIA_SERVER_PORT || "3100")
 const SERVER_URL = String(
   env.VITE_MAFIA_SERVER_URL || `http://${SERVER_HOST}:${SERVER_PORT}`

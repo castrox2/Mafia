@@ -4,18 +4,27 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "dev": "electron ."
+    "dev": "electron .",
+    "build:client": "npm --prefix ../Client run build",
+    "build:server": "npm --prefix ../Server run build",
+    "build": "npm run build:client && npm run build:server",
+    "dist": "npm run build && electron-builder --config electron-builder.json",
+    "dist:dir": "npm run build && electron-builder --dir --config electron-builder.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3"
+  },
   "devDependencies": {
+    "@types/node": "^25.0.9",
     "electron": "^39.2.7",
+    "electron-builder": "^26.4.0",
     "electron-reloader": "^1.2.3",
     "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "@types/node": "^25.0.9"
   }
 }

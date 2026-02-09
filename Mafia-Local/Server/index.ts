@@ -3,6 +3,9 @@ import http from "http"
 import { Server as SocketIOServer } from "socket.io"
 import { generateRoomCode, generateRoomJoinQrDataUrl } from "./utils/generateRoomCode.js"
 import os from "os"
+import fs from "fs"
+import path from "path"
+import { fileURLToPath } from "url"
 import { createRoomsManager, type GameSettings } from "./rooms.js"
 import type { PlayerRole, PlayerStatus } from "./players.js"
 import { createTimersManager } from "./utils/timers.js"
@@ -17,14 +20,89 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express()
 const server = http.createServer(app)
-const SERVER_PORT = Number(process.env.MAFIA_SERVER_PORT || process.env.PORT || 3100)
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const parsePort = (value: unknown, fallback: number): number => {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const SERVER_PORT = parsePort(process.env.MAFIA_SERVER_PORT || process.env.PORT, 3100)
+const DEFAULT_DEV_CLIENT_PORT = 5173
+
+const getResourcesPath = (): string => {
+  const value = (process as any).resourcesPath
+  return typeof value === "string" ? value : ""
+}
+
+const resolveClientDistDir = (): string | null => {
+  const resourcesPath = getResourcesPath()
+  const envDir = String(process.env.MAFIA_CLIENT_DIST_DIR || "").trim()
+
+  const candidates = [
+    envDir,
+    path.join(__dirname, "..", "Client", "dist"),
+    path.join(__dirname, "..", "..", "Client", "dist"),
+    resourcesPath ? path.join(resourcesPath, "Client", "dist") : "",
+    resourcesPath ? path.join(resourcesPath, "app", "Client", "dist") : "",
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, "index.html"))) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+const resolveServerPublicDir = (): string | null => {
+  const candidates = [
+    path.join(__dirname, "public"),
+    path.join(__dirname, "..", "public"),
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+const CLIENT_DIST_DIR = resolveClientDistDir()
+const CLIENT_PORT_FOR_JOIN_URL = parsePort(
+  process.env.MAFIA_CLIENT_PORT,
+  CLIENT_DIST_DIR ? SERVER_PORT : DEFAULT_DEV_CLIENT_PORT
+)
+
+const getClientPortFromBaseUrl = (baseUrl?: string): number => {
+  const cleanBaseUrl = String(baseUrl || "").trim()
+  if (!cleanBaseUrl) return CLIENT_PORT_FOR_JOIN_URL
+
+  try {
+    const parsedUrl = new URL(cleanBaseUrl)
+    return parsePort(parsedUrl.port, CLIENT_PORT_FOR_JOIN_URL)
+  } catch (_err) {
+    return CLIENT_PORT_FOR_JOIN_URL
+  }
+}
 
 const io = new SocketIOServer(server, {
   cors: { origin: "*" },
 })
 
-// serve static files from the "public" directory
-app.use(express.static("public"))
+const serverPublicDir = resolveServerPublicDir()
+if (serverPublicDir) {
+  app.use(express.static(serverPublicDir))
+}
+
+if (CLIENT_DIST_DIR) {
+  app.use(express.static(CLIENT_DIST_DIR))
+}
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -76,12 +154,10 @@ io.on("connection", (socket) => {
 
   socket.on(
     "createRoom",
-    async ({ playerName, baseUrl }: { playerName: string; baseUrl: string }) => {
+    async ({ playerName, baseUrl }: { playerName: string; baseUrl?: string }) => {
       const cleanName = (playerName || "").trim()
-      const cleanBaseUrl = (baseUrl || "").trim()
 
       if (!cleanName) return
-      if (!cleanBaseUrl) return
 
       // Create a new unique room code
       const roomId = generateRoomCode(roomsManager.rooms)
@@ -89,7 +165,8 @@ io.on("connection", (socket) => {
       // ensure room exists + join + add player + emit state
       roomsManager.createRoomLocal(socket, roomId, cleanName, socket.data.clientId)
 
-      const lanClientBaseUrl = `http://${getLanIp()}:5173`
+      const clientPortForRoom = getClientPortFromBaseUrl(baseUrl)
+      const lanClientBaseUrl = `http://${getLanIp()}:${clientPortForRoom}`
       const { joinUrl, qrDataUrl } = await generateRoomJoinQrDataUrl(lanClientBaseUrl, roomId)
 
       // Tell ONLY this socket what the room code is
@@ -216,4 +293,7 @@ io.on("connection", (socket) => {
 // server starts listening
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`)
+  if (CLIENT_DIST_DIR) {
+    console.log(`Serving client from ${CLIENT_DIST_DIR}`)
+  }
 })
