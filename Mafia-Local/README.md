@@ -64,3 +64,80 @@ Play this with friends to find out who the best liar, detective, or maybe even t
 
     - Killer / Impostor / Murderer
         - Gets to kill a player each night
+
+# Install (Players)
+
+1. Open this repository on GitHub and go to the `Releases` page.
+2. Download the latest installer: `Mafia Local Setup <version>.exe`.
+3. Run the installer and complete setup.
+4. Launch `Mafia Local` from the Start Menu.
+5. If Windows SmartScreen appears, click `More info` then `Run anyway`.
+6. If hosting a LAN room, allow the app through Windows Firewall on private networks (port `3100`).
+
+No Node.js or coding tools are required for players.
+
+# Setup (Developers)
+
+## Prerequisites
+
+- Node.js 20+ and npm.
+- Windows for desktop packaging steps below.
+
+## Install Dependencies
+
+Run these once:
+
+```powershell
+cd Mafia-Local/Client
+npm install
+
+cd ../Server
+npm install
+
+cd ../Electron
+npm install
+```
+
+## Run In Development
+
+Use 2-3 terminals:
+
+1. Server
+
+```powershell
+cd Mafia-Local/Server
+npm run dev
+```
+
+2. Client (web)
+
+```powershell
+cd Mafia-Local/Client
+npm run dev
+```
+
+3. Electron wrapper (optional)
+
+```powershell
+cd Mafia-Local/Electron
+$env:ELECTRON_USE_DEV_SERVER='1'
+npm run dev
+```
+
+## Build Desktop Installer
+
+```powershell
+cd Mafia-Local/Electron
+npm run dist
+```
+
+Output files:
+
+- `Mafia-Local/Electron/dist/Mafia Local Setup 1.0.0.exe`
+- `Mafia-Local/Electron/dist/Mafia Local Setup 1.0.0.exe.blockmap`
+
+## Publish A Release
+
+1. Create a new GitHub release (for example `v1.0.0`).
+2. Upload the installer from `Mafia-Local/Electron/dist`.
+3. Publish release so players can download it directly.

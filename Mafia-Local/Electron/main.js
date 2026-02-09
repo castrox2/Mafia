@@ -1,7 +1,6 @@
 import fs from "fs"
 import path from "path"
-import { fileURLToPath } from "url"
-import { fork } from "child_process"
+import { fileURLToPath, pathToFileURL } from "url"
 import { app, BrowserWindow } from "electron"
 
 const DEV_URL = "http://localhost:5173"
@@ -19,7 +18,7 @@ const SERVER_PORT = parsePort(process.env.MAFIA_SERVER_PORT || process.env.PORT,
 const SERVER_URL = process.env.ELECTRON_SERVER_URL || `http://127.0.0.1:${SERVER_PORT}`
 
 let win
-let backendProcess = null
+let backendStartedInProcess = false
 let backendStartPromise = null
 
 /* ------------------------------------------------------
@@ -39,7 +38,9 @@ const shouldAutoStartBackend = () => {
 }
 
 const getServerEntryPath = () => {
+  const appPath = app.getAppPath()
   const candidates = [
+    path.join(appPath, "Server", "dist", "index.js"),
     path.join(__dirname, "..", "Server", "dist", "index.js"),
     path.join(__dirname, "Server", "dist", "index.js"),
     path.join(process.resourcesPath, "Server", "dist", "index.js"),
@@ -54,7 +55,9 @@ const getServerEntryPath = () => {
 }
 
 const getPackagedClientIndexPath = () => {
+  const appPath = app.getAppPath()
   const candidates = [
+    path.join(appPath, "Client", "dist", "index.html"),
     path.join(__dirname, "..", "Client", "dist", "index.html"),
     path.join(process.resourcesPath, "Client", "dist", "index.html"),
     path.join(process.resourcesPath, "app", "Client", "dist", "index.html"),
@@ -94,12 +97,6 @@ const waitForBackendReady = async (timeoutMs = 15000) => {
   return false
 }
 
-const stopBackend = () => {
-  if (!backendProcess) return
-  if (!backendProcess.killed) backendProcess.kill()
-  backendProcess = null
-}
-
 const startBackend = async () => {
   if (await isBackendHealthy()) return
   if (!shouldAutoStartBackend()) return
@@ -118,23 +115,16 @@ const startBackend = async () => {
     }
 
     const clientPort = shouldUseDevRenderer() ? "5173" : String(SERVER_PORT)
+    process.env.MAFIA_SERVER_PORT = String(SERVER_PORT)
+    process.env.MAFIA_CLIENT_PORT = clientPort
 
-    backendProcess = fork(serverEntryPath, [], {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        MAFIA_SERVER_PORT: String(SERVER_PORT),
-        MAFIA_CLIENT_PORT: clientPort,
-      },
-    })
-
-    backendProcess.on("exit", (_code) => {
-      backendProcess = null
-    })
+    if (!backendStartedInProcess) {
+      await import(pathToFileURL(serverEntryPath).href)
+      backendStartedInProcess = true
+    }
 
     const ready = await waitForBackendReady()
     if (!ready) {
-      stopBackend()
       throw new Error("Backend failed to become ready in time.")
     }
   })()
@@ -154,7 +144,11 @@ const loadRenderer = async () => {
     return
   }
 
-  await startBackend()
+  try {
+    await startBackend()
+  } catch (err) {
+    console.error("Backend startup failed:", err)
+  }
 
   if (await isBackendHealthy()) {
     await win.loadURL(SERVER_URL)
@@ -211,10 +205,6 @@ process.on("uncaughtException", (error) => {
 
 process.on("unhandledRejection", (reason, _promise) => {
   console.error("Unhandled Rejection at:", "reason:", reason)
-})
-
-app.on("before-quit", () => {
-  stopBackend()
 })
 
 app.whenReady().then(createWindow)

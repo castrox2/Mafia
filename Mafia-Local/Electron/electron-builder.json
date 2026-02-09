@@ -7,19 +7,19 @@
   "files": [
     "main.js",
     "package.json",
-    "assets/**/*"
+    "assets/**/*",
+    {
+      "from": "../Server/dist",
+      "to": "Server/dist",
+      "filter": [
+        "**/*"
+      ]
+    }
   ],
   "extraResources": [
     {
       "from": "../Client/dist",
       "to": "Client/dist",
-      "filter": [
-        "**/*"
-      ]
-    },
-    {
-      "from": "../Server/dist",
-      "to": "Server/dist",
       "filter": [
         "**/*"
       ]

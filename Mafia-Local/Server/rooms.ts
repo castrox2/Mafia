@@ -1322,7 +1322,7 @@ const updateRoomSettings = (
     const s = io.sockets.sockets.get(targetSocketId)
     if (s) {
       s.leave(cleanRoomId)
-      s.emit("kicked", { roomId: cleanRoomId, reason: "You were kicked by the host." })
+      s.emit("kicked", { roomId: cleanRoomId, reason: "LMAO You Got Booted From The Game." })
     }
   }
 
