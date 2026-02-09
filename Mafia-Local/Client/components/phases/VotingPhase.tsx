@@ -1,6 +1,8 @@
 import { socket } from "../../src/socket.js"
 import type { PhaseScreenProps } from "./types.js"
 
+const SKIP_TARGET_CLIENT_ID = "__SKIP__"
+
 export function VotingPhase({ state, me }: PhaseScreenProps) {
   const vote = (targetClientId: string) => {
     socket.emit("submitRoleAction", {
@@ -16,7 +18,7 @@ export function VotingPhase({ state, me }: PhaseScreenProps) {
 
       <ul>
         {state.players
-          .filter((p) => p.alive && p.clientId !== me?.clientId)
+          .filter((p) => p.alive && p.isSpectator !== true && p.clientId !== me?.clientId)
           .map((p) => (
             <li key={p.clientId}>
               {p.name}
@@ -24,6 +26,8 @@ export function VotingPhase({ state, me }: PhaseScreenProps) {
             </li>
           ))}
       </ul>
+
+      <button onClick={() => vote(SKIP_TARGET_CLIENT_ID)}>Skip Vote</button>
     </div>
   )
 }

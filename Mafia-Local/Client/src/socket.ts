@@ -57,12 +57,23 @@ const getOrCreateClientId = (): string => {
 
 export const clientId = getOrCreateClientId()
 
-// IMPOERTANT: Socket.IO is on port 3000 but vite is on 5173
-const SERVER_URL = `http://${window.location.hostname}:3000`
+// IMPORTANT:
+// - Use env override if provided.
+// - Default to a dedicated local server port to avoid common 3000 conflicts.
+const env = (import.meta as any).env ?? {}
+const SERVER_HOST =
+  window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
+const SERVER_PORT = String(env.VITE_MAFIA_SERVER_PORT || "3100")
+const SERVER_URL = String(
+  env.VITE_MAFIA_SERVER_URL || `http://${SERVER_HOST}:${SERVER_PORT}`
+)
 
 export const socket: Socket = io(SERVER_URL, {
   // IMPORTANT: this is how the server knows who you "really" are (even after reconnect)
     auth: { clientId },
+
+    // WebSocket-first avoids noisy XHR polling errors in local/Electron dev.
+    // Keep polling as fallback only if websocket upgrade path needs it.
     transports: ["websocket", "polling"],
 })
 

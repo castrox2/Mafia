@@ -19,6 +19,7 @@
 ====================================================== */
 
 import type { PhaseName, RoleAction } from "./types.js"
+import { normalizeRoomId } from "../gameLogic/gameLogic.js"
 
 /* ------------------------------------------------------
                 Internal storage shape
@@ -29,8 +30,7 @@ import type { PhaseName, RoleAction } from "./types.js"
 type RoomPhaseKey = `${string}:${PhaseName}`
 
 const makeKey = (roomId: string, phase: PhaseName): RoomPhaseKey => {
-  const cleanRoomId = (roomId || "").trim().toUpperCase()
-  return `${cleanRoomId}:${phase}` as RoomPhaseKey
+  return `${normalizeRoomId(roomId)}:${phase}` as RoomPhaseKey
 }
 
 /* ------------------------------------------------------
@@ -88,7 +88,7 @@ export const clearRoleActions = (roomId: string, phase: PhaseName) => {
  * Clear ALL buffered actions for a room (called when room closes).
  */
 export const clearAllRoomActions = (roomId: string) => {
-  const cleanRoomId = (roomId || "").trim().toUpperCase()
+  const cleanRoomId = normalizeRoomId(roomId)
   for (const key of actionsByRoomPhase.keys()) {
     if (key.startsWith(`${cleanRoomId}:`)) {
       actionsByRoomPhase.delete(key)
@@ -137,7 +137,7 @@ const makeSheriffUsedKey = (
   gameNumber: number,
   sheriffClientId: string
 ): SheriffUsedKey => {
-  const cleanRoomId = (roomId || "").trim().toUpperCase()
+  const cleanRoomId = normalizeRoomId(roomId)
   const cleanSheriffId = (sheriffClientId || "").trim()
   return `${cleanRoomId}:game${gameNumber}:sheriff:${cleanSheriffId}` as SheriffUsedKey
 }
@@ -174,7 +174,7 @@ const makeDoctorSelfSaveKey = (
   gameNumber: number,
   doctorClientId: string
 ): DoctorSelfSaveKey => {
-  const cleanRoomId = (roomId || "").trim().toUpperCase()
+  const cleanRoomId = normalizeRoomId(roomId)
   const cleanDoctorId = (doctorClientId || "").trim()
   return `${cleanRoomId}:game${gameNumber}:doctor:${cleanDoctorId}` as DoctorSelfSaveKey
 }
@@ -211,7 +211,7 @@ export const clearRoomRoleMemory = (roomId: string) => {
 
   
 
-  const cleanRoomId = (roomId || "").trim().toUpperCase()
+  const cleanRoomId = normalizeRoomId(roomId)
   
     for (const key of sheriffUsed.keys()) {
     if (key.startsWith(`${cleanRoomId}:`)) {
@@ -233,7 +233,7 @@ export const clearRoomRoleMemory = (roomId: string) => {
 ------------------------------------------------------ */
 
 export const debugDumpRoomActions = (roomId: string) => {
-  const cleanRoomId = (roomId || "").trim().toUpperCase()
+  const cleanRoomId = normalizeRoomId(roomId)
   const out: Record<string, number> = {}
 
   for (const [key, list] of actionsByRoomPhase.entries()) {

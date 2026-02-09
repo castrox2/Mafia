@@ -18,6 +18,8 @@
 
 import type { Player } from "../players.js"
 import type { DoctorSaveAction, ClientId } from "./types.js"
+import { SKIP_TARGET_CLIENT_ID } from "./types.js"
+import { isPlayerActive, isPlayerAlive, isPlayerRole } from "../gameLogic/gameLogic.js"
 
 /* ------------------------------------------------------
                   Types
@@ -54,19 +56,17 @@ export type DoctorResolution = {
                   Helpers (local)
 ------------------------------------------------------ */
 
-const isActive = (p: Player) => p.isSpectator !== true
-const isAlive = (p: Player) => p.alive === true
-const isDoctor = (p: Player) => p.role === "DOCTOR"
-
 const aliveDoctors = (players: Player[]): Player[] => {
-  return players.filter((p) => isActive(p) && isAlive(p) && isDoctor(p))
+  return players.filter(
+    (p) => isPlayerActive(p) && isPlayerAlive(p) && isPlayerRole(p, "DOCTOR")
+  )
 }
 
 const eligibleSaveTargets = (players: Player[]): Player[] => {
   // Doctors can save:
   // - any ACTIVE (non-spectator) alive player
   // (including other doctors, civilians, detectives, sheriffs, etc.)
-  return players.filter((p) => isActive(p) && isAlive(p))
+  return players.filter((p) => isPlayerActive(p) && isPlayerAlive(p))
 }
 
 /* ------------------------------------------------------
@@ -111,6 +111,11 @@ export const resolveDoctorNightSaves = (
     // Must be an alive doctor (active)
     if (!doctorIds.has(by)) {
       rejected.push({ byClientId: by, targetClientId: target, reason: "not_alive_doctor" })
+      continue
+    }
+
+    // Explicit skip action: valid no-op.
+    if (target === SKIP_TARGET_CLIENT_ID) {
       continue
     }
 

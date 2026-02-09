@@ -19,6 +19,7 @@ import type { RoomState, Player } from "../../src/types.js"
 type Phase = RoomState["phase"]
 
 type Banner = null | { kind: "NIGHT" | "VOTING"; text: string }
+const SKIP_TARGET_CLIENT_ID = "__SKIP__"
 
 type PhaseRouterProps = {
   phase: Phase
@@ -32,6 +33,7 @@ type PhaseRouterProps = {
   myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
   privateMessages: any[]
   banner: Banner
+  submitRoleAction: (kind: string, targetClientId: string) => void
 }
 
 export const PhaseRouter: React.FC<PhaseRouterProps> = ({
@@ -44,6 +46,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
   myActions,
   privateMessages,
   banner,
+  submitRoleAction,
 }) => {
   switch (phase) {
     case "LOBBY":
@@ -57,6 +60,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -71,6 +75,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -85,6 +90,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -99,6 +105,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -113,6 +120,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -127,6 +135,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -141,6 +150,7 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
+          submitRoleAction={submitRoleAction}
         />
       )
 
@@ -164,6 +174,7 @@ type ScreenProps = {
   myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
   privateMessages: any[]
   banner: Banner
+  submitRoleAction: (kind: string, targetClientId: string) => void
 }
 
 const BannerView = ({ banner }: { banner: Banner }) => {
@@ -216,11 +227,30 @@ const PubDiscussionScreen = ({ banner }: ScreenProps) => (
   </div>
 )
 
-const VotingScreen = ({ isSpectator, myActions, banner }: ScreenProps) => (
+const VotingScreen = ({ state, me, isSpectator, myActions, banner, submitRoleAction }: ScreenProps) => (
   <div>
     <h2>Voting</h2>
     <BannerView banner={banner} />
-    <div>Voting UI goes here.</div>
+    <div>Cast your vote or skip this round.</div>
+
+    {!isSpectator && me?.alive === true && (
+      <div style={{ marginTop: 10 }}>
+        <ul>
+          {state.players
+            .filter((p) => p.alive && p.isSpectator !== true && p.clientId !== me.clientId)
+            .map((p) => (
+              <li key={p.clientId}>
+                {p.name}{" "}
+                <button onClick={() => submitRoleAction("CIVILIAN_VOTE", p.clientId)}>Vote</button>
+              </li>
+            ))}
+        </ul>
+
+        <button onClick={() => submitRoleAction("CIVILIAN_VOTE", SKIP_TARGET_CLIENT_ID)}>
+          Skip Vote
+        </button>
+      </div>
+    )}
 
     <div style={{ marginTop: 10 }}>
       <strong>My recorded action(s):</strong>
@@ -238,41 +268,85 @@ const VotingScreen = ({ isSpectator, myActions, banner }: ScreenProps) => (
   </div>
 )
 
-const NightScreen = ({ isSpectator, myRole, myActions, privateMessages, banner }: ScreenProps) => (
-  <div>
-    <h2>Night</h2>
-    <BannerView banner={banner} />
-    <div>Night role action UI goes here.</div>
+const NightScreen = ({
+  state,
+  me,
+  isSpectator,
+  myRole,
+  myActions,
+  privateMessages,
+  banner,
+  submitRoleAction,
+}: ScreenProps) => {
+  const canActAtNight = isSpectator !== true && me?.alive === true
+  const aliveTargets = state.players.filter(
+    (p) => p.alive && p.isSpectator !== true && p.clientId !== me?.clientId
+  )
 
-    <div style={{ marginTop: 10 }}>
-      <div>
-        <strong>My role:</strong> {myRole ?? "(unknown)"}
-      </div>
+  const actionByRole =
+    myRole === "MAFIA"
+      ? { kind: "MAFIA_KILL_VOTE", actionLabel: "Kill", skipLabel: "Skip Kill" }
+      : myRole === "DOCTOR"
+        ? { kind: "DOCTOR_SAVE", actionLabel: "Save", skipLabel: "Skip Save" }
+        : myRole === "DETECTIVE"
+          ? { kind: "DETECTIVE_CHECK", actionLabel: "Investigate", skipLabel: "Skip Check" }
+          : null
+
+  return (
+    <div>
+      <h2>Night</h2>
+      <BannerView banner={banner} />
+      <div>Night role action UI goes here.</div>
 
       <div style={{ marginTop: 10 }}>
-        <strong>My recorded NIGHT action(s):</strong>
-        <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(myActions, null, 2)}</pre>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          (UI teammate: use this to pre-select the target I chose.)
+        <div>
+          <strong>My role:</strong> {myRole ?? "(unknown)"}
         </div>
-      </div>
 
-      <div style={{ marginTop: 10 }}>
-        <strong>Private messages:</strong>
-        <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(privateMessages, null, 2)}</pre>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          (Detective results should appear here; later turn into a modal/toast.)
-        </div>
-      </div>
+        {canActAtNight && actionByRole && (
+          <div style={{ marginTop: 10 }}>
+            <ul>
+              {aliveTargets.map((p) => (
+                <li key={p.clientId}>
+                  {p.name}{" "}
+                  <button onClick={() => submitRoleAction(actionByRole.kind, p.clientId)}>
+                    {actionByRole.actionLabel}
+                  </button>
+                </li>
+              ))}
+            </ul>
 
-      {isSpectator && (
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-          Spectators can view, but cannot act at night.
+            <button onClick={() => submitRoleAction(actionByRole.kind, SKIP_TARGET_CLIENT_ID)}>
+              {actionByRole.skipLabel}
+            </button>
+          </div>
+        )}
+
+        <div style={{ marginTop: 10 }}>
+          <strong>My recorded NIGHT action(s):</strong>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(myActions, null, 2)}</pre>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>
+            (UI teammate: use this to pre-select the target I chose.)
+          </div>
         </div>
-      )}
+
+        <div style={{ marginTop: 10 }}>
+          <strong>Private messages:</strong>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(privateMessages, null, 2)}</pre>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>
+            (Detective results should appear here; later turn into a modal/toast.)
+          </div>
+        </div>
+
+        {isSpectator && (
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+            Spectators can view, but cannot act at night.
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 const GameOverScreen = ({ isHost, banner }: ScreenProps) => (
   <div>

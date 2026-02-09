@@ -17,6 +17,12 @@
 
 import type { Player } from "../players.js"
 import type { SheriffShootAction, PublicAnnouncement, ClientId } from "./types.js"
+import {
+  getPlayerFromListByClientId,
+  isPlayerActive,
+  isPlayerAlive,
+  isPlayerRole,
+} from "../gameLogic/gameLogic.js"
 
 export type SheriffUsedTracker = Record<ClientId, boolean>
 
@@ -52,8 +58,8 @@ export const resolveSheriffShots = (
   let accepted = 0
 
   for (const a of shots) {
-    const actor = players.find((p) => p.clientId === a.fromClientId)
-    const target = players.find((p) => p.clientId === a.targetClientId)
+    const actor = getPlayerFromListByClientId(players, a.fromClientId)
+    const target = getPlayerFromListByClientId(players, a.targetClientId)
 
     if (!actor) {
       rejected.push({
@@ -65,7 +71,11 @@ export const resolveSheriffShots = (
     }
 
     // Defensive: alive-only + must actually be sheriff
-    if (actor.isSpectator === true || actor.alive !== true || actor.role !== "SHERIFF") {
+    if (
+      !isPlayerActive(actor) ||
+      !isPlayerAlive(actor) ||
+      !isPlayerRole(actor, "SHERIFF")
+    ) {
       rejected.push({
         byClientId: a.fromClientId,
         targetClientId: a.targetClientId,
@@ -85,7 +95,7 @@ export const resolveSheriffShots = (
     }
 
     // Defensive: target must be eligible (alive, not spectator)
-    if (!target || target.isSpectator === true || target.alive !== true) {
+    if (!target || !isPlayerActive(target) || !isPlayerAlive(target)) {
       rejected.push({
         byClientId: a.fromClientId,
         targetClientId: a.targetClientId,
@@ -98,7 +108,7 @@ export const resolveSheriffShots = (
     used[actor.clientId] = true
     usedBy.push(actor.clientId)
 
-    const mafiaKilled = target.role === "MAFIA"
+    const mafiaKilled = isPlayerRole(target, "MAFIA")
     if (mafiaKilled) {
       // Sheriff only kills mafia; if multiple shots kill multiple mafia, last one wins.
       // (Room mutation happens outside; we just report.)

@@ -1,4 +1,5 @@
-import type { PlayerRole } from "../players.js"
+import type { PlayerRole, Player } from "../players.js"
+import { countPlayerVotes } from "../gameLogic/gameLogic.js"
 
 /* ======================================================
                         Phases
@@ -118,9 +119,9 @@ export type BaseAction = {
 }
 
 /* ---------------- Mafia Vote Kill ----------------
-  - If no votes at all => random kill
-  - If tie => kill no one
-  - 3+ mafia => majority wins (tie => no kill)
+  - If no votes at all => no kill
+  - If tie => random kill
+  - 3+ mafia => majority wins (tie => random kill)
 --------------------------------------------------- */
 
 export type MafiaKillVoteAction = BaseAction & { type: "MAFIA_KILL_VOTE" }
@@ -167,7 +168,7 @@ export type RoleAction =
 
 export type MafiaKillResolution =
   | { outcome: "KILL"; targetClientId: string }
-  | { outcome: "NO_KILL"; reason: "TIE" | "NO_VALID_TARGETS" }
+  | { outcome: "NO_KILL"; reason: "TIE" | "NO_VALID_TARGETS" | "NO_VOTES" }
   | { outcome: "RANDOM_KILL"; targetClientId: string }
 
 export type DoctorSaveResolution = {
@@ -210,25 +211,37 @@ export function resolveMafiaKill(options: {
     tally.set(target, (tally.get(target) ?? 0) + 1)
   }
 
-  // No votes => random kill (your rule)
+  // No votes => no kill
   if (tally.size === 0) {
+    return { outcome: "NO_KILL", reason: "NO_VOTES" }
+  }
+
+  const voteBoard: Player[] = eligibleTargetClientIds.map((targetClientId, idx) => ({
+    id: `VOTE_TARGET_${idx}`,
+    name: `Vote Target ${idx}`,
+    clientId: targetClientId,
+    alive: true,
+    role: "CIVILIAN",
+    status: "CONNECTED",
+    isSpectator: false,
+    voteCount: tally.get(targetClientId) ?? 0,
+    joinedAt: 0,
+  }))
+
+  const topTargets = countPlayerVotes(voteBoard)
+  if (topTargets === false || topTargets.length === 0) {
+    return { outcome: "NO_KILL", reason: "NO_VALID_TARGETS" }
+  }
+
+  // Tie => random kill
+  if (topTargets.length !== 1) {
     return { outcome: "RANDOM_KILL", targetClientId: pickRandom(eligibleTargetClientIds) }
   }
 
-  // Find max votes
-  let maxVotes = 0
-  for (const v of tally.values()) maxVotes = Math.max(maxVotes, v)
+  const target = topTargets[0]
+  if (!target) return { outcome: "NO_KILL", reason: "NO_VALID_TARGETS" }
 
-  const topTargets = [...tally.entries()]
-    .filter(([, c]) => c === maxVotes)
-    .map(([t]) => t)
-
-  // Tie => no kill (your rule)
-  if (topTargets.length !== 1) {
-    return { outcome: "NO_KILL", reason: "TIE" }
-  }
-
-  return { outcome: "KILL", targetClientId: topTargets[0]! }
+  return { outcome: "KILL", targetClientId: target.clientId }
 }
 
 /* ======================================================

@@ -13,32 +13,38 @@
   2) Actions cannot target spectators.
   3) Mafia can ONLY kill at night (buffer routes votes to NIGHT; resolver assumes NIGHT).
   4) If there are multiple mafia:
-     - 2 mafia split votes => tie => kill no one
-     - 3+ mafia => majority wins, tie => kill no one
-  5) If NO mafia votes, kill a RANDOM eligible player.
+     - tie => random kill
+     - majority wins normally
+  5) If NO mafia votes, no kill.
 ====================================================== */
 
 import type { Player } from "../players.js"
 import type { MafiaKillVoteAction, ClientId } from "./types.js"
+import {
+  countPlayerVotes,
+  isPlayerActive,
+  isPlayerAlive,
+  isPlayerRole,
+} from "../gameLogic/gameLogic.js"
 
 /* ------------------------------------------------------
                   Helpers (local)
 ------------------------------------------------------ */
-
-const isActive = (p: Player) => p.isSpectator !== true
-const isAlive = (p: Player) => p.alive === true
-const isMafia = (p: Player) => p.role === "MAFIA"
 
 const eligibleKillTargets = (players: Player[]): Player[] => {
   // Mafia can kill anyone who is:
   // - not a spectator
   // - alive
   // - not mafia
-  return players.filter((p) => isActive(p) && isAlive(p) && !isMafia(p))
+  return players.filter(
+    (p) => isPlayerActive(p) && isPlayerAlive(p) && !isPlayerRole(p, "MAFIA")
+  )
 }
 
 const aliveMafia = (players: Player[]): Player[] => {
-  return players.filter((p) => isActive(p) && isAlive(p) && isMafia(p))
+  return players.filter(
+    (p) => isPlayerActive(p) && isPlayerAlive(p) && isPlayerRole(p, "MAFIA")
+  )
 }
 
 const pickRandom = <T,>(arr: T[], rng: () => number): T | null => {
@@ -63,11 +69,11 @@ export type MafiaResolution = {
     reason:
       | "no_alive_mafia"
       | "no_eligible_targets"
-      | "no_votes_random_kill"
+      | "no_votes_no_kill"
       | "single_mafia_vote"
       | "majority_vote"
-      | "tie_no_kill"
-      | "no_valid_votes_random_kill"
+      | "tie_random_kill"
+      | "no_valid_votes_no_kill"
   }
 }
 
@@ -86,7 +92,9 @@ export const resolveMafiaNightKill = (
   const mafias = aliveMafia(players)
   const targets = eligibleKillTargets(players)
 
-  // No alive mafia => no kill
+  // Defensive fallback:
+  // Room-level winner checks should normally end the game before NIGHT resolves.
+  // If we still get here with 0 mafia, return no kill safely.
   if (mafias.length === 0) {
     return {
       targetClientId: null,
@@ -99,7 +107,9 @@ export const resolveMafiaNightKill = (
     }
   }
 
-  // No eligible targets => no kill
+  // Defensive fallback:
+  // If only mafia are alive, room-level winner checks should already declare mafia win.
+  // Keep this as a safe no-kill return in case resolver is called out of sequence.
   if (targets.length === 0) {
     return {
       targetClientId: null,
@@ -134,16 +144,15 @@ export const resolveMafiaNightKill = (
   const votesCounted: Record<ClientId, number> = {}
   for (const [k, n] of tally.entries()) votesCounted[k] = n
 
-  // If nobody voted (or all votes invalid), random eligible kill
+  // If nobody voted (or all votes invalid), no kill.
   if (validVotes.length === 0) {
-    const pick = pickRandom(targets, rng)
     return {
-      targetClientId: pick?.clientId ?? null,
+      targetClientId: null,
       debug: {
         aliveMafiaCount: mafias.length,
         eligibleTargetCount: targets.length,
         votesCounted,
-        reason: actions.length === 0 ? "no_votes_random_kill" : "no_valid_votes_random_kill",
+        reason: actions.length === 0 ? "no_votes_no_kill" : "no_valid_votes_no_kill",
       },
     }
   }
@@ -174,34 +183,40 @@ export const resolveMafiaNightKill = (
 
   // Multiple mafia:
   // - Majority wins
-  // - Tie => no kill
-  let topVotes = 0
-  let topTargets: ClientId[] = []
-
-  for (const [targetId, count] of tally.entries()) {
-    if (count > topVotes) {
-      topVotes = count
-      topTargets = [targetId]
-    } else if (count === topVotes) {
-      topTargets.push(targetId)
-    }
-  }
-
-  // Tie among top => no kill
-  if (topTargets.length !== 1) {
+  // - Tie => random kill
+  const voteBoard = targets.map((target) => ({
+    ...target,
+    voteCount: tally.get(target.clientId) ?? 0,
+  }))
+  const topTargetsByVote = countPlayerVotes(voteBoard)
+  if (topTargetsByVote === false) {
     return {
       targetClientId: null,
       debug: {
         aliveMafiaCount: mafias.length,
         eligibleTargetCount: targets.length,
         votesCounted,
-        reason: "tie_no_kill",
+        reason: "no_eligible_targets",
+      },
+    }
+  }
+
+  // Tie among top => random kill
+  if (topTargetsByVote.length !== 1) {
+    const pick = pickRandom(targets, rng)
+    return {
+      targetClientId: pick?.clientId ?? null,
+      debug: {
+        aliveMafiaCount: mafias.length,
+        eligibleTargetCount: targets.length,
+        votesCounted,
+        reason: "tie_random_kill",
       },
     }
   }
 
   return {
-    targetClientId: topTargets[0] ?? null,
+    targetClientId: topTargetsByVote[0]?.clientId ?? null,
     debug: {
       aliveMafiaCount: mafias.length,
       eligibleTargetCount: targets.length,

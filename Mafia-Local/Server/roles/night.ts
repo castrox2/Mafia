@@ -23,6 +23,7 @@
 
 import type { Player } from "../players.js"
 import type { ClientId, MafiaKillVoteAction, DoctorSaveAction } from "./types.js"
+import { isPlayerRole } from "../gameLogic/gameLogic.js"
 
 import { resolveMafiaNightKill } from "./mafia.js"
 import { resolveDoctorNightSaves, type DoctorSelfSaveTracker } from "./doctor.js"
@@ -91,7 +92,7 @@ export const resolveNightPhase = (
   //    This is passed into resolveDoctorNightSaves so it can reject second self-save attempts.
   const selfSaveUsedByDoctor: DoctorSelfSaveTracker = {}
   for (const p of players) {
-    if (p.role !== "DOCTOR") continue
+    if (!isPlayerRole(p, "DOCTOR")) continue
     const used = getDoctorSelfSaveUsed(roomId, gameNumber, p.clientId)
     selfSaveUsedByDoctor[p.clientId] = used
   }

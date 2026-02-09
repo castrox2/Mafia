@@ -1,6 +1,7 @@
 import type { Server as SocketIOServer } from "socket.io"
 import type { Socket } from "socket.io"
 import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction, SheriffShootAction } from "./roles/types.js"
+import { SKIP_TARGET_CLIENT_ID } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 import type { SheriffResolution } from "./roles/types.js"
 import { resolveNightPhase } from "./roles/night.js"
@@ -314,11 +315,66 @@ export const createRoomsManager = (io: SocketIOServer) => {
     return "GAMEOVER"
   }
 
-    const clearPhaseTimeout = (room: Room) => {
+  const clearPhaseTimeout = (room: Room) => {
     if (room.phaseTimeoutId) {
       clearTimeout(room.phaseTimeoutId)
       room.phaseTimeoutId = null
     }
+  }
+
+  const clearPhaseEndingTimeout = (room: Room) => {
+    if (room.phaseEndingTimeoutId) {
+      clearTimeout(room.phaseEndingTimeoutId)
+      room.phaseEndingTimeoutId = null
+    }
+  }
+
+  type Winner = "MAFIA" | "CIVILIANS"
+
+  const getWinnerFromAliveState = (room: Room): Winner | null => {
+    const aliveActivePlayers = room.players.filter(
+      (p) => p.isSpectator !== true && p.alive === true
+    )
+
+    const aliveMafiaCount = aliveActivePlayers.filter((p) => p.role === "MAFIA").length
+    const aliveNonMafiaCount = aliveActivePlayers.length - aliveMafiaCount
+
+    // If no mafia remain, civilians win.
+    if (aliveMafiaCount === 0) return "CIVILIANS"
+
+    // Mafia win at parity/majority against non-mafia alive players.
+    if (aliveMafiaCount >= aliveNonMafiaCount) return "MAFIA"
+
+    return null
+  }
+
+  const maybeEndGameFromAliveState = (room: Room, cleanRoomId: string): boolean => {
+    if (!room.gameStarted) return false
+    if (room.phase === "GAMEOVER") return true
+
+    const winner = getWinnerFromAliveState(room)
+    if (!winner) return false
+
+    clearPhaseTimeout(room)
+    clearPhaseEndingTimeout(room)
+
+    room.phase = "GAMEOVER"
+    room.phaseEndTime = null
+    room.gameStarted = false
+
+    // Safety: no stale phase actions should survive into the next game.
+    clearRoleActions(cleanRoomId, "NIGHT")
+    clearRoleActions(cleanRoomId, "DAY")
+    clearRoleActions(cleanRoomId, "VOTING")
+
+    io.to(cleanRoomId).emit("gameOver", {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      winner,
+    })
+
+    emitRoomState(cleanRoomId)
+    return true
   }
 
 /* ------------------------------------------------------
@@ -427,6 +483,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
+    if (maybeEndGameFromAliveState(room, cleanRoomId)) return
 
     room.phase = phase
     const sec = getPhaseDurationSec(room, phase)
@@ -449,11 +506,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
     clearPhaseTimeout(room)
 
     // Clear any previous "phaseEnding" timer too (avoid ghost events)
-    // (Add this property to Room type below.)
-    if (room.phaseEndingTimeoutId) {
-      clearTimeout(room.phaseEndingTimeoutId)
-      room.phaseEndingTimeoutId = null
-    }
+    clearPhaseEndingTimeout(room)
 
 
     // Schedule the next transition (server authoritative)
@@ -490,6 +543,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
         // If NIGHT just ended, resolve NIGHT actions BEFORE moving on
         if (phase === "NIGHT") {
           applyNightResolution(r, cleanRoomId)
+          if (maybeEndGameFromAliveState(r, cleanRoomId)) return
           emitRoomState(cleanRoomId)
         }
 
@@ -499,10 +553,12 @@ export const createRoomsManager = (io: SocketIOServer) => {
 
           // Sheriff resolves at end of VOTING (right before NIGHT)
           applySheriffResolution(r, cleanRoomId)
+          if (maybeEndGameFromAliveState(r, cleanRoomId)) return
 
           emitRoomState(cleanRoomId)
         }
 
+        if (maybeEndGameFromAliveState(r, cleanRoomId)) return
         startPhase(cleanRoomId, nextPhase(phase))
       }, sec * 1000)
     }
@@ -528,6 +584,9 @@ export const createRoomsManager = (io: SocketIOServer) => {
       const fromClientId = String((a as any).fromClientId || "").trim()
       const targetClientId = String((a as any).targetClientId || "").trim()
       if (!fromClientId || !targetClientId) continue
+
+      // Explicit skip vote: accepted action, but does not add tally.
+      if (targetClientId === SKIP_TARGET_CLIENT_ID) continue
 
       const voter = room.players.find((p) => p.clientId === fromClientId)
       const target = room.players.find((p) => p.clientId === targetClientId)
@@ -1245,21 +1304,6 @@ const updateRoomSettings = (
       return
     }
 
-    // Target validity
-    const target = room.players.find((p) => p.clientId === targetClientId)
-    if (!target) {
-      socket.emit("actionRefused", { reason: "Target player not found." })
-      return
-    }
-    if (target.isSpectator === true) {
-      socket.emit("actionRefused", { reason: "Spectators cannot be targeted." })
-      return
-    }
-    if (target.alive !== true) {
-      socket.emit("actionRefused", { reason: "Target must be alive." })
-      return
-    }
-
     // Phase rules (server authoritative)
     const phase = room.phase
 
@@ -1267,17 +1311,48 @@ const updateRoomSettings = (
       socket.emit("actionRefused", { kind, reason })
     }
 
+    const skipAllowed =
+      kind === "MAFIA_KILL_VOTE" ||
+      kind === "DOCTOR_SAVE" ||
+      kind === "DETECTIVE_CHECK" ||
+      kind === "CIVILIAN_VOTE"
+
+    const isSkipAction = targetClientId === SKIP_TARGET_CLIENT_ID
+
+    if (isSkipAction && !skipAllowed) {
+      return refuse("This action type does not support skip.")
+    }
+
+    let target: Player | null = null
+
+    // Target validity (only for non-skip actions)
+    if (!isSkipAction) {
+      target = room.players.find((p) => p.clientId === targetClientId) ?? null
+      if (!target) {
+        socket.emit("actionRefused", { reason: "Target player not found." })
+        return
+      }
+      if (target.isSpectator === true) {
+        socket.emit("actionRefused", { reason: "Spectators cannot be targeted." })
+        return
+      }
+      if (target.alive !== true) {
+        socket.emit("actionRefused", { reason: "Target must be alive." })
+        return
+      }
+    }
+
     // Role gating + phase gating
     if (kind === "MAFIA_KILL_VOTE") {
       if (phase !== "NIGHT") return refuse("Mafia can only vote to kill during NIGHT.")
       if (actor.role !== "MAFIA") return refuse("Only Mafia can submit mafia kill votes.")
-      if (target.role === "MAFIA") return refuse("Mafia cannot target fellow mafia.")
+      if (!isSkipAction && target?.role === "MAFIA") return refuse("Mafia cannot target fellow mafia.")
     } else if (kind === "DOCTOR_SAVE") {
       if (phase !== "NIGHT") return refuse("Doctor can only save during NIGHT.")
       if (actor.role !== "DOCTOR") return refuse("Only Doctor can submit doctor saves.")
 
       // Doctor self-save only once per game
-      if (targetClientId === fromClientId) {
+      if (!isSkipAction && targetClientId === fromClientId) {
         const used = getDoctorSelfSaveUsed(cleanRoomId, room.gameNumber, fromClientId)
         if (used) return refuse("Doctor self-save is only allowed once per game.")
         // IMPORTANT:

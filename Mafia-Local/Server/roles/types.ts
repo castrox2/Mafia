@@ -31,6 +31,9 @@ export type PhaseName =
 
 export type ClientId = string
 
+// Special target id used for explicit "skip/abstain" role actions.
+export const SKIP_TARGET_CLIENT_ID = "__SKIP__" as const
+
 export type ActionTarget = {
   targetClientId: ClientId
 }

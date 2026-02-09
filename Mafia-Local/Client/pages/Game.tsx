@@ -289,6 +289,11 @@ useEffect(() => {
     const me = state?.players?.find((p) => p.clientId === clientId) ?? null
     const amSpectator = me?.isSpectator === true
 
+    const submitRoleAction = (kind: string, targetClientId: string) => {
+      socket.emit("submitRoleAction", { roomId: cleanRoomId, kind, targetClientId })
+      socket.emit("requestMyActions", { roomId: cleanRoomId })
+    }
+
 
     return (
     <div style={{ padding: 20, maxWidth: 900, fontFamily: "sans-serif" }}>
@@ -342,6 +347,7 @@ useEffect(() => {
                 myActions={myActions}
                 privateMessages={privateMessages}
                 banner={banner}
+                submitRoleAction={submitRoleAction}
             />
         )}
 

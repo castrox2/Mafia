@@ -17,6 +17,7 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express()
 const server = http.createServer(app)
+const SERVER_PORT = Number(process.env.MAFIA_SERVER_PORT || process.env.PORT || 3100)
 
 const io = new SocketIOServer(server, {
   cors: { origin: "*" },
@@ -208,6 +209,6 @@ io.on("connection", (socket) => {
 })
 
 // server starts listening
-server.listen(3000, "0.0.0.0", () => {
-  console.log("Server listening on http://localhost:3000")
+server.listen(SERVER_PORT, () => {
+  console.log(`Server listening on http://localhost:${SERVER_PORT}`)
 })

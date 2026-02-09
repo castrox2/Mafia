@@ -4,7 +4,7 @@ type Room = { players: Player[] }
 type Rooms = Record<string, Room>
 
 // Clean roomid
-const normalizeRoomId = (roomId: string): string => (roomId || "").trim().toUpperCase()
+export const normalizeRoomId = (roomId: string): string => (roomId || "").trim().toUpperCase()
 
 /* ======================================================
         Identity Note (Reconnect-safe)
@@ -40,6 +40,18 @@ export const getPlayerByClientId = (
 
   return room.players.find((p) => p.clientId === clientId) ?? null
 }
+
+// Player list lookup (used by pure role resolvers)
+export const getPlayerFromListByClientId = (
+  players: Player[],
+  clientId: string
+): Player | null => {
+  return players.find((p) => p.clientId === clientId) ?? null
+}
+
+export const isPlayerActive = (player: Player): boolean => player.isSpectator !== true
+export const isPlayerAlive = (player: Player): boolean => player.alive === true
+export const isPlayerRole = (player: Player, role: PlayerRole): boolean => player.role === role
 
 /* ======================================================
 Simple Player state updates
@@ -146,7 +158,7 @@ export const randomizePlayerRoles = (rooms: Rooms, roomId: string, addDoctorRole
   if (!room) return false
 
   // Only assign roles among ACTIVE players (not spectators) if your Player type supports it
-  const activePlayers = room.players.filter((p) => (p as any).isSpectator !== true)
+  const activePlayers = room.players.filter((p) => isPlayerActive(p))
 
   const playerCount = activePlayers.length
   if (playerCount === 0) return false
@@ -211,17 +223,17 @@ Basic Vote Function
     - Feed a player list, then return most voted player(s)
 ====================================================== */
 
-export const countPlayerVotes = (players: Player[]): Player[] | boolean => {
+export const countPlayerVotes = (players: Player[]): Player[] | false => {
 
-  const activePlayers = players.filter((p) => (p as any).isSpectator !== true)
+  const activePlayers = players.filter((p) => isPlayerActive(p))
 
   const playerCount = activePlayers.length
   if (playerCount === 0) return false
 
   let votedPlayers: Player[] = []
-  const maxVotes = Math.max(...players.map(player => player.voteCount));
+  const maxVotes = Math.max(...activePlayers.map((player) => player.voteCount))
 
-  votedPlayers = players.filter(player => player.voteCount === maxVotes);
+  votedPlayers = activePlayers.filter((player) => player.voteCount === maxVotes)
 
-  return votedPlayers;
+  return votedPlayers
 }

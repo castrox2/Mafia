@@ -15,6 +15,13 @@
 
 import type { Player } from "../players.js"
 import type { DetectiveCheckAction, PrivateMessage, ClientId } from "./types.js"
+import { SKIP_TARGET_CLIENT_ID } from "./types.js"
+import {
+  getPlayerFromListByClientId,
+  isPlayerActive,
+  isPlayerAlive,
+  isPlayerRole,
+} from "../gameLogic/gameLogic.js"
 
 export type DetectiveResolveResult = {
   privateMessages: PrivateMessage[]
@@ -39,8 +46,8 @@ export const resolveDetectiveChecks = (
   let accepted = 0
 
   for (const a of checks) {
-    const actor = players.find((p) => p.clientId === a.fromClientId)
-    const target = players.find((p) => p.clientId === a.targetClientId)
+    const actor = getPlayerFromListByClientId(players, a.fromClientId)
+    const target = getPlayerFromListByClientId(players, a.targetClientId)
 
     if (!actor) {
       rejected.push({
@@ -52,7 +59,11 @@ export const resolveDetectiveChecks = (
     }
 
     // Defensive: alive-only + must actually be detective
-    if (actor.isSpectator === true || actor.alive !== true || actor.role !== "DETECTIVE") {
+    if (
+      !isPlayerActive(actor) ||
+      !isPlayerAlive(actor) ||
+      !isPlayerRole(actor, "DETECTIVE")
+    ) {
       rejected.push({
         byClientId: a.fromClientId,
         targetClientId: a.targetClientId,
@@ -61,8 +72,13 @@ export const resolveDetectiveChecks = (
       continue
     }
 
+    // Explicit skip action: valid no-op.
+    if (a.targetClientId === SKIP_TARGET_CLIENT_ID) {
+      continue
+    }
+
     // Defensive: target must be eligible (alive, not spectator)
-    if (!target || target.isSpectator === true || target.alive !== true) {
+    if (!target || !isPlayerActive(target) || !isPlayerAlive(target)) {
       rejected.push({
         byClientId: a.fromClientId,
         targetClientId: a.targetClientId,
@@ -77,7 +93,7 @@ export const resolveDetectiveChecks = (
       type: "DETECTIVE_RESULT",
       toClientId: actor.clientId,
       checkedClientId: target.clientId,
-      isMafia: target.role === "MAFIA",
+      isMafia: isPlayerRole(target, "MAFIA"),
     })
   }
 
