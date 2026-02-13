@@ -1,6 +1,6 @@
 {
   "name": "mafia-local",
-  "version": "1.0.0",
+  "version": "0.7.5",
   "description": "Web game based on the party game mafia and its different variations",
   "main": "index.js",
   "scripts": {

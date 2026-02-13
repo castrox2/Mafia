@@ -25,6 +25,7 @@ export type Player = {
 export type RoomState = {
     roomId: string
     hostId: string
+    hostParticipates: boolean
     players: Player[]
     settings: GameSettings
     phase: Phase

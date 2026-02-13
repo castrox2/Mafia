@@ -33,6 +33,8 @@ export default function Lobby({
 
   const isHost = state?.hostId === clientId
   const me = state?.players?.find((p) => p.clientId === clientId) ?? null
+  const amSpectator = me?.isSpectator === true
+  const hostParticipates = state?.hostParticipates ?? true
   const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
@@ -76,6 +78,10 @@ export default function Lobby({
       alert(reason)
     }
 
+    const onHostParticipationRefused = ({ reason }: { reason: string }) => {
+      alert(reason)
+    }
+
     const onGameStarted = ({ gameNumber }: { gameNumber: number }) => {
       setStatus(`Game started! (Game #${gameNumber})`)
       onEnterGame()
@@ -89,6 +95,7 @@ export default function Lobby({
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("startRefused", onStartRefused)
+    socket.on("hostParticipationRefused", onHostParticipationRefused)
     socket.on("gameStarted", onGameStarted)
     socket.on("kicked", onKicked)
 
@@ -111,6 +118,7 @@ export default function Lobby({
       socket.off("roomState", onRoomState)
       socket.off("roomClosed", onRoomClosed)
       socket.off("startRefused", onStartRefused)
+      socket.off("hostParticipationRefused", onHostParticipationRefused)
       socket.off("gameStarted", onGameStarted)
       socket.off("kicked", onKicked)
     }
@@ -127,6 +135,13 @@ export default function Lobby({
       roomId: cleanRoomId,
       playerId: clientId,
       status: amReady ? "NOT READY" : "READY",
+    })
+  }
+
+  const toggleHostParticipation = (nextParticipates: boolean) => {
+    socket.emit("setHostParticipation", {
+      roomId: cleanRoomId,
+      participates: nextParticipates,
     })
   }
 
@@ -162,8 +177,28 @@ export default function Lobby({
         </div>
         <div>
           <strong>You:</strong> {cleanPlayerName}
+          {amSpectator ? " (SPECTATOR)" : ""}
         </div>
       </div>
+
+      {isHost && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={hostParticipates}
+              disabled={state?.gameStarted === true}
+              onChange={(event) => toggleHostParticipation(event.target.checked)}
+            />
+            Host participates as a player
+          </label>
+          {state?.gameStarted && (
+            <div style={{ marginTop: 4, fontSize: 12, color: "#666" }}>
+              Host participation can only be changed before the game starts.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DEBUG: current room settings from server */}
       {state?.settings && (
@@ -226,12 +261,14 @@ export default function Lobby({
       )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-        <button
-          style={readyToggleButtonStyle}
-          onClick={toggleReady}
-        >
-          {amReady ? "Unready" : "Ready"}
-        </button>
+        {!amSpectator && (
+          <button
+            style={readyToggleButtonStyle}
+            onClick={toggleReady}
+          >
+            {amReady ? "Unready" : "Ready"}
+          </button>
+        )}
         <button
           style={actionButtonStyle}
           onClick={leaveRoom}
@@ -239,6 +276,12 @@ export default function Lobby({
           Leave Room
         </button>
       </div>
+
+      {amSpectator && (
+        <div style={{ marginBottom: 10, fontSize: 12, color: "#555" }}>
+          You are currently spectating and cannot ready up or receive a role.
+        </div>
+      )}
 
       <div style={{ fontWeight: 700, whiteSpace: "pre-wrap", marginBottom: 12 }}>
         {status}
@@ -249,12 +292,14 @@ export default function Lobby({
       <ul style={{ paddingLeft: 18 }}>
         {(state?.players ?? []).map((p) => {
           const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
+          const spectatorTag = p.isSpectator ? " (SPECTATOR)" : ""
           const deadTag = p.alive ? "" : " (dead)"
 
           return (
             <li key={p.clientId} style={{ marginBottom: 6 }}>
               {p.name}
               {hostTag}
+              {spectatorTag}
               {deadTag}
               {" — "}
               Status: {p.status}

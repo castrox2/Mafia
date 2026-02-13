@@ -235,6 +235,13 @@ io.on("connection", (socket) => {
     }
   )
 
+  socket.on(
+    "setHostParticipation",
+    ({ roomId, participates }: { roomId: string; participates: boolean }) => {
+      roomsManager.setHostParticipationLocal(socket, roomId, participates)
+    }
+  )
+
     socket.on("requestMyActions", ({ roomId }: { roomId: string }) => {
     roomsManager.requestMyActionsLocal(socket, roomId)
   })

@@ -481,6 +481,29 @@ useEffect(() => {
         </div>
         )}
 
+        {state && (
+          <div style={{ marginBottom: 14 }}>
+            <h3 style={{ margin: "0 0 8px 0" }}>Player Status</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {state.players.map((p) => {
+                const lifeState = p.isSpectator ? "Spectator" : p.alive ? "Alive" : "Dead"
+                const hostTag = p.clientId === state.hostId ? " (HOST)" : ""
+                const meTag = p.clientId === clientId ? " (YOU)" : ""
+
+                return (
+                  <li key={p.clientId} style={{ marginBottom: 4 }}>
+                    {p.name}
+                    {hostTag}
+                    {meTag}
+                    {" — "}
+                    {lifeState}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
       {/* Minimal actions (no flashy UI) */}
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         {isGameOverPhase ? (

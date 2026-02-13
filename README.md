@@ -140,5 +140,5 @@ npm run dist
 
 Output files:
 
-- `Mafia-Local/Electron/dist/Mafia Local Setup 1.0.0.exe`
-- `Mafia-Local/Electron/dist/Mafia Local Setup 1.0.0.exe.blockmap`
+- `Mafia-Local/Electron/dist/Mafia Local Setup <version>.exe`
+- `Mafia-Local/Electron/dist/Mafia Local Setup <version>.exe.blockmap`
