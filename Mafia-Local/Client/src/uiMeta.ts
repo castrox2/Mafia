@@ -3,6 +3,7 @@ import type {
   MafiaPlayer,
   MafiaPlayerRole,
   MafiaPlayerStatus,
+  RoundSummaryPayload,
   MafiaWinner,
   RoleActionKind,
 } from "../../Shared/events.js"
@@ -84,6 +85,15 @@ export const getWinnerLabel = (winner: MafiaWinner | null): string => {
   return winner === "MAFIA" ? "Mafia" : "Civilians"
 }
 
+export const getNightSummaryLabel = (payload: RoundSummaryPayload): string => {
+  if (!payload.someoneDied) return "Night ended: no one died."
+
+  const killedName = String(payload.killedPlayerName || "").trim()
+  if (killedName) return `Night ended: ${killedName} was killed.`
+
+  return "Night ended: someone was killed."
+}
+
 export const getActionLabel = (kind: string): string => {
   const typedKind = kind as RoleActionKind
   const known = ROLE_ACTION_UI_META[typedKind]
@@ -134,4 +144,3 @@ export const getPlayerTags = (
 
   return tags
 }
-

@@ -76,3 +76,24 @@ TODO / next-agent suggestions:
     - `node C:/Users/User/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js --url http://127.0.0.1:5173 --click 100,100 --click-selector button --iterations 1 --pause-ms 250`
     - Screenshot reviewed: `output/web-game/shot-0.png` (Join screen visible, no obvious runtime regressions from this UI-helper refactor).
 
+---
+
+- New task: after each NIGHT phase, broadcast a global announcement naming who mafia killed.
+- Updated shared summary payload for UI consumption:
+  - `Shared/events.ts`: `RoundSummaryPayload` now includes optional `killedClientId` and `killedPlayerName`.
+  - `Shared/events.ts`: `PublicAnnouncementPayload` `NIGHT_SUMMARY` now also supports optional `killedPlayerName`.
+- Server wiring:
+  - `Server/rooms.ts` `applyNightResolution` now resolves and emits `nightSummary` with:
+    - `someoneDied`
+    - `killedClientId` (when a kill happened)
+    - `killedPlayerName` (when available)
+  - This is emitted to the full room (`io.to(room).emit`), so announcement is global.
+- Client/UI-friendly wiring:
+  - `Client/src/uiMeta.ts`: added `getNightSummaryLabel(payload)` to centralize copy generation.
+  - `Client/pages/Game.tsx`: night banner now uses `getNightSummaryLabel`, so UI can display `Night ended: {player} was killed.`
+  - Added inline note for UI dev to use `payload.killedPlayerName` directly for richer announcement cards/toasts.
+- Validation:
+  - `Server`: `npm run build` passes.
+  - `Client`: `npm run build` passes.
+  - `Server`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.

@@ -19,6 +19,7 @@ import type {
   MafiaServerToClientEvents,
   MafiaSocketData,
   PhaseTimersPayload,
+  RoundSummaryPayload,
   RoleCountPayload,
   SubmitRoleActionPayload,
 } from "../Shared/events.js"
@@ -555,20 +556,34 @@ type Winner = MafiaWinner
       doctorSaves
     )
 
+    let killedClientId: string | undefined
+    let killedPlayerName: string | undefined
+
     // Apply kill (if any)
     if (res.killedClientId) {
+      killedClientId = res.killedClientId
       const target = room.players.find((p) => p.clientId === res.killedClientId)
       if (target && target.isSpectator !== true) {
         target.alive = false
+        killedPlayerName = target.name
       }
     }
 
-        // Public night summary (anti-spoiler)
-    io.to(cleanRoomId).emit("nightSummary", {
+    const nightSummaryPayload: RoundSummaryPayload = {
       roomId: cleanRoomId,
       gameNumber: room.gameNumber,
-      someoneDied: Boolean(res.killedClientId),
-    })
+      someoneDied: Boolean(killedClientId),
+    }
+
+    if (killedClientId) {
+      nightSummaryPayload.killedClientId = killedClientId
+    }
+    if (killedPlayerName) {
+      nightSummaryPayload.killedPlayerName = killedPlayerName
+    }
+
+    // Public night summary (anti-spoiler)
+    io.to(cleanRoomId).emit("nightSummary", nightSummaryPayload)
 
     // Detective: resolve privately (anti-spoiler)
     // - We do NOT broadcast results.

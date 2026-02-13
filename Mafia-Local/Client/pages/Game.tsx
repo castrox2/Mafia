@@ -21,6 +21,7 @@ import type {
 } from "../../Shared/events.js"
 import {
   getActionRecordedLabel,
+  getNightSummaryLabel,
   getPhaseLabel,
   getPlayerLifeStateLabel,
   getPlayerTags,
@@ -271,9 +272,10 @@ useEffect(() => {
     // UI teammate idea:
     // - Show a full-screen overlay or banner for 1-2 seconds
     // - Fade out automatically
+    // - Use payload.killedPlayerName for richer copy/cards if someoneDied=true
     setBanner({
         kind: "NIGHT",
-        text: payload.someoneDied ? "Night ended: someone died." : "Night ended: no one died.",
+        text: getNightSummaryLabel(payload),
     })
 
     if (bannerTimeoutRef.current) {

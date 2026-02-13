@@ -171,6 +171,8 @@ export type RoundSummaryPayload = {
   roomId: string
   gameNumber: number
   someoneDied: boolean
+  killedClientId?: string
+  killedPlayerName?: string
 }
 
 export type DetectiveResultPrivateMessagePayload = {
@@ -196,6 +198,7 @@ export type PublicAnnouncementPayload =
       type: "NIGHT_SUMMARY"
       someoneDied: boolean
       killedClientId?: string
+      killedPlayerName?: string
     }
 
 export type PublicAnnouncementsPayload = {
