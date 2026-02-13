@@ -2,15 +2,19 @@ import React, { useEffect, useMemo, useState, useRef } from "react"
 import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/PhaseRouter.js"
 import type { RoomState } from "../src/types.js"
+import { normalizeRoomId } from "../../Shared/events.js"
 import type {
   ActionAcceptedPayload,
   ActionRefusedPayload,
   GameOverPayload,
+  MafiaWinner,
   MyActionsPayload,
   MyRecordedActionPayload,
   PhaseEndingPayload,
   PhaseStartedPayload,
   PrivateMessagePayload,
+  ReasonPayload,
+  RoomIdPayload,
   RoleActionKind,
   RoundSummaryPayload,
   YourRolePayload,
@@ -29,13 +33,13 @@ type Props = {
     onBackToLobby: () => void
 }
 
-type Winner = "MAFIA" | "CIVILIANS"
+type Winner = MafiaWinner
 type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
 
 export default function Game({ roomId, playerName, onExit, onBackToLobby }: Props) {
     const [state, setState] = useState<RoomState | null>(null)
 
-    const cleanRoomId = useMemo(() => roomId.trim().toUpperCase(), [roomId])
+    const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
     const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
 
 /* ------------------------------------------------------
@@ -91,19 +95,19 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
         }
     }
 
-    const onRoomClosed = ({ roomId: closedRoomId }: { roomId: string }) => {
+    const onRoomClosed = ({ roomId: closedRoomId }: RoomIdPayload) => {
         if (closedRoomId === cleanRoomId) {
         alert("Room was closed by the host.")
         onExit()
         }
     }
 
-    const onKicked = ({ reason }: { reason: string }) => {
+    const onKicked = ({ reason }: ReasonPayload & RoomIdPayload) => {
         alert(reason || "You were kicked.")
         onExit()
     }
 
-    const onStartRefused = ({ reason }: { reason: string }) => {
+    const onStartRefused = ({ reason }: ReasonPayload) => {
         alert(reason || "Unable to start a new game.")
     }
 

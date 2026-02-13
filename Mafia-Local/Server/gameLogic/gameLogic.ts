@@ -1,10 +1,11 @@
 import type { Player, PlayerRole } from "../players.js"
+import { normalizeRoomId as normalizeSharedRoomId } from "../../Shared/events.js"
 
 type Room = { players: Player[] }
 type Rooms = Record<string, Room>
 
 // Clean roomid
-export const normalizeRoomId = (roomId: string): string => (roomId || "").trim().toUpperCase()
+export const normalizeRoomId = normalizeSharedRoomId
 
 /* ======================================================
         Identity Note (Reconnect-safe)

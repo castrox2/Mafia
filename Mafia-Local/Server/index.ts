@@ -7,7 +7,7 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 import { createRoomsManager } from "./rooms.js"
-import { createTimersManager } from "./utils/timers.js"
+import { normalizeRoomId } from "../Shared/events.js"
 import type {
   CreateRoomPayload,
   JoinRoomPayload,
@@ -149,11 +149,6 @@ function getLanIp(): string {
 
 const roomsManager = createRoomsManager(io)
 
-const timers = createTimersManager(io, ({ roomId, phase }) => {
-  // Timer manager already emits "timerEnded".
-  // This callback should be used to advance game phase in roomsManager (wired later).
-})
-
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
@@ -216,7 +211,7 @@ io.on("connection", (socket) => {
   socket.on(
     "setRole",
     ({ roomId, playerId, role }: SetRolePayload) => {
-      const cleanRoomId = (roomId || "").trim().toUpperCase()
+      const cleanRoomId = normalizeRoomId(roomId)
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
@@ -237,7 +232,7 @@ io.on("connection", (socket) => {
     "setPlayerStatus",
     ({ roomId, playerId, status }: SetPlayerStatusPayload) => {
       // For now allow host or self
-      const cleanRoomId = (roomId || "").trim().toUpperCase()
+      const cleanRoomId = normalizeRoomId(roomId)
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 

@@ -1,6 +1,8 @@
 import React from "react"
 import type { RoomState, Player } from "../src/types.js"
+import { SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
 import type {
+  MafiaWinner,
   MyRecordedActionPayload,
   PrivateMessagePayload,
   RoleActionKind,
@@ -31,9 +33,8 @@ import {
 type Phase = RoomState["phase"]
 
 type Banner = null | { kind: "NIGHT" | "VOTING"; text: string }
-type Winner = "MAFIA" | "CIVILIANS"
+type Winner = MafiaWinner
 type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
-const SKIP_TARGET_CLIENT_ID = "__SKIP__"
 
 type PhaseRouterProps = {
   phase: Phase

@@ -3,11 +3,23 @@ import type { Socket } from "socket.io"
 import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction, SheriffShootAction } from "./roles/types.js"
 import { SKIP_TARGET_CLIENT_ID } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
+import {
+  ROOM_CODE_LENGTH,
+  TIMER_MAX_SECONDS,
+  TIMER_MIN_SECONDS,
+  isValidRoomId,
+  normalizeRoomId,
+} from "../Shared/events.js"
 import type {
+  GameSettingsPayload,
   HostParticipationRefusedPayload,
   MafiaClientToServerEvents,
+  MafiaPhase,
+  MafiaWinner,
   MafiaServerToClientEvents,
   MafiaSocketData,
+  PhaseTimersPayload,
+  RoleCountPayload,
   SubmitRoleActionPayload,
 } from "../Shared/events.js"
 import { resolveNightPhase } from "./roles/night.js"
@@ -39,34 +51,10 @@ const PHASE_ENDING_LEAD_MS = 500
                           Types
 ====================================================== */
 
-export type PhaseTimers = {
-  daySec: number
-  nightSec: number
-  voteSec: number
-  discussionSec: number
-  pubDiscussionSec: number
-}
-
-export type RoleCount = {
-  mafia: number
-  doctor: number
-  detective: number
-  sheriff: number
-}
-
-export type Phase = 
-  | "LOBBY" 
-  | "DAY" 
-  | "DISCUSSION" 
-  | "PUBDISCUSSION" 
-  | "VOTING" 
-  | "NIGHT" 
-  | "GAMEOVER"
-
-export type GameSettings = {
-  timers: PhaseTimers
-  roleCount: RoleCount
-}
+export type PhaseTimers = PhaseTimersPayload
+export type RoleCount = RoleCountPayload
+export type Phase = MafiaPhase
+export type GameSettings = GameSettingsPayload
 
 type MafiaIoServer = SocketIOServer<
   MafiaClientToServerEvents,
@@ -111,9 +99,6 @@ export const createRoomsManager = (io: MafiaIoServer) => {
   /* ------------------------------------------------------
                   Normalization helpers
   ------------------------------------------------------ */
-
-  const normalizeRoomId = (roomId: string) =>
-    (roomId || "").trim().toUpperCase()
 
   const normalizeName = (name: string) =>
     (name || "").trim()
@@ -212,18 +197,30 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     timers: Partial<PhaseTimers> | undefined,
     current: PhaseTimers
   ): PhaseTimers => ({
-    daySec: clampInt(timers?.daySec ?? current.daySec, 10, 3600),
-    nightSec: clampInt(timers?.nightSec ?? current.nightSec, 10, 3600),
-    voteSec: clampInt(timers?.voteSec ?? current.voteSec, 10, 3600),
+    daySec: clampInt(
+      timers?.daySec ?? current.daySec,
+      TIMER_MIN_SECONDS,
+      TIMER_MAX_SECONDS
+    ),
+    nightSec: clampInt(
+      timers?.nightSec ?? current.nightSec,
+      TIMER_MIN_SECONDS,
+      TIMER_MAX_SECONDS
+    ),
+    voteSec: clampInt(
+      timers?.voteSec ?? current.voteSec,
+      TIMER_MIN_SECONDS,
+      TIMER_MAX_SECONDS
+    ),
     discussionSec: clampInt(
       timers?.discussionSec ?? current.discussionSec,
-      10,
-      3600
+      TIMER_MIN_SECONDS,
+      TIMER_MAX_SECONDS
     ),
     pubDiscussionSec: clampInt(
       timers?.pubDiscussionSec ?? current.pubDiscussionSec,
-      10,
-      3600
+      TIMER_MIN_SECONDS,
+      TIMER_MAX_SECONDS
     ),
   })
 
@@ -464,7 +461,7 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     room.gameStarted = false
   }
 
-type Winner = "MAFIA" | "CIVILIANS"
+type Winner = MafiaWinner
 
   const getWinnerFromAliveState = (room: Room): Winner | null => {
     const aliveActivePlayers = getActivePlayers(room).filter((p) => p.alive === true)
@@ -1030,14 +1027,14 @@ const updateRoomSettings = (
     if (!cleanRoomId || !cleanName) return
 
     // Room code validation
-    if (cleanRoomId.length !== 5) {
+    if (cleanRoomId.length !== ROOM_CODE_LENGTH) {
       socket.emit("roomInvalid", {
-        reason: "Room Code MUST Be 5 Characters Long",
+        reason: `Room Code MUST Be ${ROOM_CODE_LENGTH} Characters Long`,
       })
       return
     }
 
-    if (!/^[A-Z0-9]{5}$/.test(cleanRoomId)) {
+    if (!isValidRoomId(cleanRoomId)) {
       socket.emit("roomInvalid", {
         reason: "Room Code MUST Be Alphanumeric (A-Z, 0-9)",
       })

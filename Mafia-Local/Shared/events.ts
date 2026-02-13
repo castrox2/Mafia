@@ -7,6 +7,21 @@ export type MafiaPhase =
   | "NIGHT"
   | "GAMEOVER"
 
+export const ROOM_CODE_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890" as const
+export const ROOM_CODE_LENGTH = 5 as const
+export const ROOM_CODE_REGEX = /^[A-Z0-9]{5}$/
+
+export const TIMER_MIN_SECONDS = 10 as const
+export const TIMER_MAX_SECONDS = 3600 as const
+
+export const SKIP_TARGET_CLIENT_ID = "__SKIP__" as const
+
+export const normalizeRoomId = (roomId: string): string =>
+  String(roomId || "").trim().toUpperCase()
+
+export const isValidRoomId = (roomId: string): boolean =>
+  ROOM_CODE_REGEX.test(normalizeRoomId(roomId))
+
 export type MafiaPlayerRole =
   | "MAFIA"
   | "CIVILIAN"

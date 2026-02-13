@@ -2,8 +2,12 @@ import React, { useEffect, useMemo, useState } from "react"
 import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
+import { normalizeRoomId } from "../../Shared/events.js"
 import type {
+  GameStartedPayload,
   HostParticipationRefusedPayload,
+  ReasonPayload,
+  RoomIdPayload,
   SetHostParticipationPayload,
 } from "../../Shared/events.js"
 import { getPlayerTags, getStatusLabel } from "../src/uiMeta.js"
@@ -33,7 +37,7 @@ export default function Lobby({
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
 
-  const cleanRoomId = useMemo(() => roomId.trim().toUpperCase(), [roomId])
+  const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
 
   const isHost = state?.hostId === clientId
@@ -72,14 +76,14 @@ export default function Lobby({
       }
     }
 
-    const onRoomClosed = ({ roomId: closedRoomId }: { roomId: string }) => {
+    const onRoomClosed = ({ roomId: closedRoomId }: RoomIdPayload) => {
       if (closedRoomId === cleanRoomId) {
         alert("Room was closed by the host.")
         onExit()
       }
     }
 
-    const onStartRefused = ({ reason }: { reason: string }) => {
+    const onStartRefused = ({ reason }: ReasonPayload) => {
       alert(reason)
     }
 
@@ -87,12 +91,12 @@ export default function Lobby({
       alert(reason)
     }
 
-    const onGameStarted = ({ gameNumber }: { gameNumber: number }) => {
+    const onGameStarted = ({ gameNumber }: GameStartedPayload) => {
       setStatus(`Game started! (Game #${gameNumber})`)
       onEnterGame()
     }
 
-    const onKicked = ({ reason }: { reason: string }) => {
+    const onKicked = ({ reason }: ReasonPayload & RoomIdPayload) => {
       alert(reason || "You were kicked.")
       onExit()
     }
