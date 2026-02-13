@@ -3,6 +3,13 @@ import type { Socket } from "socket.io"
 import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction, SheriffShootAction } from "./roles/types.js"
 import { SKIP_TARGET_CLIENT_ID } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
+import type {
+  HostParticipationRefusedPayload,
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  MafiaSocketData,
+  SubmitRoleActionPayload,
+} from "../Shared/events.js"
 import { resolveNightPhase } from "./roles/night.js"
 import { resolveDetectiveChecks } from "./roles/detective.js"
 import { resolveSheriffShots } from "./roles/sheriff.js"
@@ -61,6 +68,20 @@ export type GameSettings = {
   roleCount: RoleCount
 }
 
+type MafiaIoServer = SocketIOServer<
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  Record<string, never>,
+  MafiaSocketData
+>
+
+type MafiaServerSocket = Socket<
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  Record<string, never>,
+  MafiaSocketData
+>
+
 type Room = {
   hostId: string
   hostParticipates: boolean
@@ -84,7 +105,7 @@ type Room = {
                     Rooms Manager
 ====================================================== */
 
-export const createRoomsManager = (io: SocketIOServer) => {
+export const createRoomsManager = (io: MafiaIoServer) => {
   const rooms: Record<string, Room> = {}
 
   /* ------------------------------------------------------
@@ -269,6 +290,29 @@ export const createRoomsManager = (io: SocketIOServer) => {
   const getActivePlayerCount = (room: Room) =>
     getActivePlayers(room).length
 
+  const applyHostParticipationState = (
+    hostPlayer: Player,
+    participates: boolean,
+    opts: {
+      resetRoleState: boolean
+      setConnectedStatusWhenSpectating: boolean
+    }
+  ) => {
+    hostPlayer.isSpectator = !participates
+
+    if (participates && opts.resetRoleState) {
+      hostPlayer.alive = true
+      hostPlayer.voteCount = 0
+      hostPlayer.role = "CIVILIAN"
+      hostPlayer.status = "NOT READY"
+      return
+    }
+
+    if (!participates && opts.setConnectedStatusWhenSpectating) {
+      hostPlayer.status = "CONNECTED"
+    }
+  }
+
   const emitRoomState = (roomId: string) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
@@ -369,15 +413,20 @@ export const createRoomsManager = (io: SocketIOServer) => {
   const resetPlayersForNewGame = (room: Room) => {
     room.players = room.players.map((p) => ({
       ...p,
-      isSpectator: p.clientId === room.hostId ? !room.hostParticipates : false,
+      isSpectator: false,
       alive: true,
-      status:
-        p.clientId === room.hostId && room.hostParticipates === false
-          ? "CONNECTED"
-          : "NOT READY",
+      status: "NOT READY",
       voteCount: 0,
       role: "CIVILIAN",
     }))
+
+    const hostPlayer = room.players.find((p) => p.clientId === room.hostId)
+    if (!hostPlayer) return
+
+    applyHostParticipationState(hostPlayer, room.hostParticipates === true, {
+      resetRoleState: true,
+      setConnectedStatusWhenSpectating: true,
+    })
   }
 
 /* ------------------------------------------------------
@@ -418,9 +467,7 @@ export const createRoomsManager = (io: SocketIOServer) => {
 type Winner = "MAFIA" | "CIVILIANS"
 
   const getWinnerFromAliveState = (room: Room): Winner | null => {
-    const aliveActivePlayers = room.players.filter(
-      (p) => p.isSpectator !== true && p.alive === true
-    )
+    const aliveActivePlayers = getActivePlayers(room).filter((p) => p.alive === true)
 
     const aliveMafiaCount = aliveActivePlayers.filter((p) => p.role === "MAFIA").length
     const aliveNonMafiaCount = aliveActivePlayers.length - aliveMafiaCount
@@ -716,8 +763,8 @@ type Winner = "MAFIA" | "CIVILIANS"
   const allEligibleVotersSubmitted = (room: Room, cleanRoomId: string): boolean => {
     if (room.phase !== "VOTING") return false
 
-    const eligibleVoterIds = room.players
-      .filter((p) => p.isSpectator !== true && p.alive === true)
+    const eligibleVoterIds = getActivePlayers(room)
+      .filter((p) => p.alive === true)
       .map((p) => p.clientId)
 
     if (eligibleVoterIds.length === 0) return false
@@ -819,6 +866,12 @@ type Winner = "MAFIA" | "CIVILIANS"
           Helper: removes clientId from all rooms
   ------------------------------------------------------ */
 
+  const assignNextHost = (room: Room) => {
+    const nextHost = room.players[0]
+    room.hostId = nextHost?.clientId ?? ""
+    room.hostParticipates = nextHost ? nextHost.isSpectator !== true : false
+  }
+
   const removeFromAllRooms = (clientId: string, skipRoomId?: string) => {
     const skip = skipRoomId ? normalizeRoomId(skipRoomId) : undefined
     const cleanClientId = (clientId || "").trim()
@@ -837,8 +890,7 @@ type Winner = "MAFIA" | "CIVILIANS"
 
       // If host leaves, assign new host
       if (room.hostId === cleanClientId) {
-        room.hostId = room.players[0]?.clientId ?? ""
-        room.hostParticipates = true
+        assignNextHost(room)
       }
 
       if (before !== room.players.length) {
@@ -858,7 +910,7 @@ type Winner = "MAFIA" | "CIVILIANS"
                 Socket lifecycle cleanup
   ------------------------------------------------------ */
 
-  const handleDisconnecting = (socket: Socket) => {
+  const handleDisconnecting = (socket: MafiaServerSocket) => {
     for (const roomId of socket.rooms) {
       if (roomId === socket.id) continue
 
@@ -886,7 +938,7 @@ type Winner = "MAFIA" | "CIVILIANS"
   ------------------------------------------------------ */
 
   const createRoomLocal = (
-    socket: Socket,
+    socket: MafiaServerSocket,
     roomId: string,
     playerName: string,
     clientId: string
@@ -925,7 +977,7 @@ type Winner = "MAFIA" | "CIVILIANS"
   ------------------------------------------------------ */
 
 const updateRoomSettings = (
-  socket: Socket,
+  socket: MafiaServerSocket,
   roomId: string,
   settings: Partial<GameSettings>
 ) => {
@@ -968,7 +1020,7 @@ const updateRoomSettings = (
   ------------------------------------------------------ */
 
   const joinRoomLocal = (
-    socket: Socket,
+    socket: MafiaServerSocket,
     roomId: string,
     playerName: string,
     clientId: string
@@ -1024,7 +1076,7 @@ const updateRoomSettings = (
                         Leave Room
   ------------------------------------------------------ */
 
-  const leaveRoomLocal = (socket: Socket, roomId: string) => {
+  const leaveRoomLocal = (socket: MafiaServerSocket, roomId: string) => {
     const cleanRoomId = normalizeRoomId(roomId)
     socket.leave(cleanRoomId)
 
@@ -1034,8 +1086,7 @@ const updateRoomSettings = (
     room.players = room.players.filter((p) => p.clientId !== socket.data.clientId)
 
     if (room.hostId === socket.data.clientId) {
-      room.hostId = room.players[0]?.clientId ?? ""
-      room.hostParticipates = true
+      assignNextHost(room)
     }
 
     if (room.players.length === 0) {
@@ -1070,7 +1121,7 @@ const updateRoomSettings = (
   }
 
   const assignRolesForNewGame = (room: Room) => {
-    const activePlayers = room.players.filter((p) => p.isSpectator !== true)
+    const activePlayers = getActivePlayers(room)
 
     // Safety: if no active players, nothing to do
     if (activePlayers.length === 0) return
@@ -1120,10 +1171,9 @@ const updateRoomSettings = (
     if (player.isSpectator === true) return []
     if (player.role !== "MAFIA" && player.role !== "DOCTOR") return []
 
-    return room.players
+    return getActivePlayers(room)
       .filter(
         (p) =>
-          p.isSpectator !== true &&
           p.clientId !== player.clientId &&
           p.role === player.role
       )
@@ -1168,7 +1218,7 @@ const updateRoomSettings = (
   ------------------------------------------------------ */
 
   const startGameLocal = (
-    socket: Socket,
+    socket: MafiaServerSocket,
     roomId: string,
     opts: { force: boolean }
   ) => {
@@ -1307,7 +1357,7 @@ const updateRoomSettings = (
                       Kick Player (host-only)
   ------------------------------------------------------ */
 
-  const kickPlayerLocal = (socket: Socket, roomId: string, targetClientId: string) => {
+  const kickPlayerLocal = (socket: MafiaServerSocket, roomId: string, targetClientId: string) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
@@ -1358,7 +1408,7 @@ const updateRoomSettings = (
       - Prevent duplicates by matching clientId
 ------------------------------------------------------ */
 
-  const handleReconnect = (socket: Socket, clientId: string) => {
+  const handleReconnect = (socket: MafiaServerSocket, clientId: string) => {
   const cleanClientId = (clientId || "").trim()
   if (!cleanClientId) return
 
@@ -1418,44 +1468,45 @@ const updateRoomSettings = (
   ------------------------------------------------------ */
 
   const setHostParticipationLocal = (
-    socket: Socket,
+    socket: MafiaServerSocket,
     roomId: string,
     participates: boolean
   ) => {
+    const refuseHostParticipation = (reason: string) => {
+      const payload: HostParticipationRefusedPayload = { reason }
+      socket.emit("hostParticipationRefused", payload)
+    }
+
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
 
     if (room.hostId !== socket.data.clientId) {
-      socket.emit("hostParticipationRefused", {
-        reason: "Only the host can change host participation.",
-      })
+      refuseHostParticipation("Only the host can change host participation.")
       return
     }
 
     if (room.gameStarted) {
-      socket.emit("hostParticipationRefused", {
-        reason: "Host participation can only be changed in lobby before game start.",
-      })
+      refuseHostParticipation("Host participation can only be changed in lobby before game start.")
       return
     }
 
     const hostPlayer = room.players.find((p) => p.clientId === room.hostId)
     if (!hostPlayer) {
-      socket.emit("hostParticipationRefused", {
-        reason: "Host player was not found in room.",
-      })
+      refuseHostParticipation("Host player was not found in room.")
       return
     }
 
     const nextParticipates = participates === true
+    const prevParticipates = room.hostParticipates === true
     room.hostParticipates = nextParticipates
 
-    hostPlayer.isSpectator = !nextParticipates
-    hostPlayer.alive = true
-    hostPlayer.voteCount = 0
-    hostPlayer.role = "CIVILIAN"
-    hostPlayer.status = nextParticipates ? "NOT READY" : "CONNECTED"
+    applyHostParticipationState(hostPlayer, nextParticipates, {
+      // Only reset role-related state when host transitions to participating.
+      resetRoleState: prevParticipates === false && nextParticipates === true,
+      // Keep prior status when toggling to spectator in lobby.
+      setConnectedStatusWhenSpectating: false,
+    })
 
     emitRoomState(cleanRoomId)
   }
@@ -1498,9 +1549,9 @@ const updateRoomSettings = (
 ------------------------------------------------------ */
 
   const submitRoleActionLocal = (
-    socket: Socket,
+    socket: MafiaServerSocket,
     roomId: string,
-    payload: { kind: string; targetClientId: string }
+    payload: Pick<SubmitRoleActionPayload, "kind" | "targetClientId">
   ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
@@ -1657,7 +1708,7 @@ const updateRoomSettings = (
       everything else -> DAY (covers DAY/DISCUSSION/PUBDISCUSSION for sheriff)
   ------------------------------------------------------ */
 
-  const requestMyActionsLocal = (socket: Socket, roomId: string) => {
+  const requestMyActionsLocal = (socket: MafiaServerSocket, roomId: string) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) {
@@ -1700,7 +1751,7 @@ const updateRoomSettings = (
       role emit and would otherwise show "(unknown)"
   ------------------------------------------------------ */
 
-  const requestMyRoleLocal = (socket: Socket, roomId: string) => {
+  const requestMyRoleLocal = (socket: MafiaServerSocket, roomId: string) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
@@ -1748,3 +1799,4 @@ const updateRoomSettings = (
     requestMyRoleLocal,
   }
 }
+

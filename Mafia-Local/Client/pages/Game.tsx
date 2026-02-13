@@ -3,6 +3,7 @@ import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/PhaseRouter.js"
 import { PHASE_LABELS } from "../src/constants/phaseLabels.js"
 import type { RoomState } from "../src/types.js"
+import type { MyActionsPayload } from "../../Shared/events.js"
 
 type Props = {
     roomId: string
@@ -336,13 +337,7 @@ useEffect(() => {
     console.log("actionRefused", payload)
   }
 
-  const onMyActions = (payload: {
-    roomId: string
-    gameNumber: number
-    phase: string
-    bucket: string
-    actions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
-  }) => {
+  const onMyActions = (payload: MyActionsPayload) => {
     if (payload.roomId !== cleanRoomId) return
 
     // UI teammate idea:

@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from "react"
 import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
+import type {
+  HostParticipationRefusedPayload,
+  SetHostParticipationPayload,
+} from "../../Shared/events.js"
 
 type Props = {
   roomId: string
@@ -78,7 +82,7 @@ export default function Lobby({
       alert(reason)
     }
 
-    const onHostParticipationRefused = ({ reason }: { reason: string }) => {
+    const onHostParticipationRefused = ({ reason }: HostParticipationRefusedPayload) => {
       alert(reason)
     }
 
@@ -139,10 +143,11 @@ export default function Lobby({
   }
 
   const toggleHostParticipation = (nextParticipates: boolean) => {
-    socket.emit("setHostParticipation", {
+    const payload: SetHostParticipationPayload = {
       roomId: cleanRoomId,
       participates: nextParticipates,
-    })
+    }
+    socket.emit("setHostParticipation", payload)
   }
 
   return (

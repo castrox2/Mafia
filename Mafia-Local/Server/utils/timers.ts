@@ -1,6 +1,19 @@
 import type { Server as SocketIOServer } from "socket.io"
+import type {
+  MafiaClientToServerEvents,
+  MafiaPhase,
+  MafiaServerToClientEvents,
+  MafiaSocketData,
+} from "../../Shared/events.js"
 
-export type PhaseName = "LOBBY" | "DAY" | "DISCUSSION" | "PUBDISCUSSION" | "VOTING" | "NIGHT" | "GAMEOVER"
+type MafiaIoServer = SocketIOServer<
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  Record<string, never>,
+  MafiaSocketData
+>
+
+export type PhaseName = MafiaPhase
 
 export type TimerState = {
     roomId: string
@@ -20,7 +33,7 @@ type RoomTimers = {
 type OnTimerEnd = (args: { roomId: string; phase: PhaseName }) => void
 
 export function createTimersManager(
-    io: SocketIOServer, 
+    io: MafiaIoServer, 
     onTimerEnd: OnTimerEnd
 ) {
     const timers: Record<string, RoomTimers> = {}

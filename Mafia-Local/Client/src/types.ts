@@ -1,64 +1,19 @@
-export type PlayerRole=
-    | "MAFIA"
-    | "CIVILIAN"
-    | "DOCTOR"
-    | "DETECTIVE"
-    | "SHERIFF"
+import type {
+  GameSettingsPayload,
+  MafiaPhase,
+  MafiaPlayer,
+  MafiaPlayerRole,
+  MafiaPlayerStatus,
+  PhaseTimersPayload,
+  RoleCountPayload,
+  RoomStatePayload,
+} from "../../Shared/events.js"
 
-export type PlayerStatus =
-    | "DISCONNECTED"
-    | "CONNECTED"
-    | "NOT_READY" // Checks if player is ready to start 
-    | "READY" // not if dead or alive
-
-export type Player = {
-    id: string // Socket ID
-    clientId: string // Persistent client ID
-    name: string
-    alive: boolean
-    role: PlayerRole
-    status: PlayerStatus
-    isSpectator: boolean // True if player joins mid-game (duh tf)
-    joinedAt: number // timestamp for when player joined
-}
-
-export type RoomState = {
-    roomId: string
-    hostId: string
-    hostParticipates: boolean
-    players: Player[]
-    settings: GameSettings
-    phase: Phase
-    phaseEndTime: number | null
-    gameStarted: boolean
-    gameNumber: number
-}
-
-export type Phase =
-    | "LOBBY"
-    | "DAY"
-    | "DISCUSSION"
-    | "PUBDISCUSSION"
-    | "VOTING"
-    | "NIGHT"
-    | "GAMEOVER"
-
-export type PhaseTimers = {
-    daySec: number
-    nightSec: number
-    voteSec: number
-    discussionSec: number
-    pubDiscussionSec: number
-}
-
-export type RoleCounts = {
-    mafia: number
-    doctor: number
-    detective: number
-    sheriff: number
-}
-
-export type GameSettings = {
-    roleCount: RoleCounts
-    timers: PhaseTimers
-}
+export type PlayerRole = MafiaPlayerRole
+export type PlayerStatus = MafiaPlayerStatus
+export type Player = MafiaPlayer
+export type RoomState = RoomStatePayload
+export type Phase = MafiaPhase
+export type PhaseTimers = PhaseTimersPayload
+export type RoleCounts = RoleCountPayload
+export type GameSettings = GameSettingsPayload

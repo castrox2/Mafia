@@ -1,9 +1,9 @@
 import { io, type Socket } from "socket.io-client"
-
-export type ReconnectedPayload = {
-    roomId: string
-    playerName: string
-}
+import type {
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  ReconnectedPayload,
+} from "../../Shared/events.js"
 
 // Stable identity rules:
 // - deviceId: persists across browser restarts (localStorage)
@@ -73,14 +73,17 @@ const SERVER_URL = String(
   env.VITE_MAFIA_SERVER_URL || `http://${SERVER_HOST}:${SERVER_PORT}`
 )
 
-export const socket: Socket = io(SERVER_URL, {
+export const socket: Socket<MafiaServerToClientEvents, MafiaClientToServerEvents> = io(
+  SERVER_URL,
+  {
   // IMPORTANT: this is how the server knows who you "really" are (even after reconnect)
     auth: { clientId },
 
     // WebSocket-first avoids noisy XHR polling errors in local/Electron dev.
     // Keep polling as fallback only if websocket upgrade path needs it.
     transports: ["websocket", "polling"],
-})
+  }
+)
 
 /* ------------------------------------------------------
             Buffered "reconnected" event
