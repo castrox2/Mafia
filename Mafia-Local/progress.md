@@ -49,3 +49,30 @@ TODO / next-agent suggestions:
   - `Server`: `npm run build` passes.
   - `Server`: `npx tsc -p tsconfig.json --noEmit` passes.
 
+---
+
+- New task: make project UI-friendly for styling/UI implementation handoff.
+- Added centralized client UI metadata/helpers in `Client/src/uiMeta.ts`:
+  - Phase labels (`PHASE_UI_META`, `getPhaseLabel`)
+  - Role labels (`ROLE_UI_META`, `getRoleLabel`)
+  - Player status labels (`PLAYER_STATUS_UI_META`, `getStatusLabel`)
+  - Winner labels (`getWinnerLabel`)
+  - Action labels (`getActionLabel`, `getActionRecordedLabel`)
+  - Night-role action mapping (`getNightActionMetaForRole`)
+  - Player display helpers (`getPlayerTags`, `getPlayerLifeStateLabel`)
+- Wired UI helpers into existing screens:
+  - `Client/pages/Lobby.tsx`: standardized player tags + status labels.
+  - `Client/pages/Game.tsx`: standardized phase label, player tags/life state, and action feedback labels.
+  - `Client/components/PhaseRouter.tsx`: standardized phase headers, role labels, banner phase labels, winner label, and night-action metadata lookup.
+  - `Client/src/constants/phaseLabels.ts`: now sourced from centralized UI metadata.
+- Note:
+  - Initially placed helpers in `Shared/ui.ts`, then moved to `Client/src/uiMeta.ts` to avoid `TS1287` (CommonJS/ESM boundary issue under current package setup).
+- Validation:
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npm run build` passes.
+  - `Server`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Server`: `npm run build` passes.
+  - Playwright skill script executed:
+    - `node C:/Users/User/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js --url http://127.0.0.1:5173 --click 100,100 --click-selector button --iterations 1 --pause-ms 250`
+    - Screenshot reviewed: `output/web-game/shot-0.png` (Join screen visible, no obvious runtime regressions from this UI-helper refactor).
+

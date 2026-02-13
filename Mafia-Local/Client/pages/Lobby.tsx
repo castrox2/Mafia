@@ -6,6 +6,7 @@ import type {
   HostParticipationRefusedPayload,
   SetHostParticipationPayload,
 } from "../../Shared/events.js"
+import { getPlayerTags, getStatusLabel } from "../src/uiMeta.js"
 
 type Props = {
   roomId: string
@@ -182,7 +183,15 @@ export default function Lobby({
         </div>
         <div>
           <strong>You:</strong> {cleanPlayerName}
-          {amSpectator ? " (SPECTATOR)" : ""}
+          {me
+            ? ` ${getPlayerTags(me, {
+                hostId: state?.hostId ?? "",
+                viewerClientId: clientId,
+              })
+                .filter((tag) => tag.key !== "YOU")
+                .map((tag) => `(${tag.label})`)
+                .join(" ")}`
+            : ""}
         </div>
       </div>
 
@@ -296,18 +305,19 @@ export default function Lobby({
 
       <ul style={{ paddingLeft: 18 }}>
         {(state?.players ?? []).map((p) => {
-          const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
-          const spectatorTag = p.isSpectator ? " (SPECTATOR)" : ""
-          const deadTag = p.alive ? "" : " (dead)"
+          const tags = getPlayerTags(p, {
+            hostId: state?.hostId ?? "",
+            viewerClientId: clientId,
+          })
+            .map((tag) => `(${tag.label})`)
+            .join(" ")
 
           return (
             <li key={p.clientId} style={{ marginBottom: 6 }}>
               {p.name}
-              {hostTag}
-              {spectatorTag}
-              {deadTag}
-              {" — "}
-              Status: {p.status}
+              {tags ? ` ${tags}` : ""}
+              {" - "}
+              Status: {getStatusLabel(p.status)}
               {isHost &&
                 p.clientId !== state?.hostId &&
                 p.clientId !== clientId && (
@@ -347,3 +357,4 @@ export default function Lobby({
     </div>
   )
 }
+

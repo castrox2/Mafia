@@ -1,9 +1,26 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
 import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/PhaseRouter.js"
-import { PHASE_LABELS } from "../src/constants/phaseLabels.js"
 import type { RoomState } from "../src/types.js"
-import type { MyActionsPayload } from "../../Shared/events.js"
+import type {
+  ActionAcceptedPayload,
+  ActionRefusedPayload,
+  GameOverPayload,
+  MyActionsPayload,
+  MyRecordedActionPayload,
+  PhaseEndingPayload,
+  PhaseStartedPayload,
+  PrivateMessagePayload,
+  RoleActionKind,
+  RoundSummaryPayload,
+  YourRolePayload,
+} from "../../Shared/events.js"
+import {
+  getActionRecordedLabel,
+  getPhaseLabel,
+  getPlayerLifeStateLabel,
+  getPlayerTags,
+} from "../src/uiMeta.js"
 
 type Props = {
     roomId: string
@@ -28,17 +45,17 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
     const [nowMs, setNowMs] = useState(Date.now())
 
     // Private role (anti-spoiler): set by server via "yourRole"
-    const [myRole, setMyRole] = useState<string | null>(null)
+    const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
     const [rolemateClientIds, setRolemateClientIds] = useState<string[]>([])
 
     // UI-friendly transient banners (night/vote summaries)
     const [banner, setBanner] = useState<null | { kind: "NIGHT" | "VOTING"; text: string }>(null)
 
     // Private messages (ex: Detective result). UI teammate can turn into toast/modal later.
-    const [privateMessages, setPrivateMessages] = useState<any[]>([])
+    const [privateMessages, setPrivateMessages] = useState<PrivateMessagePayload[]>([])
 
     // Optional: restore my current selections for a phase (from requestMyActions)
-    const [myActions, setMyActions] = useState<any[]>([])
+    const [myActions, setMyActions] = useState<MyRecordedActionPayload[]>([])
 
     // End-game winner (authoritative event from server)
     const [winner, setWinner] = useState<Winner | null>(null)
@@ -133,13 +150,7 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
 // ------------------------------------------------------
 
 useEffect(() => {
-    const onPhaseEnding = (payload: {
-        roomId: string
-        gameNumber: number
-        fromPhase: string
-        toPhase: string
-        leadMs: number
-    }) => {
+    const onPhaseEnding = (payload: PhaseEndingPayload) => {
         // Ignore events for other rooms (important if you ever support multiple rooms)
         if (payload.roomId !== cleanRoomId) return
 
@@ -155,12 +166,7 @@ useEffect(() => {
         console.log("phaseEnding", payload)
     }
 
-    const onPhaseStarted = (payload: {
-        roomId: string
-        gameNumber: number
-        phase: string
-        phaseEndTime: number | null
-    }) => {
+    const onPhaseStarted = (payload: PhaseStartedPayload) => {
         if (payload.roomId !== cleanRoomId) return
 
         // UI teammate idea:
@@ -232,12 +238,7 @@ useEffect(() => {
     }, 1500)
   }
 
-  const onYourRole = (payload: {
-    roomId: string
-    gameNumber: number
-    role: string
-    rolemateClientIds?: string[]
-  }) => {
+  const onYourRole = (payload: YourRolePayload) => {
     if (payload.roomId !== cleanRoomId) return
 
     // UI teammate idea:
@@ -248,10 +249,10 @@ useEffect(() => {
     console.log("yourRole", payload)
   }
 
-  const onPrivateMessage = (payload: any) => {
+  const onPrivateMessage = (payload: PrivateMessagePayload) => {
     // This event is already private by design, but still room-filter it.
     // (Good habit if you ever support multiple rooms per client.)
-    if ((payload as any)?.roomId && (payload as any).roomId !== cleanRoomId) return
+    if (payload.roomId !== cleanRoomId) return
 
     // UI teammate idea:
     // - Show toast/modal
@@ -260,11 +261,7 @@ useEffect(() => {
     console.log("privateMessage", payload)
   }
 
-  const onNightSummary = (payload: {
-    roomId: string
-    gameNumber: number
-    someoneDied: boolean
-  }) => {
+  const onNightSummary = (payload: RoundSummaryPayload) => {
     if (payload.roomId !== cleanRoomId) return
 
     // UI teammate idea:
@@ -286,11 +283,7 @@ useEffect(() => {
     console.log("nightSummary", payload)
   }
 
-  const onVoteSummary = (payload: {
-    roomId: string
-    gameNumber: number
-    someoneDied: boolean
-  }) => {
+  const onVoteSummary = (payload: RoundSummaryPayload) => {
     if (payload.roomId !== cleanRoomId) return
 
     setBanner({
@@ -308,19 +301,15 @@ useEffect(() => {
     console.log("voteSummary", payload)
   }
 
-  const onGameOver = (payload: {
-    roomId: string
-    gameNumber: number
-    winner: Winner
-  }) => {
+  const onGameOver = (payload: GameOverPayload) => {
     if (payload.roomId !== cleanRoomId) return
 
     setWinner(payload.winner)
     console.log("gameOver", payload)
   }
 
-  const onActionAccepted = (payload: { kind: string; targetClientId: string }) => {
-    const actionKind = String(payload?.kind || "ACTION").replaceAll("_", " ")
+  const onActionAccepted = (payload: ActionAcceptedPayload) => {
+    const actionKind = getActionRecordedLabel(String(payload?.kind || "ACTION"))
     showActionFeedback({
       kind: "ACCEPTED",
       text: `${actionKind} recorded.`,
@@ -328,7 +317,7 @@ useEffect(() => {
     console.log("actionAccepted", payload)
   }
 
-  const onActionRefused = (payload: { kind?: string; reason: string }) => {
+  const onActionRefused = (payload: ActionRefusedPayload) => {
     const reason = String(payload?.reason || "Action was refused.")
     showActionFeedback({
       kind: "REFUSED",
@@ -427,7 +416,7 @@ useEffect(() => {
       socket.emit("forceStartGame", { roomId: cleanRoomId })
     }
 
-    const submitRoleAction = (kind: string, targetClientId: string) => {
+    const submitRoleAction = (kind: RoleActionKind, targetClientId: string) => {
       socket.emit("submitRoleAction", { roomId: cleanRoomId, kind, targetClientId })
       socket.emit("requestMyActions", { roomId: cleanRoomId })
     }
@@ -453,8 +442,15 @@ useEffect(() => {
         </div>
         <div>
             <strong>You:</strong> {cleanPlayerName}
-            {isHost ? " (HOST)" : ""}
-            {amSpectator ? " (SPECTATOR)" : ""}
+            {me
+              ? ` ${getPlayerTags(me, {
+                  hostId: state?.hostId ?? "",
+                  viewerClientId: clientId,
+                })
+                  .filter((tag) => tag.key !== "YOU")
+                  .map((tag) => `(${tag.label})`)
+                  .join(" ")}`
+              : ""}
         </div>
         </div>
 
@@ -466,7 +462,7 @@ useEffect(() => {
             {state.gameStarted ? `Started (#${state.gameNumber})` : "Not started"}
             </div>
             <div>
-            <strong>Phase:</strong> {state.phase}
+            <strong>Phase:</strong> {getPhaseLabel(state.phase)}
             </div>
             {remainingSec !== null && (
             <div>
@@ -481,16 +477,19 @@ useEffect(() => {
             <h3 style={{ margin: "0 0 8px 0" }}>Player Status</h3>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {state.players.map((p) => {
-                const lifeState = p.isSpectator ? "Spectator" : p.alive ? "Alive" : "Dead"
-                const hostTag = p.clientId === state.hostId ? " (HOST)" : ""
-                const meTag = p.clientId === clientId ? " (YOU)" : ""
+                const lifeState = getPlayerLifeStateLabel(p)
+                const tags = getPlayerTags(p, {
+                  hostId: state.hostId,
+                  viewerClientId: clientId,
+                })
+                  .map((tag) => `(${tag.label})`)
+                  .join(" ")
 
                 return (
                   <li key={p.clientId} style={{ marginBottom: 4 }}>
                     {p.name}
-                    {hostTag}
-                    {meTag}
-                    {" — "}
+                    {tags ? ` ${tags}` : ""}
+                    {" - "}
                     {lifeState}
                   </li>
                 )
@@ -547,5 +546,6 @@ useEffect(() => {
     </div>
     )
 }
+
 
 
