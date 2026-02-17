@@ -335,8 +335,18 @@ export type MafiaSocketData = {
   clientId: string
 }
 
-export interface HostParticipationClientToServerEvents
-  extends Pick<MafiaClientToServerEvents, "setHostParticipation"> {}
+export type SetHostParticipationEvent =
+  MafiaClientToServerEvents["setHostParticipation"]
 
-export interface HostParticipationServerToClientEvents
-  extends Pick<MafiaServerToClientEvents, "hostParticipationRefused"> {}
+export type HostParticipationRefusedEvent =
+  MafiaServerToClientEvents["hostParticipationRefused"]
+
+export type HostParticipationClientToServerEvents = Pick<
+  MafiaClientToServerEvents,
+  "setHostParticipation"
+>
+
+export type HostParticipationServerToClientEvents = Pick<
+  MafiaServerToClientEvents,
+  "hostParticipationRefused"
+>

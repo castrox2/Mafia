@@ -5,9 +5,11 @@ import HostSettingsModal from "../components/HostSettings.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
   GameStartedPayload,
+  HostParticipationRefusedEvent,
   HostParticipationRefusedPayload,
   ReasonPayload,
   RoomIdPayload,
+  SetHostParticipationEvent,
   SetHostParticipationPayload,
 } from "../../Shared/events.js"
 import { getPlayerTags, getStatusLabel } from "../src/uiMeta.js"
@@ -87,7 +89,9 @@ export default function Lobby({
       alert(reason)
     }
 
-    const onHostParticipationRefused = ({ reason }: HostParticipationRefusedPayload) => {
+    const onHostParticipationRefused: HostParticipationRefusedEvent = ({
+      reason,
+    }: HostParticipationRefusedPayload) => {
       alert(reason)
     }
 
@@ -148,11 +152,21 @@ export default function Lobby({
   }
 
   const toggleHostParticipation = (nextParticipates: boolean) => {
+    if (hostParticipates && !nextParticipates) {
+      const confirmed = window.confirm(
+        "Turn host participation off? You will become a spectator and will not receive a role until you opt back in."
+      )
+      if (!confirmed) return
+    }
+
     const payload: SetHostParticipationPayload = {
       roomId: cleanRoomId,
       participates: nextParticipates,
     }
-    socket.emit("setHostParticipation", payload)
+    const emitSetHostParticipation: SetHostParticipationEvent = (nextPayload) => {
+      socket.emit("setHostParticipation", nextPayload)
+    }
+    emitSetHostParticipation(payload)
   }
 
   return (

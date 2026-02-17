@@ -17,7 +17,7 @@ import type {
   MafiaSocketData,
   RoomIdPayload,
   SetAlivePayload,
-  SetHostParticipationPayload,
+  SetHostParticipationEvent,
   SetPlayerStatusPayload,
   SetRolePayload,
   SubmitRoleActionPayload,
@@ -241,14 +241,12 @@ io.on("connection", (socket) => {
     }
   )
 
-  socket.on(
-    "setHostParticipation",
-    ({ roomId, participates }: SetHostParticipationPayload) => {
-      roomsManager.setHostParticipationLocal(socket, roomId, participates)
-    }
-  )
+  const onSetHostParticipation: SetHostParticipationEvent = (payload) => {
+    roomsManager.setHostParticipationLocal(socket, payload)
+  }
+  socket.on("setHostParticipation", onSetHostParticipation)
 
-    socket.on("requestMyActions", ({ roomId }: RoomIdPayload) => {
+  socket.on("requestMyActions", ({ roomId }: RoomIdPayload) => {
     roomsManager.requestMyActionsLocal(socket, roomId)
   })
 
@@ -257,7 +255,7 @@ io.on("connection", (socket) => {
     roomsManager.requestMyRoleLocal(socket, roomId)
   })
 
-    socket.on("startGame", ({ roomId }: RoomIdPayload) => {
+  socket.on("startGame", ({ roomId }: RoomIdPayload) => {
     roomsManager.startGameLocal(socket, roomId, { force: false })
   })
 
@@ -283,15 +281,15 @@ io.on("connection", (socket) => {
     }
   )
 
-    socket.on("disconnect", () => {
-      console.log("Client disconnected:", socket.id)
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id)
 
-      // IMPORTANT:
-      // Do NOT hard-remove on disconnect.
-      // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
-      // Cleanup should be handled by:
-      // - explicit leaveRoom (user intent)
-      // - a "disconnect grace period" (optional; can be added later)
+    // IMPORTANT:
+    // Do NOT hard-remove on disconnect.
+    // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
+    // Cleanup should be handled by:
+    // - explicit leaveRoom (user intent)
+    // - a "disconnect grace period" (optional; can be added later)
   })
 })
 

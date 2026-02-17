@@ -21,6 +21,7 @@ import type {
   PhaseTimersPayload,
   RoundSummaryPayload,
   RoleCountPayload,
+  SetHostParticipationPayload,
   SubmitRoleActionPayload,
 } from "../Shared/events.js"
 import { resolveNightPhase } from "./roles/night.js"
@@ -1481,15 +1482,14 @@ const updateRoomSettings = (
 
   const setHostParticipationLocal = (
     socket: MafiaServerSocket,
-    roomId: string,
-    participates: boolean
+    payload: SetHostParticipationPayload
   ) => {
     const refuseHostParticipation = (reason: string) => {
       const payload: HostParticipationRefusedPayload = { reason }
       socket.emit("hostParticipationRefused", payload)
     }
 
-    const cleanRoomId = normalizeRoomId(roomId)
+    const cleanRoomId = normalizeRoomId(payload.roomId)
     const room = rooms[cleanRoomId]
     if (!room) return
 
@@ -1509,7 +1509,7 @@ const updateRoomSettings = (
       return
     }
 
-    const nextParticipates = participates === true
+    const nextParticipates = payload.participates === true
     const prevParticipates = room.hostParticipates === true
     room.hostParticipates = nextParticipates
 

@@ -97,3 +97,44 @@ TODO / next-agent suggestions:
   - `Client`: `npm run build` passes.
   - `Server`: `npx tsc -p tsconfig.json --noEmit` passes.
   - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+
+---
+
+- New task: apply the 3 TODO items from this file.
+- Implemented TODO #1 (host spectator badge):
+  - `Client/src/uiMeta.ts` `getPlayerTags` now emits a dedicated `HOST DEVICE` badge when the host is spectating.
+  - Existing lobby/game tag rendering picks this up automatically via shared UI metadata.
+- Implemented TODO #2 (opt-out confirmation):
+  - `Client/pages/Lobby.tsx` now asks for confirmation before turning host participation OFF.
+  - Confirmation copy explains that host becomes spectator and will not receive a role until opting back in.
+- Implemented TODO #3 (shared host-participation typings tightening):
+  - `Shared/events.ts` now exports explicit host-participation handler types:
+    - `SetHostParticipationEvent`
+    - `HostParticipationRefusedEvent`
+  - `Server/index.ts` now wires `setHostParticipation` using the shared handler type.
+  - `Server/rooms.ts` `setHostParticipationLocal` now accepts `SetHostParticipationPayload` directly (shared payload object path end-to-end).
+  - `Client/pages/Lobby.tsx` now uses shared host-participation handler function types for emit/listener wiring.
+- Validation:
+  - `Server`: `npm run build` passes.
+  - `Server`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npm run build` passes.
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - Playwright skill smoke script executed against local preview:
+    - `node C:/Users/User/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js --url http://127.0.0.1:5173 --click 100,100 --click-selector button --iterations 1 --pause-ms 250`
+    - Latest artifact updated: `output/web-game/shot-0.png`.
+
+---
+
+- New task: align project version metadata with latest patch line.
+- Updated version from `0.7.5` -> `0.8.4` in:
+  - Root `package.json` + `package-lock.json`
+  - `Mafia-Local/Client/package.json` + `package-lock.json`
+  - `Mafia-Local/Server/package.json` + `package-lock.json`
+  - `Mafia-Local/Electron/package.json` + `package-lock.json`
+- Updated docs release example:
+  - `Mafia-Local/README.md`: `v0.7.5` -> `v0.8.4`.
+- Packaging/build validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron`.
+  - Generated installer artifacts include:
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
