@@ -119,6 +119,16 @@ export default function Join({ onEnterLobby }: Props) {
         socket.emit("createRoom", { playerName: cleanName, baseUrl: baseUrll })
     }
 
+    const createRoleSelectorRoom = () => {
+        if (!cleanName) return alert("Enter Name First!")
+        setStatus("Creating role selector room...")
+        socket.emit("createRoom", {
+            playerName: cleanName,
+            baseUrl: baseUrll,
+            roomType: "ROLE_SELECTOR",
+        })
+    }
+
     const joinRoom = () => {
         if (!cleanName || !cleanRoom) {
             setStatus("Enter Name and Room Code First!")
@@ -172,6 +182,9 @@ export default function Join({ onEnterLobby }: Props) {
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
             <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoom}>
             Create Room
+            </button>
+            <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoleSelectorRoom}>
+            Role Selector
             </button>
             <button style={{ padding: "10px 12px", fontSize: 16 }} disabled={!validRoomCode || !validName} onClick={joinRoom}>
             Join Room

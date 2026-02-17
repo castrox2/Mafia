@@ -15,11 +15,15 @@ import type {
   HostParticipationRefusedPayload,
   MafiaClientToServerEvents,
   MafiaPhase,
+  MafiaRoomType,
   MafiaWinner,
   MafiaServerToClientEvents,
   MafiaSocketData,
   PhaseTimersPayload,
+  RoleAssignmentCountsPayload,
   RoundSummaryPayload,
+  RoleSelectorHostCountsPayload,
+  RoleSelectorSettingsPayload,
   RoleCountPayload,
   SetHostParticipationPayload,
   SubmitRoleActionPayload,
@@ -73,10 +77,13 @@ type MafiaServerSocket = Socket<
 >
 
 type Room = {
+  roomType: MafiaRoomType
   hostId: string
   hostParticipates: boolean
   players: Player[]
   settings: GameSettings
+  roleSelectorSettings: RoleSelectorSettingsPayload | null
+  roomLocked: boolean
 
   // Game State
   gameStarted: boolean
@@ -123,6 +130,11 @@ export const createRoomsManager = (io: MafiaIoServer) => {
       detective: 0,
       sheriff: 0,
     },
+  })
+
+  const defaultRoleSelectorSettings = (): RoleSelectorSettingsPayload => ({
+    scriptMode: "REGULAR_MAFIA",
+    allowRedeal: false,
   })
 
   /* ------------------------------------------------------
@@ -268,6 +280,27 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     return { mafia, doctor, detective, sheriff }
   }
 
+  const normalizeRoleSelectorSettings = (
+    incoming: Partial<RoleSelectorSettingsPayload> | undefined,
+    current: RoleSelectorSettingsPayload
+  ): RoleSelectorSettingsPayload => {
+    const nextAllowRedeal =
+      typeof incoming?.allowRedeal === "boolean"
+        ? incoming.allowRedeal
+        : current.allowRedeal
+
+    const incomingScript = incoming?.scriptMode
+    const nextScriptMode =
+      incomingScript === "REGULAR_MAFIA" || incomingScript === "BLOOD_ON_THE_CLOCKTOWER"
+        ? incomingScript
+        : current.scriptMode
+
+    return {
+      scriptMode: nextScriptMode,
+      allowRedeal: nextAllowRedeal,
+    }
+  }
+
   /* ------------------------------------------------------
                 Helper: broadcast room state
   ------------------------------------------------------ */
@@ -288,6 +321,48 @@ export const createRoomsManager = (io: MafiaIoServer) => {
 
   const getActivePlayerCount = (room: Room) =>
     getActivePlayers(room).length
+
+  const getAssignedRoleCounts = (room: Room): RoleAssignmentCountsPayload => {
+    const counts: RoleAssignmentCountsPayload = {
+      mafia: 0,
+      doctor: 0,
+      detective: 0,
+      sheriff: 0,
+      civilian: 0,
+    }
+
+    for (const player of getActivePlayers(room)) {
+      if (player.role === "MAFIA") counts.mafia += 1
+      else if (player.role === "DOCTOR") counts.doctor += 1
+      else if (player.role === "DETECTIVE") counts.detective += 1
+      else if (player.role === "SHERIFF") counts.sheriff += 1
+      else counts.civilian += 1
+    }
+
+    return counts
+  }
+
+  const emitRoleSelectorHostCounts = (cleanRoomId: string) => {
+    const room = rooms[cleanRoomId]
+    if (!room) return
+    if (room.roomType !== "ROLE_SELECTOR") return
+
+    const hostPlayer = room.players.find((p) => p.clientId === room.hostId)
+    if (!hostPlayer) return
+
+    const hostSocket = io.sockets.sockets.get(hostPlayer.id)
+    if (!hostSocket) return
+
+    const payload: RoleSelectorHostCountsPayload = {
+      roomId: cleanRoomId,
+      gameNumber: room.gameNumber,
+      started: room.gameStarted,
+      roomLocked: room.roomLocked,
+      counts: getAssignedRoleCounts(room),
+    }
+
+    hostSocket.emit("roleSelectorHostCounts", payload)
+  }
 
   const applyHostParticipationState = (
     hostPlayer: Player,
@@ -322,6 +397,7 @@ export const createRoomsManager = (io: MafiaIoServer) => {
 
     io.to(cleanRoomId).emit("roomState", {
       roomId: cleanRoomId,
+      roomType: room.roomType,
       hostId: room.hostId,
       hostParticipates: room.hostParticipates,
 
@@ -334,12 +410,16 @@ export const createRoomsManager = (io: MafiaIoServer) => {
       })),
 
       settings: room.settings,
+      roleSelectorSettings: room.roleSelectorSettings,
       roleBounds: getRoleBounds(getActivePlayerCount(room)),
       gameStarted: room.gameStarted,
+      roomLocked: room.roomLocked,
       gameNumber: room.gameNumber,
       phase: room.phase,
       phaseEndTime: room.phaseEndTime,
     })
+
+    emitRoleSelectorHostCounts(cleanRoomId)
   }
 
   const getPhaseDurationSec = (room: Room, phase: Phase): number => {
@@ -417,6 +497,25 @@ export const createRoomsManager = (io: MafiaIoServer) => {
       status: "NOT READY",
       voteCount: 0,
       role: "CIVILIAN",
+    }))
+
+    const hostPlayer = room.players.find((p) => p.clientId === room.hostId)
+    if (!hostPlayer) return
+
+    applyHostParticipationState(hostPlayer, room.hostParticipates === true, {
+      resetRoleState: true,
+      setConnectedStatusWhenSpectating: true,
+    })
+  }
+
+  const resetPlayersForRoleSelectorDeal = (room: Room) => {
+    room.players = room.players.map((p) => ({
+      ...p,
+      isSpectator: p.clientId === room.hostId ? p.isSpectator : false,
+      alive: true,
+      voteCount: 0,
+      role: "CIVILIAN",
+      status: p.status === "DISCONNECTED" ? "DISCONNECTED" : "CONNECTED",
     }))
 
     const hostPlayer = room.players.find((p) => p.clientId === room.hostId)
@@ -954,17 +1053,22 @@ type Winner = MafiaWinner
     socket: MafiaServerSocket,
     roomId: string,
     playerName: string,
-    clientId: string
+    clientId: string,
+    roomType: MafiaRoomType = "CLASSIC"
   ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
     if (!cleanRoomId || !cleanName) return
 
     rooms[cleanRoomId] = {
+      roomType,
       hostId: clientId, // Host is stable identity
       hostParticipates: true,
       players: [],
       settings: defaultSettings(),
+      roleSelectorSettings:
+        roomType === "ROLE_SELECTOR" ? defaultRoleSelectorSettings() : null,
+      roomLocked: false,
 
       gameStarted: false,
       gameNumber: 0,
@@ -1012,7 +1116,10 @@ const updateRoomSettings = (
   console.log("DEBUG: current roleCount", room.settings.roleCount)
 
   const next: GameSettings = {
-    timers: normalizeTimers(settings.timers, room.settings.timers),
+    timers:
+      room.roomType === "ROLE_SELECTOR"
+        ? room.settings.timers
+        : normalizeTimers(settings.timers, room.settings.timers),
     roleCount: normalizeRoleCount(
       settings.roleCount,
       room.settings.roleCount,
@@ -1026,6 +1133,45 @@ const updateRoomSettings = (
   room.settings = next
   emitRoomState(cleanRoomId)
 }
+
+  const updateRoleSelectorSettingsLocal = (
+    socket: MafiaServerSocket,
+    roomId: string,
+    settings: Partial<RoleSelectorSettingsPayload>
+  ) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    if (room.roomType !== "ROLE_SELECTOR") {
+      socket.emit("settingsRefused", { reason: "This room does not support role selector settings." })
+      return
+    }
+
+    if (room.hostId !== socket.data.clientId) {
+      socket.emit("settingsRefused", { reason: "Only the host can update settings." })
+      return
+    }
+
+    const current = room.roleSelectorSettings ?? defaultRoleSelectorSettings()
+    let next = normalizeRoleSelectorSettings(settings, current)
+
+    if (
+      settings.scriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
+      current.scriptMode !== "BLOOD_ON_THE_CLOCKTOWER"
+    ) {
+      socket.emit("settingsRefused", {
+        reason: "Blood on the Clocktower scripts are not implemented yet.",
+      })
+      next = {
+        ...next,
+        scriptMode: current.scriptMode,
+      }
+    }
+
+    room.roleSelectorSettings = next
+    emitRoomState(cleanRoomId)
+  }
 
 
   /* ------------------------------------------------------
@@ -1063,15 +1209,23 @@ const updateRoomSettings = (
       return
     }
 
+    const existing = room.players.find((p) => p.clientId === clientId)
+
+    if (room.roomType === "ROLE_SELECTOR" && room.roomLocked && !existing) {
+      socket.emit("roomInvalid", {
+        reason: "This role selector room is locked after roles were dealt.",
+      })
+      return
+    }
+
     const isHostClient = clientId === room.hostId
-    const shouldSpectate =
-      room.gameStarted === true || (isHostClient && room.hostParticipates === false)
+    const shouldSpectate = room.roomType === "ROLE_SELECTOR"
+      ? Boolean(existing ? existing.isSpectator : (isHostClient && room.hostParticipates === false))
+      : room.gameStarted === true || (isHostClient && room.hostParticipates === false)
 
     removeFromAllRooms(clientId, cleanRoomId)
 
     socket.join(cleanRoomId)
-
-    const existing = room.players.find((p) => p.clientId === clientId)
     
     const merged = mergePlayerState(existing, socket.id, clientId, cleanName)
 
@@ -1258,6 +1412,60 @@ const updateRoomSettings = (
     hostPlayer.id = socket.id
     socket.join(cleanRoomId)
 
+    if (room.roomType === "ROLE_SELECTOR") {
+      const roleSelectorSettings =
+        room.roleSelectorSettings ?? defaultRoleSelectorSettings()
+      room.roleSelectorSettings = roleSelectorSettings
+
+      if (room.gameStarted) {
+        socket.emit("startRefused", {
+          reason: roleSelectorSettings.allowRedeal
+            ? "Roles were already dealt. Use Redeal Roles to overwrite assignments."
+            : "Roles were already dealt for this room.",
+        })
+        return
+      }
+
+      resetPlayersForRoleSelectorDeal(room)
+
+      const playerCount = normalizeRoleCountsForRoom(room)
+      if (playerCount <= 0) {
+        socket.emit("startRefused", {
+          reason: "At least one participant is required to deal roles.",
+        })
+        return
+      }
+
+      clearPhaseScheduling(room)
+      room.phase = "LOBBY"
+      room.phaseEndTime = null
+      room.roomLocked = true
+      room.gameStarted = true
+      room.gameNumber += 1
+
+      clearGameplayRoleActions(cleanRoomId)
+      assignRolesForNewGame(room)
+      emitPrivateRolesToRoom(cleanRoomId)
+      emitRoomState(cleanRoomId)
+
+      io.to(cleanRoomId).emit("gameStarted", {
+        roomId: cleanRoomId,
+        roomType: room.roomType,
+        gameNumber: room.gameNumber,
+      })
+
+      const startedGameNumber = room.gameNumber
+      setTimeout(() => {
+        const r = rooms[cleanRoomId]
+        if (!r) return
+        if (!r.gameStarted) return
+        if (r.gameNumber !== startedGameNumber) return
+        emitPrivateRolesToRoom(cleanRoomId)
+      }, 150)
+
+      return
+    }
+
     if (room.gameStarted) {
       socket.emit("startRefused", { reason: "Game already started." })
       return
@@ -1319,6 +1527,7 @@ const updateRoomSettings = (
     // marking gameStarted=true, otherwise startPhase() will short-circuit.
     clearPhaseScheduling(room)
     room.phase = "LOBBY"
+    room.roomLocked = false
 
     room.gameStarted = true
     room.gameNumber += 1
@@ -1351,6 +1560,7 @@ const updateRoomSettings = (
     emitRoomState(cleanRoomId)
     io.to(cleanRoomId).emit("gameStarted", {
       roomId: cleanRoomId,
+      roomType: room.roomType,
       gameNumber: room.gameNumber,
     })
 
@@ -1364,6 +1574,47 @@ const updateRoomSettings = (
       if (r.gameNumber !== startedGameNumber) return
       emitPrivateRolesToRoom(cleanRoomId)
     }, 150)
+  }
+
+  const redealRoleSelectorLocal = (socket: MafiaServerSocket, roomId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    if (room.roomType !== "ROLE_SELECTOR") {
+      socket.emit("startRefused", { reason: "This room is not a role selector room." })
+      return
+    }
+
+    if (room.hostId !== socket.data.clientId) {
+      socket.emit("startRefused", { reason: "Only the host can redeal roles." })
+      return
+    }
+
+    const roleSelectorSettings =
+      room.roleSelectorSettings ?? defaultRoleSelectorSettings()
+
+    if (!room.gameStarted) {
+      socket.emit("startRefused", { reason: "Deal roles first before trying to redeal." })
+      return
+    }
+
+    if (!roleSelectorSettings.allowRedeal) {
+      socket.emit("startRefused", { reason: "Redeal is disabled in host settings." })
+      return
+    }
+
+    const activePlayers = getActivePlayers(room)
+    if (activePlayers.length <= 0) {
+      socket.emit("startRefused", { reason: "No eligible players found for redeal." })
+      return
+    }
+
+    normalizeRoleCountsForRoom(room)
+    room.gameNumber += 1
+    assignRolesForNewGame(room)
+    emitPrivateRolesToRoom(cleanRoomId)
+    emitRoomState(cleanRoomId)
   }
 
   /* ------------------------------------------------------
@@ -1533,6 +1784,7 @@ const updateRoomSettings = (
   const setPlayerRole = (roomId: string, playerId: string, role: PlayerRole) => {
     const room = rooms[normalizeRoomId(roomId)]
     if (!room) return
+    if (room.roomType === "ROLE_SELECTOR") return
     room.players = setRoleList(room.players, playerId, role)
     emitRoomState(roomId)
   }
@@ -1569,6 +1821,13 @@ const updateRoomSettings = (
     const room = rooms[cleanRoomId]
     if (!room) {
       socket.emit("actionRefused", { reason: "Room does not exist." })
+      return
+    }
+
+    if (room.roomType === "ROLE_SELECTOR") {
+      socket.emit("actionRefused", {
+        reason: "Role selector rooms do not support gameplay actions.",
+      })
       return
     }
 
@@ -1728,6 +1987,17 @@ const updateRoomSettings = (
       return
     }
 
+    if (room.roomType === "ROLE_SELECTOR") {
+      socket.emit("myActions", {
+        roomId: cleanRoomId,
+        gameNumber: room.gameNumber,
+        phase: room.phase,
+        bucket: "DAY",
+        actions: [],
+      })
+      return
+    }
+
     const fromClientId = String(socket.data.clientId || "").trim()
     if (!fromClientId) {
       socket.emit("myActions", { roomId: cleanRoomId, actions: [] })
@@ -1803,8 +2073,10 @@ const updateRoomSettings = (
     setPlayerRole,
     setPlayerStatus,
     updateRoomSettings,
+    updateRoleSelectorSettingsLocal,
     handleReconnect,
     startGameLocal,
+    redealRoleSelectorLocal,
     kickPlayerLocal,
     submitRoleActionLocal,
     requestMyActionsLocal,

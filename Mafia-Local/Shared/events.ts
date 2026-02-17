@@ -7,6 +7,12 @@ export type MafiaPhase =
   | "NIGHT"
   | "GAMEOVER"
 
+export type MafiaRoomType = "CLASSIC" | "ROLE_SELECTOR"
+
+export type RoleSelectorScriptMode =
+  | "REGULAR_MAFIA"
+  | "BLOOD_ON_THE_CLOCKTOWER"
+
 export const ROOM_CODE_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890" as const
 export const ROOM_CODE_LENGTH = 5 as const
 export const ROOM_CODE_REGEX = /^[A-Z0-9]{5}$/
@@ -66,6 +72,19 @@ export type GameSettingsPayload = {
   roleCount: RoleCountPayload
 }
 
+export type RoleSelectorSettingsPayload = {
+  scriptMode: RoleSelectorScriptMode
+  allowRedeal: boolean
+}
+
+export type RoleAssignmentCountsPayload = {
+  mafia: number
+  doctor: number
+  detective: number
+  sheriff: number
+  civilian: number
+}
+
 export type RoleBoundRangePayload = {
   min: number
   max: number
@@ -92,12 +111,15 @@ export type MafiaPlayer = {
 
 export type RoomStatePayload = {
   roomId: string
+  roomType: MafiaRoomType
   hostId: string
   hostParticipates: boolean
   players: MafiaPlayer[]
   settings: GameSettingsPayload
+  roleSelectorSettings: RoleSelectorSettingsPayload | null
   roleBounds: RoleBoundsPayload
   gameStarted: boolean
+  roomLocked: boolean
   gameNumber: number
   phase: MafiaPhase
   phaseEndTime: number | null
@@ -143,7 +165,16 @@ export type ReconnectedPayload = {
 
 export type GameStartedPayload = {
   roomId: string
+  roomType: MafiaRoomType
   gameNumber: number
+}
+
+export type RoleSelectorHostCountsPayload = {
+  roomId: string
+  gameNumber: number
+  started: boolean
+  roomLocked: boolean
+  counts: RoleAssignmentCountsPayload
 }
 
 export type GameOverPayload = {
@@ -243,6 +274,11 @@ export type UpdateSettingsPayload = {
   settings: Partial<GameSettingsPayload>
 }
 
+export type UpdateRoleSelectorSettingsPayload = {
+  roomId: string
+  settings: Partial<RoleSelectorSettingsPayload>
+}
+
 export type SetPlayerStatusPayload = {
   roomId: string
   playerId: string
@@ -275,6 +311,7 @@ export type KickPlayerPayload = {
 export type CreateRoomPayload = {
   playerName: string
   baseUrl?: string
+  roomType?: MafiaRoomType
 }
 
 export type JoinRoomPayload = {
@@ -289,6 +326,7 @@ export interface MafiaClientToServerEvents {
   setAlive: (payload: SetAlivePayload) => void
   setRole: (payload: SetRolePayload) => void
   updateSettings: (payload: UpdateSettingsPayload) => void
+  updateRoleSelectorSettings: (payload: UpdateRoleSelectorSettingsPayload) => void
   setPlayerStatus: (payload: SetPlayerStatusPayload) => void
   setHostParticipation: (payload: SetHostParticipationPayload) => void
   requestMyActions: (payload: RoomIdPayload) => void
@@ -298,6 +336,7 @@ export interface MafiaClientToServerEvents {
   submitRoleAction: (payload: SubmitRoleActionPayload) => void
   requestMyRole: (payload: RoomIdPayload) => void
   kickPlayer: (payload: KickPlayerPayload) => void
+  redealRoleSelector: (payload: RoomIdPayload) => void
 }
 
 export interface MafiaServerToClientEvents {
@@ -324,6 +363,7 @@ export interface MafiaServerToClientEvents {
   actionAccepted: (payload: ActionAcceptedPayload) => void
   actionRefused: (payload: ActionRefusedPayload) => void
   myActions: (payload: MyActionsPayload) => void
+  roleSelectorHostCounts: (payload: RoleSelectorHostCountsPayload) => void
   timerStarted: (payload: TimerStatePayload) => void
   timerState: (payload: TimerStatePayload) => void
   timerTick: (payload: TimerStatePayload) => void

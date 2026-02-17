@@ -21,6 +21,7 @@ import type {
   SetPlayerStatusPayload,
   SetRolePayload,
   SubmitRoleActionPayload,
+  UpdateRoleSelectorSettingsPayload,
   UpdateSettingsPayload,
 } from "../Shared/events.js"
 
@@ -168,7 +169,7 @@ io.on("connection", (socket) => {
 
   socket.on(
     "createRoom",
-    async ({ playerName, baseUrl }: CreateRoomPayload) => {
+    async ({ playerName, baseUrl, roomType }: CreateRoomPayload) => {
       const cleanName = (playerName || "").trim()
 
       if (!cleanName) return
@@ -177,7 +178,13 @@ io.on("connection", (socket) => {
       const roomId = generateRoomCode(roomsManager.rooms)
 
       // ensure room exists + join + add player + emit state
-      roomsManager.createRoomLocal(socket, roomId, cleanName, socket.data.clientId)
+      roomsManager.createRoomLocal(
+        socket,
+        roomId,
+        cleanName,
+        socket.data.clientId,
+        roomType ?? "CLASSIC"
+      )
 
       const clientPortForRoom = getClientPortFromBaseUrl(baseUrl)
       const lanClientBaseUrl = `http://${getLanIp()}:${clientPortForRoom}`
@@ -227,6 +234,13 @@ io.on("connection", (socket) => {
       roomsManager.updateRoomSettings(socket, roomId, settings)
     })
 
+  socket.on(
+    "updateRoleSelectorSettings",
+    ({ roomId, settings }: UpdateRoleSelectorSettingsPayload) => {
+      roomsManager.updateRoleSelectorSettingsLocal(socket, roomId, settings)
+    }
+  )
+
   // Status can be used for ready/not-ready etc.
   socket.on(
     "setPlayerStatus",
@@ -272,6 +286,10 @@ io.on("connection", (socket) => {
 
   socket.on("requestMyRole", ({ roomId }: RoomIdPayload) => {
     roomsManager.requestMyRoleLocal(socket, roomId)
+  })
+
+  socket.on("redealRoleSelector", ({ roomId }: RoomIdPayload) => {
+    roomsManager.redealRoleSelectorLocal(socket, roomId)
   })
 
   socket.on(

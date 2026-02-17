@@ -2,17 +2,21 @@ import React, { useEffect, useMemo, useState } from "react"
 import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
+import RoleSelectorSettingsModal from "../components/RoleSelectorSettings.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
   GameStartedPayload,
   HostParticipationRefusedEvent,
   HostParticipationRefusedPayload,
+  RoleSelectorHostCountsPayload,
+  RoomStatePayload,
   ReasonPayload,
   RoomIdPayload,
   SetHostParticipationEvent,
   SetHostParticipationPayload,
+  YourRolePayload,
 } from "../../Shared/events.js"
-import { getPlayerTags, getStatusLabel } from "../src/uiMeta.js"
+import { getPlayerTags, getRoleLabel, getStatusLabel } from "../src/uiMeta.js"
 
 type Props = {
   roomId: string
@@ -38,14 +42,21 @@ export default function Lobby({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
+  const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
+  const [hostRoleCounts, setHostRoleCounts] =
+    useState<RoleSelectorHostCountsPayload["counts"] | null>(null)
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
 
+  const roomType: RoomStatePayload["roomType"] = state?.roomType ?? "CLASSIC"
+  const isRoleSelectorRoom = roomType === "ROLE_SELECTOR"
   const isHost = state?.hostId === clientId
   const me = state?.players?.find((p) => p.clientId === clientId) ?? null
   const amSpectator = me?.isSpectator === true
   const hostParticipates = state?.hostParticipates ?? true
+  const allowRoleRedeal = state?.roleSelectorSettings?.allowRedeal ?? false
+  const roleSelectorScriptMode = state?.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
   const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
@@ -70,9 +81,29 @@ export default function Lobby({
       setState(s)
       setStatus(`In room: ${s.roomId}${clientId === s.hostId ? " (Host) " : ""}`)
 
-      // IMPORTANT:
-      // If a player joins while a game is already running, they will land in Lobby first.
-      // Auto-switch to Game screen once we learn gameStarted=true from roomState.
+      const currentPlayer = s.players.find((p) => p.clientId === clientId) ?? null
+
+      if (s.roomType === "ROLE_SELECTOR") {
+        if (currentPlayer?.isSpectator === true) {
+          setMyRole(null)
+        }
+        if (s.gameStarted) {
+          socket.emit("requestMyRole", { roomId: cleanRoomId })
+          if (s.roomLocked) {
+            setStatus(
+              `Role selector started (Deal #${s.gameNumber}). Room is locked to new joins.`
+            )
+          }
+        } else {
+          setMyRole(null)
+        }
+        return
+      }
+
+      setMyRole(null)
+      setHostRoleCounts(null)
+
+      // Classic room flow: go to Game screen after game starts.
       if (s.gameStarted) {
         onEnterGame()
       }
@@ -89,13 +120,23 @@ export default function Lobby({
       alert(reason)
     }
 
+    const onSettingsRefused = ({ reason }: ReasonPayload) => {
+      alert(reason)
+    }
+
     const onHostParticipationRefused: HostParticipationRefusedEvent = ({
       reason,
     }: HostParticipationRefusedPayload) => {
       alert(reason)
     }
 
-    const onGameStarted = ({ gameNumber }: GameStartedPayload) => {
+    const onGameStarted = ({ gameNumber, roomType }: GameStartedPayload) => {
+      if (roomType === "ROLE_SELECTOR") {
+        setStatus(`Roles dealt! (Deal #${gameNumber})`)
+        socket.emit("requestMyRole", { roomId: cleanRoomId })
+        return
+      }
+
       setStatus(`Game started! (Game #${gameNumber})`)
       onEnterGame()
     }
@@ -105,11 +146,24 @@ export default function Lobby({
       onExit()
     }
 
+    const onYourRole = (payload: YourRolePayload) => {
+      if (payload.roomId !== cleanRoomId) return
+      setMyRole(payload.role)
+    }
+
+    const onRoleSelectorHostCounts = (payload: RoleSelectorHostCountsPayload) => {
+      if (payload.roomId !== cleanRoomId) return
+      setHostRoleCounts(payload.counts)
+    }
+
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("startRefused", onStartRefused)
+    socket.on("settingsRefused", onSettingsRefused)
     socket.on("hostParticipationRefused", onHostParticipationRefused)
     socket.on("gameStarted", onGameStarted)
+    socket.on("yourRole", onYourRole)
+    socket.on("roleSelectorHostCounts", onRoleSelectorHostCounts)
     socket.on("kicked", onKicked)
 
     /// If user navigates here directly, make sure we joined
@@ -127,12 +181,19 @@ export default function Lobby({
       })
     }
 
+    if (cleanRoomId) {
+      socket.emit("requestMyRole", { roomId: cleanRoomId })
+    }
+
     return () => {
       socket.off("roomState", onRoomState)
       socket.off("roomClosed", onRoomClosed)
       socket.off("startRefused", onStartRefused)
+      socket.off("settingsRefused", onSettingsRefused)
       socket.off("hostParticipationRefused", onHostParticipationRefused)
       socket.off("gameStarted", onGameStarted)
+      socket.off("yourRole", onYourRole)
+      socket.off("roleSelectorHostCounts", onRoleSelectorHostCounts)
       socket.off("kicked", onKicked)
     }
   }, [cleanRoomId, cleanPlayerName, onExit, onEnterGame])
@@ -169,6 +230,14 @@ export default function Lobby({
     emitSetHostParticipation(payload)
   }
 
+  const startRoleSelector = () => {
+    socket.emit("startGame", { roomId: cleanRoomId })
+  }
+
+  const redealRoleSelector = () => {
+    socket.emit("redealRoleSelector", { roomId: cleanRoomId })
+  }
+
   return (
     <div style={{ padding: 20, maxWidth: 700, fontFamily: "sans-serif" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
@@ -180,7 +249,9 @@ export default function Lobby({
             event.currentTarget.style.display = "none"
           }}
         />
-        <h1 style={{ marginBottom: 0, marginTop: 0 }}>Lobby</h1>
+        <h1 style={{ marginBottom: 0, marginTop: 0 }}>
+          {isRoleSelectorRoom ? "Role Selector Lobby" : "Lobby"}
+        </h1>
       </div>
 
       {/* Host settings modal */}
@@ -190,7 +261,7 @@ export default function Lobby({
             style={{ ...actionButtonStyle, marginBottom: 12 }}
             onClick={() => setSettingsOpen(true)}
           >
-            Host Settings
+            {isRoleSelectorRoom ? "Role Selector Settings" : "Host Settings"}
           </button>
         </div>
       )}
@@ -232,8 +303,7 @@ export default function Lobby({
         </div>
       )}
 
-      {/* DEBUG: current room settings from server */}
-      {state?.settings && (
+      {state?.settings && !isRoleSelectorRoom && (
         <div style={{ marginBottom: 12, fontSize: 12, color: "#444" }}>
           <div>
             <strong>Settings (server):</strong>
@@ -242,6 +312,38 @@ export default function Lobby({
             roles: mafia {state.settings.roleCount.mafia}, doctor{" "}
             {state.settings.roleCount.doctor}, detective{" "}
             {state.settings.roleCount.detective}, sheriff{" "}
+            {state.settings.roleCount.sheriff}
+          </div>
+        </div>
+      )}
+
+      {state && isRoleSelectorRoom && (
+        <div
+          style={{
+            marginBottom: 12,
+            border: "1px solid #e7e7e7",
+            borderRadius: 10,
+            padding: 10,
+            fontSize: 13,
+            color: "#333",
+          }}
+        >
+          <div style={{ marginBottom: 4 }}>
+            <strong>Mode:</strong>{" "}
+            {roleSelectorScriptMode === "REGULAR_MAFIA"
+              ? "Regular Mafia"
+              : "Blood on the Clocktower (placeholder)"}
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            <strong>Room lock:</strong>{" "}
+            {state.roomLocked ? "Locked (started)" : "Open"}
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            <strong>Redeal:</strong> {allowRoleRedeal ? "Enabled" : "Disabled"}
+          </div>
+          <div>
+            <strong>Configured roles:</strong> mafia {state.settings.roleCount.mafia}, doctor{" "}
+            {state.settings.roleCount.doctor}, detective {state.settings.roleCount.detective}, sheriff{" "}
             {state.settings.roleCount.sheriff}
           </div>
         </div>
@@ -273,27 +375,51 @@ export default function Lobby({
 
       {isHost && (
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <button
-            style={actionButtonStyle}
-            disabled={!allReady}
-            onClick={() => socket.emit("startGame", { roomId: cleanRoomId })}
-          >
-            Start Game
-          </button>
+          {isRoleSelectorRoom ? (
+            <>
+              {!state?.gameStarted && (
+                <button
+                  style={actionButtonStyle}
+                  onClick={startRoleSelector}
+                >
+                  Deal Roles & Lock Room
+                </button>
+              )}
 
-          <button
-            style={actionButtonStyle}
-            onClick={() =>
-              socket.emit("forceStartGame", { roomId: cleanRoomId })
-            }
-          >
-            Force Start
-          </button>
+              {state?.gameStarted && allowRoleRedeal && (
+                <button
+                  style={actionButtonStyle}
+                  onClick={redealRoleSelector}
+                >
+                  Redeal Roles
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                style={actionButtonStyle}
+                disabled={!allReady}
+                onClick={() => socket.emit("startGame", { roomId: cleanRoomId })}
+              >
+                Start Game
+              </button>
+
+              <button
+                style={actionButtonStyle}
+                onClick={() =>
+                  socket.emit("forceStartGame", { roomId: cleanRoomId })
+                }
+              >
+                Force Start
+              </button>
+            </>
+          )}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-        {!amSpectator && (
+        {!amSpectator && !isRoleSelectorRoom && (
           <button
             style={readyToggleButtonStyle}
             onClick={toggleReady}
@@ -311,7 +437,46 @@ export default function Lobby({
 
       {amSpectator && (
         <div style={{ marginBottom: 10, fontSize: 12, color: "#555" }}>
-          You are currently spectating and cannot ready up or receive a role.
+          {isRoleSelectorRoom
+            ? "You are dealer-only for this room and will not receive a role."
+            : "You are currently spectating and cannot ready up or receive a role."}
+        </div>
+      )}
+
+      {state && isRoleSelectorRoom && (
+        <div
+          style={{
+            marginBottom: 12,
+            border: "1px solid #e0e0e0",
+            borderRadius: 10,
+            padding: 10,
+            background: "#fafafa",
+          }}
+        >
+          {!state.gameStarted && (
+            <div style={{ fontSize: 13, color: "#444" }}>
+              Waiting for host to deal roles.
+            </div>
+          )}
+
+          {state.gameStarted && isHost && (
+            <div style={{ fontSize: 13, color: "#222" }}>
+              <div style={{ marginBottom: 6 }}>
+                <strong>Host view:</strong> role counts only
+              </div>
+              <div>
+                Mafia: {hostRoleCounts?.mafia ?? 0} | Doctor: {hostRoleCounts?.doctor ?? 0} | Detective:{" "}
+                {hostRoleCounts?.detective ?? 0} | Sheriff: {hostRoleCounts?.sheriff ?? 0} | Civilian:{" "}
+                {hostRoleCounts?.civilian ?? 0}
+              </div>
+            </div>
+          )}
+
+          {state.gameStarted && !isHost && !amSpectator && (
+            <div style={{ fontSize: 14, color: "#222" }}>
+              <strong>Your role:</strong> {myRole ? getRoleLabel(myRole) : "Waiting for assignment..."}
+            </div>
+          )}
         </div>
       )}
 
@@ -358,19 +523,40 @@ export default function Lobby({
 
       {/* Host Settings Modal */}
       {state && clientId === state.hostId && (
-        <HostSettingsModal
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          roomState={state}
-          onSave={(settings) => {
-            console.log("DEBUG: saving settings", settings)
-            socket.emit("updateSettings", {
-              roomId: cleanRoomId,
-              settings,
-            })
-            setSettingsOpen(false)
-          }}
-        />
+        <>
+          {isRoleSelectorRoom ? (
+            <RoleSelectorSettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              roomState={state}
+              onSave={({ roleCount, roleSelectorSettings }) => {
+                socket.emit("updateSettings", {
+                  roomId: cleanRoomId,
+                  settings: { roleCount },
+                })
+                socket.emit("updateRoleSelectorSettings", {
+                  roomId: cleanRoomId,
+                  settings: roleSelectorSettings,
+                })
+                setSettingsOpen(false)
+              }}
+            />
+          ) : (
+            <HostSettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              roomState={state}
+              onSave={(settings) => {
+                console.log("DEBUG: saving settings", settings)
+                socket.emit("updateSettings", {
+                  roomId: cleanRoomId,
+                  settings,
+                })
+                setSettingsOpen(false)
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   )
