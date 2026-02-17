@@ -499,8 +499,12 @@ export default function Lobby({
             <li key={p.clientId} style={{ marginBottom: 6 }}>
               {p.name}
               {tags ? ` ${tags}` : ""}
-              {" - "}
-              Status: {getStatusLabel(p.status)}
+              {!isRoleSelectorRoom && (
+                <>
+                  {" - "}
+                  Status: {getStatusLabel(p.status)}
+                </>
+              )}
               {isHost &&
                 p.clientId !== state?.hostId &&
                 p.clientId !== clientId && (
