@@ -138,3 +138,33 @@ TODO / next-agent suggestions:
   - Generated installer artifacts include:
     - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
     - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+
+---
+
+- New task: implement desktop shortcut behavior for installer.
+- Updated `Mafia-Local/Electron/electron-builder.json` NSIS config:
+  - `createDesktopShortcut: "always"`
+  - `createStartMenuShortcut: true`
+  - `shortcutName: "Mafia Local"`
+- Packaging/build validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron` after config change.
+  - Refreshed installer artifacts:
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+
+---
+
+- New task: set desktop/app icon to project Mafia icon instead of default Electron icon.
+- Updated icon wiring:
+  - `Mafia-Local/Electron/electron-builder.json`:
+    - `win.icon: "assets/Mafia-Icon.ico"`
+    - `nsis.installerIcon: "assets/Mafia-Icon.ico"`
+    - `nsis.uninstallerIcon: "assets/Mafia-Icon.ico"`
+    - `nsis.installerHeaderIcon: "assets/Mafia-Icon.ico"`
+  - `Mafia-Local/Electron/main.js`:
+    - BrowserWindow icon now prefers `assets/Mafia-Icon.ico` with PNG fallback.
+- Packaging/build validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron`.
+  - Installer rebuilt successfully:
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`

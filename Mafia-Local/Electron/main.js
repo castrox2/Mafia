@@ -6,7 +6,11 @@ import { app, BrowserWindow } from "electron"
 const DEV_URL = "http://localhost:5173"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const WINDOW_ICON_PATH = path.join(__dirname, "assets", "Mafia-Icon.png")
+const WINDOW_ICON_PATH = (() => {
+  const icoPath = path.join(__dirname, "assets", "Mafia-Icon.ico")
+  if (fs.existsSync(icoPath)) return icoPath
+  return path.join(__dirname, "assets", "Mafia-Icon.png")
+})()
 const DEV_RENDERER_URL = process.env.ELECTRON_START_URL || DEV_URL
 
 const parsePort = (value, fallback) => {
