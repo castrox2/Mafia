@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react"
-import type { RoomState } from "../src/types.js"
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "../../Shared/events.js"
+import type { GameSettings, RoomState } from "../src/types.js"
 
 type Props = {
   open: boolean
   roomState: RoomState
   onClose: () => void
-  onSave: (settings: any) => void
+  onSave: (settings: GameSettings) => void
 }
 
 export default function HostSettingsModal({ open, roomState, onClose, onSave }: Props) {
@@ -140,8 +141,8 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
               <input
                 type="number"
                 value={daySec}
-                min={5}
-                max={600}
+                min={TIMER_MIN_SECONDS}
+                max={TIMER_MAX_SECONDS}
                 onChange={(e) => setDaySec(Number(e.target.value))}
                 style={{ marginLeft: 8, width: 100 }}
               />
@@ -152,8 +153,8 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
               <input
                 type="number"
                 value={voteSec}
-                min={5}
-                max={600}
+                min={TIMER_MIN_SECONDS}
+                max={TIMER_MAX_SECONDS}
                 onChange={(e) => setVoteSec(Number(e.target.value))}
                 style={{ marginLeft: 8, width: 100 }}
               />
@@ -164,8 +165,8 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
               <input
                 type="number"
                 value={nightSec}
-                min={5}
-                max={600}
+                min={TIMER_MIN_SECONDS}
+                max={TIMER_MAX_SECONDS}
                 onChange={(e) => setNightSec(Number(e.target.value))}
                 style={{ marginLeft: 8, width: 100 }}
               />
@@ -176,8 +177,8 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
               <input
                 type="number"
                 value={discussionSec}
-                min={5}
-                max={600}
+                min={TIMER_MIN_SECONDS}
+                max={TIMER_MAX_SECONDS}
                 onChange={(e) => setDiscussionSec(Number(e.target.value))}
                 style={{ marginLeft: 8, width: 100 }}
               />
@@ -188,8 +189,8 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
               <input
                 type="number"
                 value={pubDiscussionSec}
-                min={5}
-                max={600}
+                min={TIMER_MIN_SECONDS}
+                max={TIMER_MAX_SECONDS}
                 onChange={(e) => setPubDiscussionSec(Number(e.target.value))}
                 style={{ marginLeft: 8, width: 100 }}
               />

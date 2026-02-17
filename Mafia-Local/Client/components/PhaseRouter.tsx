@@ -1,5 +1,19 @@
 import React from "react"
 import type { RoomState, Player } from "../src/types.js"
+import { SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
+import type {
+  MafiaWinner,
+  MyRecordedActionPayload,
+  PrivateMessagePayload,
+  RoleActionKind,
+  YourRolePayload,
+} from "../../Shared/events.js"
+import {
+  getNightActionMetaForRole,
+  getPhaseLabel,
+  getRoleLabel,
+  getWinnerLabel,
+} from "../src/uiMeta.js"
 
 /* ======================================================
                     PhaseRouter.tsx
@@ -19,9 +33,8 @@ import type { RoomState, Player } from "../src/types.js"
 type Phase = RoomState["phase"]
 
 type Banner = null | { kind: "NIGHT" | "VOTING"; text: string }
-type Winner = "MAFIA" | "CIVILIANS"
+type Winner = MafiaWinner
 type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
-const SKIP_TARGET_CLIENT_ID = "__SKIP__"
 
 type PhaseRouterProps = {
   phase: Phase
@@ -31,14 +44,14 @@ type PhaseRouterProps = {
   isSpectator: boolean
 
   // UI-supporting, non-authoritative (sent by events; roomState is the truth)
-  myRole: string | null
+  myRole: YourRolePayload["role"] | null
   rolemateClientIds: string[]
-  myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
-  privateMessages: any[]
+  myActions: MyRecordedActionPayload[]
+  privateMessages: PrivateMessagePayload[]
   banner: Banner
   winner: Winner | null
   actionFeedback: ActionFeedback
-  submitRoleAction: (kind: string, targetClientId: string) => void
+  submitRoleAction: (kind: RoleActionKind, targetClientId: string) => void
 }
 
 export const PhaseRouter: React.FC<PhaseRouterProps> = ({
@@ -199,21 +212,24 @@ type ScreenProps = {
   me: Player | null
   isHost: boolean
   isSpectator: boolean
-  myRole: string | null
+  myRole: YourRolePayload["role"] | null
   rolemateClientIds: string[]
-  myActions: Array<{ kind: string; targetClientId: string; createdAtMs: number }>
-  privateMessages: any[]
+  myActions: MyRecordedActionPayload[]
+  privateMessages: PrivateMessagePayload[]
   banner: Banner
   winner: Winner | null
   actionFeedback: ActionFeedback
-  submitRoleAction: (kind: string, targetClientId: string) => void
+  submitRoleAction: (kind: RoleActionKind, targetClientId: string) => void
 }
 
 const BannerView = ({ banner }: { banner: Banner }) => {
   if (!banner) return null
+
+  const phaseLabel = banner.kind === "NIGHT" ? getPhaseLabel("NIGHT") : getPhaseLabel("VOTING")
+
   return (
     <div style={{ marginBottom: 10, padding: 10, border: "1px solid #ddd" }}>
-      <strong>{banner.kind === "NIGHT" ? "Night" : "Voting"}:</strong> {banner.text}
+      <strong>{phaseLabel}:</strong> {banner.text}
     </div>
   )
 }
@@ -233,34 +249,34 @@ const ActionFeedbackView = ({ actionFeedback }: { actionFeedback: ActionFeedback
 
 const LobbyScreen = ({ isHost, isSpectator, myRole, banner, actionFeedback }: ScreenProps) => (
   <div>
-    <h2>Lobby</h2>
+    <h2>{getPhaseLabel("LOBBY")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Waiting for host to start…</div>
+    <div>Waiting for host to start...</div>
     <div style={{ marginTop: 8 }}>
       <div>Host: {isHost ? "Yes" : "No"}</div>
       <div>Spectator: {isSpectator ? "Yes" : "No"}</div>
-      <div>My role: {myRole ?? "(unknown yet)"} </div>
+      <div>My role: {myRole ? getRoleLabel(myRole) : "(unknown yet)"} </div>
     </div>
   </div>
 )
 
 const DayScreen = ({ isSpectator, myRole, banner, actionFeedback }: ScreenProps) => (
   <div>
-    <h2>Day</h2>
+    <h2>{getPhaseLabel("DAY")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Daytime phase content goes here.</div>
     <div style={{ marginTop: 8 }}>
       <div>Spectator: {isSpectator ? "Yes" : "No"}</div>
-      <div>My role: {myRole ?? "(unknown)"} </div>
+      <div>My role: {myRole ? getRoleLabel(myRole) : "(unknown)"} </div>
     </div>
   </div>
 )
 
 const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
   <div>
-    <h2>Discussion</h2>
+    <h2>{getPhaseLabel("DISCUSSION")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Discussion phase content goes here.</div>
@@ -269,7 +285,7 @@ const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
 
 const PubDiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
   <div>
-    <h2>Public Discussion</h2>
+    <h2>{getPhaseLabel("PUBDISCUSSION")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Public discussion content goes here.</div>
@@ -311,7 +327,7 @@ const VotingScreen = ({
 
   return (
     <div>
-      <h2>Voting</h2>
+      <h2>{getPhaseLabel("VOTING")}</h2>
       <BannerView banner={banner} />
       <ActionFeedbackView actionFeedback={actionFeedback} />
       <div>Cast your vote or skip this round.</div>
@@ -388,14 +404,7 @@ const NightScreen = ({
     (p) => p.alive && p.isSpectator !== true && p.clientId !== me?.clientId
   )
 
-  const actionByRole =
-    myRole === "MAFIA"
-      ? { kind: "MAFIA_KILL_VOTE", actionLabel: "Kill", skipLabel: "Skip Kill" }
-      : myRole === "DOCTOR"
-        ? { kind: "DOCTOR_SAVE", actionLabel: "Save", skipLabel: "Skip Save" }
-        : myRole === "DETECTIVE"
-          ? { kind: "DETECTIVE_CHECK", actionLabel: "Investigate", skipLabel: "Skip Check" }
-          : null
+  const actionByRole = getNightActionMetaForRole(myRole)
 
   const rolemateSet = new Set(rolemateClientIds)
   const rolemateIconSrc =
@@ -407,14 +416,14 @@ const NightScreen = ({
 
   return (
     <div>
-      <h2>Night</h2>
+      <h2>{getPhaseLabel("NIGHT")}</h2>
       <BannerView banner={banner} />
       <ActionFeedbackView actionFeedback={actionFeedback} />
       <div>Night role action UI goes here.</div>
 
       <div style={{ marginTop: 10 }}>
         <div>
-          <strong>My role:</strong> {myRole ?? "(unknown)"}
+          <strong>My role:</strong> {myRole ? getRoleLabel(myRole) : "(unknown)"}
         </div>
 
         {canActAtNight && actionByRole && (
@@ -478,10 +487,12 @@ const NightScreen = ({
 
 const GameOverScreen = ({ isHost, banner, winner, actionFeedback }: ScreenProps) => (
   <div>
-    <h2>Game Over</h2>
+    <h2>{getPhaseLabel("GAMEOVER")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Winner: {winner ?? "(pending)"}</div>
+    <div>Winner: {getWinnerLabel(winner)}</div>
     <div style={{ marginTop: 8 }}>Host: {isHost ? "Yes" : "No"}</div>
   </div>
 )
+
+

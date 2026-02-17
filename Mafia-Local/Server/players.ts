@@ -1,33 +1,12 @@
-export type PlayerRole =
-    | "MAFIA"
-    | "CIVILIAN"
-    | "DOCTOR"
-    | "DETECTIVE"
-    | "SHERIFF"
+import type {
+  MafiaPlayer,
+  MafiaPlayerRole,
+  MafiaPlayerStatus,
+} from "../Shared/events.js"
 
-export type PlayerStatus =
-    | "DISCONNECTED"
-    | "CONNECTED"
-    | "NOT READY" // Checks if player is ready to start 
-    | "READY" // not if dead or alive
-
-export type Player = {
-    id: string // Socket ID
-    name: string
-    clientId: string // Stable client ID (persists across reconnects)
-    
-    // Core Game State
-    alive: boolean
-    role: PlayerRole
-
-    // General Status
-    status: PlayerStatus
-    isSpectator: boolean // True if player joins mid-game (duh tf)
-    voteCount: number 
-
-    // Optioanl metadata
-    joinedAt: number // timestamp for when player joined
-}
+export type PlayerRole = MafiaPlayerRole
+export type PlayerStatus = MafiaPlayerStatus
+export type Player = MafiaPlayer
 
 export function createPlayer(id: string, name: string, clientId: string): Player {
     return {

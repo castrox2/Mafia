@@ -6,9 +6,23 @@ import os from "os"
 import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
-import { createRoomsManager, type GameSettings } from "./rooms.js"
-import type { PlayerRole, PlayerStatus } from "./players.js"
-import { createTimersManager } from "./utils/timers.js"
+import { createRoomsManager } from "./rooms.js"
+import { normalizeRoomId } from "../Shared/events.js"
+import type {
+  CreateRoomPayload,
+  JoinRoomPayload,
+  KickPlayerPayload,
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  MafiaSocketData,
+  RoomIdPayload,
+  SetAlivePayload,
+  SetHostParticipationEvent,
+  SetPlayerStatusPayload,
+  SetRolePayload,
+  SubmitRoleActionPayload,
+  UpdateSettingsPayload,
+} from "../Shared/events.js"
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err)
@@ -91,7 +105,12 @@ const getClientPortFromBaseUrl = (baseUrl?: string): number => {
   }
 }
 
-const io = new SocketIOServer(server, {
+const io = new SocketIOServer<
+  MafiaClientToServerEvents,
+  MafiaServerToClientEvents,
+  Record<string, never>,
+  MafiaSocketData
+>(server, {
   cors: { origin: "*" },
 })
 
@@ -130,11 +149,6 @@ function getLanIp(): string {
 
 const roomsManager = createRoomsManager(io)
 
-const timers = createTimersManager(io, ({ roomId, phase }) => {
-  // Timer manager already emits "timerEnded".
-  // This callback should be used to advance game phase in roomsManager (wired later).
-})
-
 
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id)
@@ -154,7 +168,7 @@ io.on("connection", (socket) => {
 
   socket.on(
     "createRoom",
-    async ({ playerName, baseUrl }: { playerName: string; baseUrl?: string }) => {
+    async ({ playerName, baseUrl }: CreateRoomPayload) => {
       const cleanName = (playerName || "").trim()
 
       if (!cleanName) return
@@ -174,7 +188,7 @@ io.on("connection", (socket) => {
     }
   )
 
-  socket.on("joinRoom", ({ roomId, playerName }: { roomId: string; playerName: string }) => {
+  socket.on("joinRoom", ({ roomId, playerName }: JoinRoomPayload) => {
     roomsManager.joinRoomLocal(socket, roomId, playerName, socket.data.clientId)
   })
 
@@ -188,7 +202,7 @@ io.on("connection", (socket) => {
   // Later: restrict to host only / game rules.
   socket.on(
     "setAlive",
-    ({ roomId, playerId, alive }: { roomId: string; playerId: string; alive: boolean }) => {
+    ({ roomId, playerId, alive }: SetAlivePayload) => {
       roomsManager.setPlayerAlive(roomId, playerId, alive)
     }
   )
@@ -196,8 +210,8 @@ io.on("connection", (socket) => {
   // Host-only role assignment (recommended)
   socket.on(
     "setRole",
-    ({ roomId, playerId, role }: { roomId: string; playerId: string; role: PlayerRole }) => {
-      const cleanRoomId = (roomId || "").trim().toUpperCase()
+    ({ roomId, playerId, role }: SetRolePayload) => {
+      const cleanRoomId = normalizeRoomId(roomId)
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
@@ -208,7 +222,7 @@ io.on("connection", (socket) => {
 
   socket.on(
     "updateSettings",
-    ({ roomId, settings }: { roomId: string; settings: Partial<GameSettings> }) => {
+    ({ roomId, settings }: UpdateSettingsPayload) => {
       console.log("DEBUG: updateSettings called", { roomId, settings })
       roomsManager.updateRoomSettings(socket, roomId, settings)
     })
@@ -216,17 +230,9 @@ io.on("connection", (socket) => {
   // Status can be used for ready/not-ready etc.
   socket.on(
     "setPlayerStatus",
-    ({
-      roomId,
-      playerId,
-      status,
-    }: {
-      roomId: string
-      playerId: string
-      status: PlayerStatus
-    }) => {
+    ({ roomId, playerId, status }: SetPlayerStatusPayload) => {
       // For now allow host or self
-      const cleanRoomId = (roomId || "").trim().toUpperCase()
+      const cleanRoomId = normalizeRoomId(roomId)
       const room = roomsManager.rooms[cleanRoomId]
       if (!room) return
 
@@ -235,58 +241,55 @@ io.on("connection", (socket) => {
     }
   )
 
-    socket.on("requestMyActions", ({ roomId }: { roomId: string }) => {
+  const onSetHostParticipation: SetHostParticipationEvent = (payload) => {
+    roomsManager.setHostParticipationLocal(socket, payload)
+  }
+  socket.on("setHostParticipation", onSetHostParticipation)
+
+  socket.on("requestMyActions", ({ roomId }: RoomIdPayload) => {
     roomsManager.requestMyActionsLocal(socket, roomId)
   })
 
-  socket.on("requestRoomState", ({ roomId }: { roomId: string }) => {
+  socket.on("requestRoomState", ({ roomId }: RoomIdPayload) => {
     roomsManager.emitRoomState(roomId)
     roomsManager.requestMyRoleLocal(socket, roomId)
   })
 
-    socket.on("startGame", ({ roomId }: { roomId: string }) => {
+  socket.on("startGame", ({ roomId }: RoomIdPayload) => {
     roomsManager.startGameLocal(socket, roomId, { force: false })
   })
 
-  socket.on("forceStartGame", ({ roomId }: { roomId: string }) => {
+  socket.on("forceStartGame", ({ roomId }: RoomIdPayload) => {
     roomsManager.startGameLocal(socket, roomId, { force: true })
   })
 
   socket.on(
     "submitRoleAction",
-    ({
-      roomId,
-      kind,
-      targetClientId,
-    }: {
-      roomId: string
-      kind: string
-      targetClientId: string
-    }) => {
+    ({ roomId, kind, targetClientId }: SubmitRoleActionPayload) => {
       roomsManager.submitRoleActionLocal(socket, roomId, { kind, targetClientId })
     }
   )
 
-  socket.on("requestMyRole", ({ roomId }: { roomId: string }) => {
+  socket.on("requestMyRole", ({ roomId }: RoomIdPayload) => {
     roomsManager.requestMyRoleLocal(socket, roomId)
   })
 
   socket.on(
     "kickPlayer",
-    ({ roomId, targetClientId }: { roomId: string; targetClientId: string }) => {
+    ({ roomId, targetClientId }: KickPlayerPayload) => {
       roomsManager.kickPlayerLocal(socket, roomId, targetClientId)
     }
   )
 
-    socket.on("disconnect", () => {
-      console.log("Client disconnected:", socket.id)
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id)
 
-      // IMPORTANT:
-      // Do NOT hard-remove on disconnect.
-      // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
-      // Cleanup should be handled by:
-      // - explicit leaveRoom (user intent)
-      // - a "disconnect grace period" (optional; can be added later)
+    // IMPORTANT:
+    // Do NOT hard-remove on disconnect.
+    // Browser refresh triggers a disconnect + reconnect, and we want handleReconnect() to restore them.
+    // Cleanup should be handled by:
+    // - explicit leaveRoom (user intent)
+    // - a "disconnect grace period" (optional; can be added later)
   })
 })
 

@@ -133,11 +133,11 @@ npm run dist
 
 Output files:
 
-- `Mafia-Local/Electron/dist/Mafia Local Setup 1.0.0.exe`
-- `Mafia-Local/Electron/dist/Mafia Local Setup 1.0.0.exe.blockmap`
+- `Mafia-Local/Electron/dist/Mafia Local Setup <version>.exe`
+- `Mafia-Local/Electron/dist/Mafia Local Setup <version>.exe.blockmap`
 
 ## Publish A Release
 
-1. Create a new GitHub release (for example `v1.0.0`).
+1. Create a new GitHub release (for example `v0.8.4`).
 2. Upload the installer from `Mafia-Local/Electron/dist`.
 3. Publish release so players can download it directly.

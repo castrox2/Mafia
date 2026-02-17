@@ -1,5 +1,17 @@
 import React, { useEffect, useState, useMemo } from "react"
 import { socket } from "../src/socket.js"
+import type { RoomState } from "../src/types.js"
+import {
+  ROOM_CODE_LENGTH,
+  ROOM_CODE_REGEX,
+  normalizeRoomId,
+} from "../../Shared/events.js"
+import type {
+  ReasonPayload,
+  ReconnectedPayload,
+  RoomCreatedPayload,
+  RoomIdPayload,
+} from "../../Shared/events.js"
 
 type Props = {
     onEnterLobby: (roomId: string, playerName: string, joinUrl: string, qrDataUrl: string) => void
@@ -9,11 +21,9 @@ export default function Join({ onEnterLobby }: Props) {
     const [name, setName] = useState("")
     const [room, setRoom] = useState("")
     const [status, setStatus] = useState("")
-    const [qrDataUrl, setQrDataUrl] = useState("")
-    const [join, setJoinUrl] = useState("")
     const [pendingRoom, setPendingRoom] = useState("")
 
-    const validRoomCode = /^[A-Z0-9]{5}$/.test(room.trim())
+    const validRoomCode = ROOM_CODE_REGEX.test(normalizeRoomId(room))
     const validName = name.trim().length > 0
 
     const baseUrll = useMemo(() => window.location.origin, [])
@@ -29,7 +39,7 @@ export default function Join({ onEnterLobby }: Props) {
             setStatus(`Disconnected from server: ${reason}`)
         }
 
-        const onReconnected = ({ roomId, playerName }: { roomId: string, playerName: string }) => {
+        const onReconnected = ({ roomId, playerName }: ReconnectedPayload) => {
             setStatus(`Reconnected to room ${roomId} as ${playerName}`)
 
             // IMPORTANT (reconnect-safe):
@@ -46,17 +56,15 @@ export default function Join({ onEnterLobby }: Props) {
             setStatus(`Connection error: ${error.message}`)
         }
 
-        const onRoomCreated = ({ roomId, joinUrl, qrDataUrl }: { roomId: string, joinUrl: string, qrDataUrl: string }) => {
+        const onRoomCreated = ({ roomId, joinUrl, qrDataUrl }: RoomCreatedPayload) => {
             setRoom(roomId)
-            setJoinUrl(joinUrl)
-            setQrDataUrl(qrDataUrl)
             setStatus(`Room created! Share this code to join: ${roomId}`)
 
             // The server already joined; move UI to lobby
             onEnterLobby(roomId, name.trim(), joinUrl, qrDataUrl)
         }
 
-        const onRoomState = (s: any) => {
+        const onRoomState = (s: RoomState) => {
 
             // Only proceeds of we're attempting to join this room
             if (!pendingRoom) return
@@ -66,11 +74,11 @@ export default function Join({ onEnterLobby }: Props) {
             onEnterLobby(s.roomId, cleanName, "", "")
         }
 
-        const onRoomNotFound = ({ roomId }: { roomId: string }) => {
+        const onRoomNotFound = ({ roomId }: RoomIdPayload) => {
             setStatus(`Room ${roomId} not found.`)
         }
 
-        const onRoomInvalid = ({ reason }: { reason: string }) => {
+        const onRoomInvalid = ({ reason }: ReasonPayload) => {
             setPendingRoom("")
             setStatus(reason)
         }
@@ -87,7 +95,7 @@ export default function Join({ onEnterLobby }: Props) {
 
         // If someone lands here with ?room=XXXX, prefill it
         const params = new URLSearchParams(window.location.search)
-        const prefillRoom = (params.get("room") || "").trim().toUpperCase()
+        const prefillRoom = normalizeRoomId(params.get("room") || "")
         if (prefillRoom) setRoom(prefillRoom)
         
         return () => {
@@ -103,7 +111,7 @@ export default function Join({ onEnterLobby }: Props) {
     }, [onEnterLobby, name, pendingRoom])
 
     const cleanName = name.trim()
-    const cleanRoom = room.trim().toUpperCase()
+    const cleanRoom = normalizeRoomId(room)
 
     const createRoom = () => {
         if (!cleanName) return alert("Enter Name First!")
@@ -154,8 +162,10 @@ export default function Join({ onEnterLobby }: Props) {
             style={{ width: 160, padding: 10, fontSize: 16 }}
             placeholder="Room code"
             value={room}
-            onChange={(e) => setRoom(e.target.value.toUpperCase())}
-            maxLength={5}
+            onChange={(e) =>
+              setRoom(normalizeRoomId(e.target.value).slice(0, ROOM_CODE_LENGTH))
+            }
+            maxLength={ROOM_CODE_LENGTH}
             />
         </div>
 

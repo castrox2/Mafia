@@ -2,6 +2,17 @@ import React, { useEffect, useMemo, useState } from "react"
 import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
+import { normalizeRoomId } from "../../Shared/events.js"
+import type {
+  GameStartedPayload,
+  HostParticipationRefusedEvent,
+  HostParticipationRefusedPayload,
+  ReasonPayload,
+  RoomIdPayload,
+  SetHostParticipationEvent,
+  SetHostParticipationPayload,
+} from "../../Shared/events.js"
+import { getPlayerTags, getStatusLabel } from "../src/uiMeta.js"
 
 type Props = {
   roomId: string
@@ -28,11 +39,13 @@ export default function Lobby({
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
 
-  const cleanRoomId = useMemo(() => roomId.trim().toUpperCase(), [roomId])
+  const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
 
   const isHost = state?.hostId === clientId
   const me = state?.players?.find((p) => p.clientId === clientId) ?? null
+  const amSpectator = me?.isSpectator === true
+  const hostParticipates = state?.hostParticipates ?? true
   const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
@@ -65,23 +78,29 @@ export default function Lobby({
       }
     }
 
-    const onRoomClosed = ({ roomId: closedRoomId }: { roomId: string }) => {
+    const onRoomClosed = ({ roomId: closedRoomId }: RoomIdPayload) => {
       if (closedRoomId === cleanRoomId) {
         alert("Room was closed by the host.")
         onExit()
       }
     }
 
-    const onStartRefused = ({ reason }: { reason: string }) => {
+    const onStartRefused = ({ reason }: ReasonPayload) => {
       alert(reason)
     }
 
-    const onGameStarted = ({ gameNumber }: { gameNumber: number }) => {
+    const onHostParticipationRefused: HostParticipationRefusedEvent = ({
+      reason,
+    }: HostParticipationRefusedPayload) => {
+      alert(reason)
+    }
+
+    const onGameStarted = ({ gameNumber }: GameStartedPayload) => {
       setStatus(`Game started! (Game #${gameNumber})`)
       onEnterGame()
     }
 
-    const onKicked = ({ reason }: { reason: string }) => {
+    const onKicked = ({ reason }: ReasonPayload & RoomIdPayload) => {
       alert(reason || "You were kicked.")
       onExit()
     }
@@ -89,6 +108,7 @@ export default function Lobby({
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("startRefused", onStartRefused)
+    socket.on("hostParticipationRefused", onHostParticipationRefused)
     socket.on("gameStarted", onGameStarted)
     socket.on("kicked", onKicked)
 
@@ -111,6 +131,7 @@ export default function Lobby({
       socket.off("roomState", onRoomState)
       socket.off("roomClosed", onRoomClosed)
       socket.off("startRefused", onStartRefused)
+      socket.off("hostParticipationRefused", onHostParticipationRefused)
       socket.off("gameStarted", onGameStarted)
       socket.off("kicked", onKicked)
     }
@@ -128,6 +149,24 @@ export default function Lobby({
       playerId: clientId,
       status: amReady ? "NOT READY" : "READY",
     })
+  }
+
+  const toggleHostParticipation = (nextParticipates: boolean) => {
+    if (hostParticipates && !nextParticipates) {
+      const confirmed = window.confirm(
+        "Turn host participation off? You will become a spectator and will not receive a role until you opt back in."
+      )
+      if (!confirmed) return
+    }
+
+    const payload: SetHostParticipationPayload = {
+      roomId: cleanRoomId,
+      participates: nextParticipates,
+    }
+    const emitSetHostParticipation: SetHostParticipationEvent = (nextPayload) => {
+      socket.emit("setHostParticipation", nextPayload)
+    }
+    emitSetHostParticipation(payload)
   }
 
   return (
@@ -162,8 +201,36 @@ export default function Lobby({
         </div>
         <div>
           <strong>You:</strong> {cleanPlayerName}
+          {me
+            ? ` ${getPlayerTags(me, {
+                hostId: state?.hostId ?? "",
+                viewerClientId: clientId,
+              })
+                .filter((tag) => tag.key !== "YOU")
+                .map((tag) => `(${tag.label})`)
+                .join(" ")}`
+            : ""}
         </div>
       </div>
+
+      {isHost && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={hostParticipates}
+              disabled={state?.gameStarted === true}
+              onChange={(event) => toggleHostParticipation(event.target.checked)}
+            />
+            Host participates as a player
+          </label>
+          {state?.gameStarted && (
+            <div style={{ marginTop: 4, fontSize: 12, color: "#666" }}>
+              Host participation can only be changed before the game starts.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DEBUG: current room settings from server */}
       {state?.settings && (
@@ -226,12 +293,14 @@ export default function Lobby({
       )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-        <button
-          style={readyToggleButtonStyle}
-          onClick={toggleReady}
-        >
-          {amReady ? "Unready" : "Ready"}
-        </button>
+        {!amSpectator && (
+          <button
+            style={readyToggleButtonStyle}
+            onClick={toggleReady}
+          >
+            {amReady ? "Unready" : "Ready"}
+          </button>
+        )}
         <button
           style={actionButtonStyle}
           onClick={leaveRoom}
@@ -239,6 +308,12 @@ export default function Lobby({
           Leave Room
         </button>
       </div>
+
+      {amSpectator && (
+        <div style={{ marginBottom: 10, fontSize: 12, color: "#555" }}>
+          You are currently spectating and cannot ready up or receive a role.
+        </div>
+      )}
 
       <div style={{ fontWeight: 700, whiteSpace: "pre-wrap", marginBottom: 12 }}>
         {status}
@@ -248,16 +323,19 @@ export default function Lobby({
 
       <ul style={{ paddingLeft: 18 }}>
         {(state?.players ?? []).map((p) => {
-          const hostTag = p.clientId === state?.hostId ? " (HOST) " : ""
-          const deadTag = p.alive ? "" : " (dead)"
+          const tags = getPlayerTags(p, {
+            hostId: state?.hostId ?? "",
+            viewerClientId: clientId,
+          })
+            .map((tag) => `(${tag.label})`)
+            .join(" ")
 
           return (
             <li key={p.clientId} style={{ marginBottom: 6 }}>
               {p.name}
-              {hostTag}
-              {deadTag}
-              {" — "}
-              Status: {p.status}
+              {tags ? ` ${tags}` : ""}
+              {" - "}
+              Status: {getStatusLabel(p.status)}
               {isHost &&
                 p.clientId !== state?.hostId &&
                 p.clientId !== clientId && (
@@ -297,3 +375,4 @@ export default function Lobby({
     </div>
   )
 }
+

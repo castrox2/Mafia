@@ -14,14 +14,13 @@
   - Prevents "spaghetti" across rooms.ts / gameLogic.ts.
 ====================================================== */
 
-export type PhaseName =
-  | "LOBBY"
-  | "DAY"
-  | "DISCUSSION"
-  | "PUBDISCUSSION"
-  | "VOTING"
-  | "NIGHT"
-  | "GAMEOVER"
+import type {
+  MafiaPhase,
+  RoleActionKind as SharedRoleActionKind,
+} from "../../Shared/events.js"
+export { SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
+
+export type PhaseName = MafiaPhase
 
 /* ------------------------------------------------------
                 Identity / Targeting
@@ -31,9 +30,6 @@ export type PhaseName =
 
 export type ClientId = string
 
-// Special target id used for explicit "skip/abstain" role actions.
-export const SKIP_TARGET_CLIENT_ID = "__SKIP__" as const
-
 export type ActionTarget = {
   targetClientId: ClientId
 }
@@ -42,12 +38,7 @@ export type ActionTarget = {
                     Action kinds
 ------------------------------------------------------ */
 
-export type RoleActionKind =
-  | "MAFIA_KILL_VOTE"
-  | "DOCTOR_SAVE"
-  | "DETECTIVE_CHECK"
-  | "SHERIFF_SHOOT"
-  | "CIVILIAN_VOTE" // does nothing, but allowed for UI parity
+export type RoleActionKind = SharedRoleActionKind
 
 /* ------------------------------------------------------
               Base action payload shape
