@@ -23,6 +23,10 @@
       "filter": [
         "**/*"
       ]
+    },
+    {
+      "from": "assets/Mafia-Icon-256x256.ico",
+      "to": "Mafia-Icon.ico"
     }
   ],
   "win": {
@@ -30,14 +34,15 @@
       "nsis"
     ],
     "signAndEditExecutable": false,
-    "icon": "assets/Mafia-Icon.ico"
+    "icon": "assets/Mafia-Icon-256x256.ico"
   },
   "nsis": {
     "createDesktopShortcut": "always",
     "createStartMenuShortcut": true,
     "shortcutName": "Mafia Local",
-    "installerIcon": "assets/Mafia-Icon.ico",
-    "uninstallerIcon": "assets/Mafia-Icon.ico",
-    "installerHeaderIcon": "assets/Mafia-Icon.ico"
+    "installerIcon": "assets/Mafia-Icon-256x256.ico",
+    "uninstallerIcon": "assets/Mafia-Icon-256x256.ico",
+    "installerHeaderIcon": "assets/Mafia-Icon-256x256.ico",
+    "include": "installer.nsh"
   }
 }
