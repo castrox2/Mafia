@@ -206,3 +206,30 @@ TODO / next-agent suggestions:
   - Ran `npm run dist` in `Mafia-Local/Electron`.
   - Silent install check still confirms desktop shortcut icon path:
     - `C:\Users\User\AppData\Local\Programs\electron\resources\Mafia-Icon.ico,0`
+
+---
+
+- New task: prepare (but do not implement) splash screen/custom titlebar structure and client-side style scaffolding.
+- Added Electron UI scaffolding files (not wired yet):
+  - `Mafia-Local/Electron/ui/splash.html`
+  - `Mafia-Local/Electron/ui/splash.css`
+  - `Mafia-Local/Electron/ui/titlebar.css`
+  - `Mafia-Local/Electron/ui/titlebar.contract.md`
+  - `Mafia-Local/Electron/ui/README.md`
+- Added Client style scaffolding:
+  - Universal stylesheet: `Mafia-Local/Client/src/styles/global.css`
+  - Style notes: `Mafia-Local/Client/src/styles/README.md`
+  - Page buckets:
+    - `Mafia-Local/Client/src/styles/pages/join.css`
+    - `Mafia-Local/Client/src/styles/pages/lobby.css`
+    - `Mafia-Local/Client/src/styles/pages/game.css`
+  - Phase buckets:
+    - `Mafia-Local/Client/src/styles/phases/lobby.css`
+    - `Mafia-Local/Client/src/styles/phases/day.css`
+    - `Mafia-Local/Client/src/styles/phases/discussion.css`
+    - `Mafia-Local/Client/src/styles/phases/public-discussion.css`
+    - `Mafia-Local/Client/src/styles/phases/voting.css`
+    - `Mafia-Local/Client/src/styles/phases/night.css`
+    - `Mafia-Local/Client/src/styles/phases/gameover.css`
+- Build/package validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron` after scaffolding changes.

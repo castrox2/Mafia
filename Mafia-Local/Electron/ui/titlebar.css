@@ -1,0 +1,75 @@
+/*
+  Custom title bar style scaffold (not wired yet).
+  Intended for frameless/overlay window mode.
+*/
+
+:root {
+  --titlebar-height: 40px;
+  --titlebar-bg: #10131a;
+  --titlebar-border: rgba(255, 255, 255, 0.08);
+  --titlebar-text: #f3f4f6;
+  --titlebar-muted: #c2c7d0;
+  --titlebar-btn-hover: rgba(255, 255, 255, 0.08);
+  --titlebar-btn-close-hover: #dc2626;
+}
+
+.app-titlebar {
+  height: var(--titlebar-height);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--titlebar-bg);
+  color: var(--titlebar-text);
+  border-bottom: 1px solid var(--titlebar-border);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.app-titlebar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  min-width: 0;
+}
+
+.app-titlebar__logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.app-titlebar__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--titlebar-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-titlebar__controls {
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  -webkit-app-region: no-drag;
+}
+
+.app-titlebar__button {
+  width: 48px;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app-titlebar__button:hover {
+  background: var(--titlebar-btn-hover);
+}
+
+.app-titlebar__button[data-action="close"]:hover {
+  background: var(--titlebar-btn-close-hover);
+}

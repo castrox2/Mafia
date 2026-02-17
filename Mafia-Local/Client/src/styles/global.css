@@ -1,0 +1,100 @@
+/*
+  Universal client stylesheet scaffold.
+  This file is intentionally framework-agnostic and does not assume
+  any specific page/component implementation details.
+*/
+
+:root {
+  --ui-font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+
+  --ui-color-bg: #f4f5f7;
+  --ui-color-surface: #ffffff;
+  --ui-color-text: #111827;
+  --ui-color-text-muted: #4b5563;
+  --ui-color-border: #d1d5db;
+  --ui-color-focus: #2563eb;
+
+  --ui-radius-sm: 6px;
+  --ui-radius-md: 10px;
+  --ui-radius-lg: 14px;
+
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 24px;
+  --ui-space-6: 32px;
+
+  --ui-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --ui-shadow-2: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--ui-font-family);
+  color: var(--ui-color-text);
+  background: var(--ui-color-bg);
+  line-height: 1.45;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ui-color-focus);
+  outline-offset: 2px;
+}
+
+/*
+  Generic utility classes for upcoming UI work.
+  Safe to keep unused until UI implementation starts.
+*/
+.ui-page-shell {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: var(--ui-space-5);
+}
+
+.ui-card {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-md);
+  box-shadow: var(--ui-shadow-1);
+}
+
+.ui-text-muted {
+  color: var(--ui-color-text-muted);
+}
+
