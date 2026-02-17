@@ -168,3 +168,41 @@ TODO / next-agent suggestions:
   - Installer rebuilt successfully:
     - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
     - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+
+---
+
+- New task: desktop shortcut still showed default Electron icon.
+- Root cause findings:
+  - Installed shortcut target pointed to `...\Programs\electron\Mafia Local.exe`.
+  - EXE icon remained Electron icon in this environment when relying on executable icon embedding.
+  - Direct `signAndEditExecutable: true` path hit local winCodeSign extraction symlink privilege errors.
+- Implemented robust shortcut-icon override in NSIS:
+  - Added `Mafia-Local/Electron/installer.nsh` with `customInstall` macro that recreates desktop/start-menu links using:
+    - target: `$INSTDIR\Mafia Local.exe`
+    - icon: `$INSTDIR\resources\Mafia-Icon.ico`
+  - Updated `Mafia-Local/Electron/electron-builder.json`:
+    - added `extraResources` entry to copy `assets/Mafia-Icon.ico` to packaged `resources/Mafia-Icon.ico`
+    - added `nsis.include: "installer.nsh"`
+    - kept shortcut creation enabled (`createDesktopShortcut`, `createStartMenuShortcut`)
+  - Refreshed `Mafia-Local/Electron/assets/Mafia-Icon.ico` with a compatible generated icon asset.
+- Packaging/build validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron` after NSIS include/icon changes.
+  - Installer rebuilt successfully:
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+  - Silent install check confirmed desktop shortcut now carries explicit custom icon location:
+    - `C:\Users\User\AppData\Local\Programs\electron\resources\Mafia-Icon.ico,0`
+
+---
+
+- New task: use user-provided `Mafia-Icon-256x256.ico` for desktop icon behavior.
+- Updated `Mafia-Local/Electron/electron-builder.json` icon sources to:
+  - `win.icon: assets/Mafia-Icon-256x256.ico`
+  - `nsis.installerIcon: assets/Mafia-Icon-256x256.ico`
+  - `nsis.uninstallerIcon: assets/Mafia-Icon-256x256.ico`
+  - `nsis.installerHeaderIcon: assets/Mafia-Icon-256x256.ico`
+  - `extraResources` now copies `assets/Mafia-Icon-256x256.ico` to packaged `resources/Mafia-Icon.ico`.
+- Packaging/build validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron`.
+  - Silent install check still confirms desktop shortcut icon path:
+    - `C:\Users\User\AppData\Local\Programs\electron\resources\Mafia-Icon.ico,0`
