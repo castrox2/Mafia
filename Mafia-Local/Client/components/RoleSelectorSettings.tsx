@@ -1,26 +1,33 @@
 import React, { useEffect, useMemo, useState } from "react"
 import type {
+  BotcScriptSource,
+  BotcScriptSummaryPayload,
   RoleCountPayload,
   RoleSelectorScriptMode,
   RoleSelectorSettingsPayload,
 } from "../../Shared/events.js"
 import type { RoomState } from "../src/types.js"
+import { getRoleLabel } from "../src/uiMeta.js"
 
 type Props = {
   open: boolean
   roomState: RoomState
+  botcScriptSummary: BotcScriptSummaryPayload | null
   onClose: () => void
   onSave: (payload: {
     roleCount: RoleCountPayload
     roleSelectorSettings: RoleSelectorSettingsPayload
   }) => void
+  onImportBotcScript: (payload: { source: BotcScriptSource; rawJson: string }) => void
 }
 
 export default function RoleSelectorSettingsModal({
   open,
   roomState,
+  botcScriptSummary,
   onClose,
   onSave,
+  onImportBotcScript,
 }: Props) {
   const [mafia, setMafia] = useState(1)
   const [doctor, setDoctor] = useState(0)
@@ -29,6 +36,9 @@ export default function RoleSelectorSettingsModal({
   const [allowRedeal, setAllowRedeal] = useState(false)
   const [scriptMode, setScriptMode] =
     useState<RoleSelectorScriptMode>("REGULAR_MAFIA")
+  const [botcJsonDraft, setBotcJsonDraft] = useState("")
+  const [importHint, setImportHint] = useState("")
+  const [selectedFileName, setSelectedFileName] = useState("")
 
   useEffect(() => {
     if (!open) return
@@ -40,10 +50,14 @@ export default function RoleSelectorSettingsModal({
 
     setAllowRedeal(roomState.roleSelectorSettings?.allowRedeal ?? false)
     setScriptMode(roomState.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA")
+    setImportHint("")
+    setSelectedFileName("")
   }, [open, roomState])
 
   const roleBounds = roomState.roleBounds
   const activePlayerCount = roomState.players.filter((p) => p.isSpectator !== true).length
+  const persistedScriptMode =
+    roomState.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
 
   const helpText = useMemo(
     () =>
@@ -69,7 +83,58 @@ export default function RoleSelectorSettingsModal({
     onClose()
   }
 
+  const importScript = (source: BotcScriptSource, rawJson: string) => {
+    const nextRaw = String(rawJson || "").trim()
+    if (!nextRaw) {
+      setImportHint("Paste or select JSON first.")
+      return
+    }
+
+    if (persistedScriptMode !== "BLOOD_ON_THE_CLOCKTOWER") {
+      setImportHint("Save settings with BOCT mode first, then import.")
+      return
+    }
+
+    onImportBotcScript({ source, rawJson: nextRaw })
+    setImportHint(
+      source === "UPLOAD"
+        ? "Upload import request sent."
+        : "Paste import request sent."
+    )
+  }
+
+  const onScriptFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setSelectedFileName(file.name)
+    setImportHint("")
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const raw = String(reader.result || "")
+      importScript("UPLOAD", raw)
+    }
+    reader.onerror = () => {
+      setImportHint("Could not read that file.")
+    }
+    reader.readAsText(file)
+  }
+
   if (!open) return null
+
+  const groupedRegularRoles = {
+    townsfolk: [
+      getRoleLabel("CIVILIAN"),
+      getRoleLabel("DOCTOR"),
+      getRoleLabel("DETECTIVE"),
+      getRoleLabel("SHERIFF"),
+    ],
+    outsiders: [] as string[],
+    minions: [] as string[],
+    demons: [getRoleLabel("MAFIA")],
+    others: [] as string[],
+  }
 
   return (
     <div
@@ -89,7 +154,7 @@ export default function RoleSelectorSettingsModal({
     >
       <div
         style={{
-          width: "min(720px, 100%)",
+          width: "min(820px, 100%)",
           background: "white",
           borderRadius: 12,
           padding: 16,
@@ -191,11 +256,11 @@ export default function RoleSelectorSettingsModal({
                 checked={scriptMode === "BLOOD_ON_THE_CLOCKTOWER"}
                 onChange={() => setScriptMode("BLOOD_ON_THE_CLOCKTOWER")}
               />{" "}
-              Blood on the Clocktower (placeholder)
+              Blood on the Clocktower
             </label>
 
             <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-              Blood on the Clocktower scripts are UI-only for now and do not change behavior yet.
+              BOCT import is available for script prep. Dealing BOCT roles is not implemented yet.
             </div>
 
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -206,6 +271,158 @@ export default function RoleSelectorSettingsModal({
               />
               Allow host to redeal and overwrite assignments
             </label>
+
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ cursor: "pointer", fontWeight: 700 }}>
+                Available Roles
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                {scriptMode === "REGULAR_MAFIA" ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>Townsfolk</div>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {groupedRegularRoles.townsfolk.map((roleId) => (
+                          <li key={`townsfolk:${roleId}`}>{roleId}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>Demons</div>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {groupedRegularRoles.demons.map((roleId) => (
+                          <li key={`demons:${roleId}`}>{roleId}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : botcScriptSummary ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {botcScriptSummary.groupedRoleIds.townsfolk.length > 0 && (
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Townsfolk</div>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {botcScriptSummary.groupedRoleIds.townsfolk.map((roleId) => (
+                            <li key={`townsfolk:${roleId}`}>{roleId}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {botcScriptSummary.groupedRoleIds.outsiders.length > 0 && (
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Outsiders</div>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {botcScriptSummary.groupedRoleIds.outsiders.map((roleId) => (
+                            <li key={`outsiders:${roleId}`}>{roleId}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {botcScriptSummary.groupedRoleIds.minions.length > 0 && (
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Minions</div>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {botcScriptSummary.groupedRoleIds.minions.map((roleId) => (
+                            <li key={`minions:${roleId}`}>{roleId}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {botcScriptSummary.groupedRoleIds.demons.length > 0 && (
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Demons</div>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {botcScriptSummary.groupedRoleIds.demons.map((roleId) => (
+                            <li key={`demons:${roleId}`}>{roleId}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {botcScriptSummary.groupedRoleIds.others.length > 0 && (
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Other / Unclassified</div>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {botcScriptSummary.groupedRoleIds.others.map((roleId) => (
+                            <li key={`others:${roleId}`}>{roleId}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    Import a BOCT script to view all available script roles.
+                  </div>
+                )}
+              </div>
+            </details>
+
+            {scriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>BOCT Script Import</div>
+
+                <textarea
+                  placeholder="Paste BOCT script JSON here..."
+                  value={botcJsonDraft}
+                  onChange={(event) => setBotcJsonDraft(event.target.value)}
+                  style={{
+                    width: "100%",
+                    minHeight: 130,
+                    resize: "vertical",
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    padding: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <button
+                    style={{ padding: "8px 10px" }}
+                    type="button"
+                    onClick={() => importScript("PASTE", botcJsonDraft)}
+                  >
+                    Import Pasted JSON
+                  </button>
+
+                  <label
+                    style={{
+                      border: "1px solid #ccc",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                      cursor: "pointer",
+                      background: "#fafafa",
+                    }}
+                  >
+                    Upload .json
+                    <input
+                      type="file"
+                      accept=".json,application/json,text/json"
+                      style={{ display: "none" }}
+                      onChange={onScriptFileSelected}
+                    />
+                  </label>
+                </div>
+
+                {selectedFileName && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#444" }}>
+                    Selected file: {selectedFileName}
+                  </div>
+                )}
+
+                {botcScriptSummary && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#222" }}>
+                    Imported: {botcScriptSummary.name} ({botcScriptSummary.roleCount} roles)
+                  </div>
+                )}
+
+                {importHint && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
+                    {importHint}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

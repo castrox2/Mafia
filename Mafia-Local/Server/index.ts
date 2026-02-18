@@ -10,6 +10,7 @@ import { createRoomsManager } from "./rooms.js"
 import { normalizeRoomId } from "../Shared/events.js"
 import type {
   CreateRoomPayload,
+  ImportBotcScriptPayload,
   JoinRoomPayload,
   KickPlayerPayload,
   MafiaClientToServerEvents,
@@ -240,6 +241,10 @@ io.on("connection", (socket) => {
       roomsManager.updateRoleSelectorSettingsLocal(socket, roomId, settings)
     }
   )
+
+  socket.on("importBotcScript", (payload: ImportBotcScriptPayload) => {
+    roomsManager.importBotcScriptLocal(socket, payload)
+  })
 
   // Status can be used for ready/not-ready etc.
   socket.on(

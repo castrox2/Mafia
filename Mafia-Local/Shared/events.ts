@@ -13,6 +13,15 @@ export type RoleSelectorScriptMode =
   | "REGULAR_MAFIA"
   | "BLOOD_ON_THE_CLOCKTOWER"
 
+export type BotcScriptSource = "PASTE" | "UPLOAD"
+
+export type BotcRoleGroupKey =
+  | "TOWNSFOLK"
+  | "OUTSIDER"
+  | "MINION"
+  | "DEMON"
+  | "OTHER"
+
 export const ROOM_CODE_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890" as const
 export const ROOM_CODE_LENGTH = 5 as const
 export const ROOM_CODE_REGEX = /^[A-Z0-9]{5}$/
@@ -34,6 +43,14 @@ export type MafiaPlayerRole =
   | "DOCTOR"
   | "DETECTIVE"
   | "SHERIFF"
+
+export const REGULAR_MAFIA_AVAILABLE_ROLES: MafiaPlayerRole[] = [
+  "MAFIA",
+  "CIVILIAN",
+  "DOCTOR",
+  "DETECTIVE",
+  "SHERIFF",
+]
 
 export type MafiaPlayerStatus =
   | "DISCONNECTED"
@@ -77,6 +94,22 @@ export type RoleSelectorSettingsPayload = {
   allowRedeal: boolean
 }
 
+export type BotcScriptSummaryPayload = {
+  id: string
+  name: string
+  source: BotcScriptSource
+  roleCount: number
+  roleIds: string[]
+  groupedRoleIds: {
+    townsfolk: string[]
+    outsiders: string[]
+    minions: string[]
+    demons: string[]
+    others: string[]
+  }
+  importedAtMs: number
+}
+
 export type RoleAssignmentCountsPayload = {
   mafia: number
   doctor: number
@@ -117,6 +150,7 @@ export type RoomStatePayload = {
   players: MafiaPlayer[]
   settings: GameSettingsPayload
   roleSelectorSettings: RoleSelectorSettingsPayload | null
+  botcScriptSummary: BotcScriptSummaryPayload | null
   roleBounds: RoleBoundsPayload
   gameStarted: boolean
   roomLocked: boolean
@@ -279,6 +313,12 @@ export type UpdateRoleSelectorSettingsPayload = {
   settings: Partial<RoleSelectorSettingsPayload>
 }
 
+export type ImportBotcScriptPayload = {
+  roomId: string
+  source: BotcScriptSource
+  rawJson: string
+}
+
 export type SetPlayerStatusPayload = {
   roomId: string
   playerId: string
@@ -327,6 +367,7 @@ export interface MafiaClientToServerEvents {
   setRole: (payload: SetRolePayload) => void
   updateSettings: (payload: UpdateSettingsPayload) => void
   updateRoleSelectorSettings: (payload: UpdateRoleSelectorSettingsPayload) => void
+  importBotcScript: (payload: ImportBotcScriptPayload) => void
   setPlayerStatus: (payload: SetPlayerStatusPayload) => void
   setHostParticipation: (payload: SetHostParticipationPayload) => void
   requestMyActions: (payload: RoomIdPayload) => void
@@ -364,6 +405,7 @@ export interface MafiaServerToClientEvents {
   actionRefused: (payload: ActionRefusedPayload) => void
   myActions: (payload: MyActionsPayload) => void
   roleSelectorHostCounts: (payload: RoleSelectorHostCountsPayload) => void
+  botcScriptImported: (payload: RoomIdPayload & { summary: BotcScriptSummaryPayload }) => void
   timerStarted: (payload: TimerStatePayload) => void
   timerState: (payload: TimerStatePayload) => void
   timerTick: (payload: TimerStatePayload) => void

@@ -3,8 +3,10 @@ import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
 import RoleSelectorSettingsModal from "../components/RoleSelectorSettings.js"
+import RoleCatalogModal from "../components/RoleCatalogModal.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
+  BotcScriptSummaryPayload,
   GameStartedPayload,
   HostParticipationRefusedEvent,
   HostParticipationRefusedPayload,
@@ -40,6 +42,7 @@ export default function Lobby({
   onEnterGame,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [roleCatalogOpen, setRoleCatalogOpen] = useState(false)
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
   const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
@@ -156,6 +159,15 @@ export default function Lobby({
       setHostRoleCounts(payload.counts)
     }
 
+    const onBotcScriptImported = (
+      payload: RoomIdPayload & { summary: BotcScriptSummaryPayload }
+    ) => {
+      if (payload.roomId !== cleanRoomId) return
+      setStatus(
+        `BOCT script imported: ${payload.summary.name} (${payload.summary.roleCount} roles).`
+      )
+    }
+
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("startRefused", onStartRefused)
@@ -164,6 +176,7 @@ export default function Lobby({
     socket.on("gameStarted", onGameStarted)
     socket.on("yourRole", onYourRole)
     socket.on("roleSelectorHostCounts", onRoleSelectorHostCounts)
+    socket.on("botcScriptImported", onBotcScriptImported)
     socket.on("kicked", onKicked)
 
     /// If user navigates here directly, make sure we joined
@@ -194,6 +207,7 @@ export default function Lobby({
       socket.off("gameStarted", onGameStarted)
       socket.off("yourRole", onYourRole)
       socket.off("roleSelectorHostCounts", onRoleSelectorHostCounts)
+      socket.off("botcScriptImported", onBotcScriptImported)
       socket.off("kicked", onKicked)
     }
   }, [cleanRoomId, cleanPlayerName, onExit, onEnterGame])
@@ -266,6 +280,17 @@ export default function Lobby({
         </div>
       )}
 
+      {isRoleSelectorRoom && (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            style={actionButtonStyle}
+            onClick={() => setRoleCatalogOpen(true)}
+          >
+            Available Roles
+          </button>
+        </div>
+      )}
+
       <div style={{ marginBottom: 10 }}>
         <div>
           <strong>Room:</strong> {cleanRoomId}
@@ -332,8 +357,16 @@ export default function Lobby({
             <strong>Mode:</strong>{" "}
             {roleSelectorScriptMode === "REGULAR_MAFIA"
               ? "Regular Mafia"
-              : "Blood on the Clocktower (placeholder)"}
+              : "Blood on the Clocktower"}
           </div>
+          {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
+            <div style={{ marginBottom: 4 }}>
+              <strong>Script:</strong>{" "}
+              {state.botcScriptSummary
+                ? `${state.botcScriptSummary.name} (${state.botcScriptSummary.roleCount} roles)`
+                : "Not imported yet"}
+            </div>
+          )}
           <div style={{ marginBottom: 4 }}>
             <strong>Room lock:</strong>{" "}
             {state.roomLocked ? "Locked (started)" : "Open"}
@@ -377,14 +410,27 @@ export default function Lobby({
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           {isRoleSelectorRoom ? (
             <>
-              {!state?.gameStarted && (
-                <button
-                  style={actionButtonStyle}
-                  onClick={startRoleSelector}
-                >
-                  Deal Roles & Lock Room
-                </button>
-              )}
+              {!state?.gameStarted &&
+                (roleSelectorScriptMode === "REGULAR_MAFIA" ? (
+                  <button
+                    style={actionButtonStyle}
+                    onClick={startRoleSelector}
+                  >
+                    Deal Roles & Lock Room
+                  </button>
+                ) : (
+                  <button
+                    style={{
+                      ...actionButtonStyle,
+                      opacity: 0.65,
+                      cursor: "not-allowed",
+                    }}
+                    disabled
+                    title="BOCT role dealing is not implemented yet."
+                  >
+                    BOCT Deal (Coming Soon)
+                  </button>
+                ))}
 
               {state?.gameStarted && allowRoleRedeal && (
                 <button
@@ -455,7 +501,11 @@ export default function Lobby({
         >
           {!state.gameStarted && (
             <div style={{ fontSize: 13, color: "#444" }}>
-              Waiting for host to deal roles.
+              {roleSelectorScriptMode === "REGULAR_MAFIA"
+                ? "Waiting for host to deal roles."
+                : state.botcScriptSummary
+                ? "BOCT script imported. Role dealing for BOCT is coming soon."
+                : "Waiting for host to import a BOCT script."}
             </div>
           )}
 
@@ -533,6 +583,14 @@ export default function Lobby({
               open={settingsOpen}
               onClose={() => setSettingsOpen(false)}
               roomState={state}
+              botcScriptSummary={state.botcScriptSummary}
+              onImportBotcScript={({ source, rawJson }) => {
+                socket.emit("importBotcScript", {
+                  roomId: cleanRoomId,
+                  source,
+                  rawJson,
+                })
+              }}
               onSave={({ roleCount, roleSelectorSettings }) => {
                 socket.emit("updateSettings", {
                   roomId: cleanRoomId,
@@ -561,6 +619,15 @@ export default function Lobby({
             />
           )}
         </>
+      )}
+
+      {state && isRoleSelectorRoom && (
+        <RoleCatalogModal
+          open={roleCatalogOpen}
+          onClose={() => setRoleCatalogOpen(false)}
+          scriptMode={roleSelectorScriptMode}
+          botcScriptSummary={state.botcScriptSummary}
+        />
       )}
     </div>
   )
