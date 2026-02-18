@@ -15,22 +15,12 @@ type RoleGroupSection = {
   roles: string[]
 }
 
-const REGULAR_MAFIA_GROUPS: RoleGroupSection[] = [
-  {
-    key: "townsfolk",
-    title: "Townsfolk",
-    roles: [
-      getRoleLabel("CIVILIAN"),
-      getRoleLabel("DOCTOR"),
-      getRoleLabel("DETECTIVE"),
-      getRoleLabel("SHERIFF"),
-    ],
-  },
-  {
-    key: "demons",
-    title: "Demons",
-    roles: [getRoleLabel("MAFIA")],
-  },
+const REGULAR_MAFIA_ROLES: string[] = [
+  getRoleLabel("CIVILIAN"),
+  getRoleLabel("DOCTOR"),
+  getRoleLabel("DETECTIVE"),
+  getRoleLabel("SHERIFF"),
+  getRoleLabel("MAFIA"),
 ]
 
 const toBotcGroups = (
@@ -56,7 +46,7 @@ export default function RoleCatalogModal({
   if (!open) return null
 
   const groups =
-    scriptMode === "REGULAR_MAFIA" ? REGULAR_MAFIA_GROUPS : toBotcGroups(botcScriptSummary)
+    scriptMode === "REGULAR_MAFIA" ? [] : toBotcGroups(botcScriptSummary)
 
   return (
     <div
@@ -117,7 +107,16 @@ export default function RoleCatalogModal({
           </div>
         )}
 
-        {groups.length > 0 ? (
+        {scriptMode === "REGULAR_MAFIA" ? (
+          <section style={{ border: "1px solid #e7e7e7", borderRadius: 10, padding: 10 }}>
+            <h3 style={{ margin: "0 0 8px 0" }}>Available</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {REGULAR_MAFIA_ROLES.map((role) => (
+                <li key={`available:${role}`}>{role}</li>
+              ))}
+            </ul>
+          </section>
+        ) : groups.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {groups.map((section) => (
               <section

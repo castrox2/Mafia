@@ -123,18 +123,13 @@ export default function RoleSelectorSettingsModal({
 
   if (!open) return null
 
-  const groupedRegularRoles = {
-    townsfolk: [
-      getRoleLabel("CIVILIAN"),
-      getRoleLabel("DOCTOR"),
-      getRoleLabel("DETECTIVE"),
-      getRoleLabel("SHERIFF"),
-    ],
-    outsiders: [] as string[],
-    minions: [] as string[],
-    demons: [getRoleLabel("MAFIA")],
-    others: [] as string[],
-  }
+  const regularAvailableRoles = [
+    getRoleLabel("CIVILIAN"),
+    getRoleLabel("DOCTOR"),
+    getRoleLabel("DETECTIVE"),
+    getRoleLabel("SHERIFF"),
+    getRoleLabel("MAFIA"),
+  ]
 
   return (
     <div
@@ -260,7 +255,7 @@ export default function RoleSelectorSettingsModal({
             </label>
 
             <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-              BOCT import is available for script prep. Dealing BOCT roles is not implemented yet.
+              BOCT import and scripted role dealing are enabled with standard BOCT distribution rules.
             </div>
 
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -278,23 +273,13 @@ export default function RoleSelectorSettingsModal({
               </summary>
               <div style={{ marginTop: 8 }}>
                 {scriptMode === "REGULAR_MAFIA" ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>Townsfolk</div>
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        {groupedRegularRoles.townsfolk.map((roleId) => (
-                          <li key={`townsfolk:${roleId}`}>{roleId}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>Demons</div>
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        {groupedRegularRoles.demons.map((roleId) => (
-                          <li key={`demons:${roleId}`}>{roleId}</li>
-                        ))}
-                      </ul>
-                    </div>
+                  <div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Available</div>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {regularAvailableRoles.map((roleId) => (
+                        <li key={`available:${roleId}`}>{roleId}</li>
+                      ))}
+                    </ul>
                   </div>
                 ) : botcScriptSummary ? (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

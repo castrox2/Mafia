@@ -44,6 +44,8 @@ export type MafiaPlayerRole =
   | "DETECTIVE"
   | "SHERIFF"
 
+export type AssignedPlayerRole = MafiaPlayerRole | (string & {})
+
 export const REGULAR_MAFIA_AVAILABLE_ROLES: MafiaPlayerRole[] = [
   "MAFIA",
   "CIVILIAN",
@@ -118,6 +120,14 @@ export type RoleAssignmentCountsPayload = {
   civilian: number
 }
 
+export type BotcRoleDistributionPayload = {
+  townsfolk: number
+  outsiders: number
+  minions: number
+  demons: number
+  others: number
+}
+
 export type RoleBoundRangePayload = {
   min: number
   max: number
@@ -135,7 +145,7 @@ export type MafiaPlayer = {
   name: string
   clientId: string
   alive: boolean
-  role: MafiaPlayerRole
+  role: AssignedPlayerRole
   status: MafiaPlayerStatus
   isSpectator: boolean
   voteCount: number
@@ -208,7 +218,9 @@ export type RoleSelectorHostCountsPayload = {
   gameNumber: number
   started: boolean
   roomLocked: boolean
+  scriptMode: RoleSelectorScriptMode
   counts: RoleAssignmentCountsPayload
+  botcCounts: BotcRoleDistributionPayload | null
 }
 
 export type GameOverPayload = {
@@ -275,7 +287,7 @@ export type PublicAnnouncementsPayload = {
 export type YourRolePayload = {
   roomId: string
   gameNumber: number
-  role: MafiaPlayerRole
+  role: AssignedPlayerRole
   rolemateClientIds: string[]
 }
 

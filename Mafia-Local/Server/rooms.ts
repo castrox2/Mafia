@@ -11,6 +11,7 @@ import {
   normalizeRoomId,
 } from "../Shared/events.js"
 import type {
+  BotcRoleDistributionPayload,
   BotcRoleGroupKey,
   BotcScriptSource,
   BotcScriptSummaryPayload,
@@ -102,6 +103,13 @@ type Room = {
   // Phase Scheduling
   phaseTimeoutId?: NodeJS.Timeout | null
   phaseEndingTimeoutId?: NodeJS.Timeout | null
+}
+
+type BotcRoleDistribution = {
+  townsfolk: number
+  outsiders: number
+  minions: number
+  demons: number
 }
 
 /* ======================================================
@@ -293,6 +301,70 @@ export const createRoomsManager = (io: MafiaIoServer) => {
       demons: sortAsc(grouped.demons),
       others: sortAsc(grouped.others),
     }
+  }
+
+  const BOTC_DISTRIBUTION_BY_PLAYER_COUNT: Record<number, BotcRoleDistribution> = {
+    5: { townsfolk: 3, outsiders: 0, minions: 1, demons: 1 },
+    6: { townsfolk: 3, outsiders: 1, minions: 1, demons: 1 },
+    7: { townsfolk: 5, outsiders: 0, minions: 1, demons: 1 },
+    8: { townsfolk: 5, outsiders: 1, minions: 1, demons: 1 },
+    9: { townsfolk: 5, outsiders: 2, minions: 1, demons: 1 },
+    10: { townsfolk: 7, outsiders: 0, minions: 2, demons: 1 },
+    11: { townsfolk: 7, outsiders: 1, minions: 2, demons: 1 },
+    12: { townsfolk: 7, outsiders: 2, minions: 2, demons: 1 },
+    13: { townsfolk: 9, outsiders: 0, minions: 3, demons: 1 },
+    14: { townsfolk: 9, outsiders: 1, minions: 3, demons: 1 },
+    15: { townsfolk: 9, outsiders: 2, minions: 3, demons: 1 },
+  }
+
+  const getBotcDistributionForPlayerCount = (
+    playerCount: number
+  ): BotcRoleDistribution | null => {
+    if (playerCount < 5) return null
+    if (playerCount <= 15) {
+      return BOTC_DISTRIBUTION_BY_PLAYER_COUNT[playerCount] ?? null
+    }
+
+    // "15+" script setup: keep outsider/minion/demon counts stable and add extra seats as townsfolk.
+    const base = BOTC_DISTRIBUTION_BY_PLAYER_COUNT[15]!
+    return {
+      ...base,
+      townsfolk: base.townsfolk + (playerCount - 15),
+    }
+  }
+
+  const getBotcRoleGroupForRoleId = (roleId: string): BotcRoleGroupKey =>
+    BOTC_ROLE_GROUP_BY_KEY.get(normalizeBotcRoleKey(roleId)) ?? "OTHER"
+
+  const validateBotcScriptForDistribution = (
+    summary: BotcScriptSummaryPayload,
+    distribution: BotcRoleDistribution
+  ): string | null => {
+    const shortages: string[] = []
+
+    if (summary.groupedRoleIds.townsfolk.length < distribution.townsfolk) {
+      shortages.push(
+        `townsfolk ${summary.groupedRoleIds.townsfolk.length}/${distribution.townsfolk}`
+      )
+    }
+    if (summary.groupedRoleIds.outsiders.length < distribution.outsiders) {
+      shortages.push(
+        `outsiders ${summary.groupedRoleIds.outsiders.length}/${distribution.outsiders}`
+      )
+    }
+    if (summary.groupedRoleIds.minions.length < distribution.minions) {
+      shortages.push(
+        `minions ${summary.groupedRoleIds.minions.length}/${distribution.minions}`
+      )
+    }
+    if (summary.groupedRoleIds.demons.length < distribution.demons) {
+      shortages.push(
+        `demons ${summary.groupedRoleIds.demons.length}/${distribution.demons}`
+      )
+    }
+
+    if (shortages.length <= 0) return null
+    return `Script \"${summary.name}\" does not have enough roles for BOCT distribution (${shortages.join(", ")}).`
   }
 
   const parseBotcScript = (rawJson: string, source: BotcScriptSource) => {
@@ -554,6 +626,29 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     return counts
   }
 
+  const getAssignedBotcRoleCounts = (
+    room: Room
+  ): BotcRoleDistributionPayload => {
+    const counts: BotcRoleDistributionPayload = {
+      townsfolk: 0,
+      outsiders: 0,
+      minions: 0,
+      demons: 0,
+      others: 0,
+    }
+
+    for (const player of getActivePlayers(room)) {
+      const group = getBotcRoleGroupForRoleId(String(player.role || ""))
+      if (group === "TOWNSFOLK") counts.townsfolk += 1
+      else if (group === "OUTSIDER") counts.outsiders += 1
+      else if (group === "MINION") counts.minions += 1
+      else if (group === "DEMON") counts.demons += 1
+      else counts.others += 1
+    }
+
+    return counts
+  }
+
   const emitRoleSelectorHostCounts = (cleanRoomId: string) => {
     const room = rooms[cleanRoomId]
     if (!room) return
@@ -565,12 +660,20 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     const hostSocket = io.sockets.sockets.get(hostPlayer.id)
     if (!hostSocket) return
 
+    const scriptMode =
+      room.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
+
     const payload: RoleSelectorHostCountsPayload = {
       roomId: cleanRoomId,
       gameNumber: room.gameNumber,
       started: room.gameStarted,
       roomLocked: room.roomLocked,
+      scriptMode,
       counts: getAssignedRoleCounts(room),
+      botcCounts:
+        scriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+          ? getAssignedBotcRoleCounts(room)
+          : null,
     }
 
     hostSocket.emit("roleSelectorHostCounts", payload)
@@ -1554,11 +1657,77 @@ const updateRoomSettings = (
     return arr
   }
 
-  const assignRolesForNewGame = (room: Room) => {
+  const assignRolesForNewGame = (
+    room: Room
+  ): { ok: true } | { ok: false; reason: string } => {
     const activePlayers = getActivePlayers(room)
 
     // Safety: if no active players, nothing to do
-    if (activePlayers.length === 0) return
+    if (activePlayers.length === 0) {
+      return { ok: false, reason: "At least one participant is required to deal roles." }
+    }
+
+    const roleSelectorSettings = room.roleSelectorSettings ?? defaultRoleSelectorSettings()
+    const isBotcRoleSelector =
+      room.roomType === "ROLE_SELECTOR" &&
+      roleSelectorSettings.scriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+
+    if (isBotcRoleSelector) {
+      const summary = room.botcScriptSummary
+      if (!summary) {
+        return { ok: false, reason: "Import a BOCT script first before dealing roles." }
+      }
+
+      const distribution = getBotcDistributionForPlayerCount(activePlayers.length)
+      if (!distribution) {
+        return {
+          ok: false,
+          reason: "BOCT role dealing requires at least 5 active players.",
+        }
+      }
+
+      const validationError = validateBotcScriptForDistribution(summary, distribution)
+      if (validationError) {
+        return { ok: false, reason: validationError }
+      }
+
+      const pickRandomUnique = (source: string[], count: number): string[] => {
+        if (count <= 0) return []
+        return shuffleInPlace([...source]).slice(0, count)
+      }
+
+      const pool: string[] = [
+        ...pickRandomUnique(summary.groupedRoleIds.townsfolk, distribution.townsfolk),
+        ...pickRandomUnique(summary.groupedRoleIds.outsiders, distribution.outsiders),
+        ...pickRandomUnique(summary.groupedRoleIds.minions, distribution.minions),
+        ...pickRandomUnique(summary.groupedRoleIds.demons, distribution.demons),
+      ]
+
+      if (pool.length !== activePlayers.length) {
+        return {
+          ok: false,
+          reason:
+            "BOCT role dealing could not satisfy this player count with the imported script.",
+        }
+      }
+
+      shuffleInPlace(activePlayers)
+      shuffleInPlace(pool)
+
+      let idx = 0
+      for (const p of activePlayers) {
+        p.role = pool[idx] ?? "CIVILIAN"
+        idx += 1
+      }
+
+      for (const p of room.players) {
+        if (p.isSpectator === true) {
+          p.role = "CIVILIAN"
+        }
+      }
+
+      return { ok: true }
+    }
 
     const rc = room.settings.roleCount
 
@@ -1593,6 +1762,8 @@ const updateRoomSettings = (
         p.role = "CIVILIAN"
       }
     }
+
+    return { ok: true }
   }
 
   /* ------------------------------------------------------
@@ -1691,12 +1862,6 @@ const updateRoomSettings = (
           })
           return
         }
-
-        socket.emit("startRefused", {
-          reason:
-            "BOCT script import is active, but BOCT role dealing is not implemented yet.",
-        })
-        return
       }
 
       if (room.gameStarted) {
@@ -1710,7 +1875,10 @@ const updateRoomSettings = (
 
       resetPlayersForRoleSelectorDeal(room)
 
-      const playerCount = normalizeRoleCountsForRoom(room)
+      const playerCount =
+        roleSelectorSettings.scriptMode === "REGULAR_MAFIA"
+          ? normalizeRoleCountsForRoom(room)
+          : getActivePlayerCount(room)
       if (playerCount <= 0) {
         socket.emit("startRefused", {
           reason: "At least one participant is required to deal roles.",
@@ -1726,7 +1894,16 @@ const updateRoomSettings = (
       room.gameNumber += 1
 
       clearGameplayRoleActions(cleanRoomId)
-      assignRolesForNewGame(room)
+      const roleAssignment = assignRolesForNewGame(room)
+      if (!roleAssignment.ok) {
+        room.roomLocked = false
+        room.gameStarted = false
+        room.gameNumber = Math.max(0, room.gameNumber - 1)
+        socket.emit("startRefused", { reason: roleAssignment.reason })
+        emitRoomState(cleanRoomId)
+        return
+      }
+
       emitPrivateRolesToRoom(cleanRoomId)
       emitRoomState(cleanRoomId)
 
@@ -1881,13 +2058,6 @@ const updateRoomSettings = (
       return
     }
 
-    if (roleSelectorSettings.scriptMode === "BLOOD_ON_THE_CLOCKTOWER") {
-      socket.emit("startRefused", {
-        reason: "BOCT role redeal is not implemented yet.",
-      })
-      return
-    }
-
     if (!roleSelectorSettings.allowRedeal) {
       socket.emit("startRefused", { reason: "Redeal is disabled in host settings." })
       return
@@ -1899,9 +2069,19 @@ const updateRoomSettings = (
       return
     }
 
-    normalizeRoleCountsForRoom(room)
+    if (roleSelectorSettings.scriptMode === "REGULAR_MAFIA") {
+      normalizeRoleCountsForRoom(room)
+    }
+
     room.gameNumber += 1
-    assignRolesForNewGame(room)
+    const roleAssignment = assignRolesForNewGame(room)
+    if (!roleAssignment.ok) {
+      room.gameNumber = Math.max(1, room.gameNumber - 1)
+      socket.emit("startRefused", { reason: roleAssignment.reason })
+      emitRoomState(cleanRoomId)
+      return
+    }
+
     emitPrivateRolesToRoom(cleanRoomId)
     emitRoomState(cleanRoomId)
   }

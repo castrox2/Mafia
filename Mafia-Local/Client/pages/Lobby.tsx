@@ -47,7 +47,7 @@ export default function Lobby({
   const [status, setStatus] = useState("")
   const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
   const [hostRoleCounts, setHostRoleCounts] =
-    useState<RoleSelectorHostCountsPayload["counts"] | null>(null)
+    useState<RoleSelectorHostCountsPayload | null>(null)
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
@@ -60,6 +60,10 @@ export default function Lobby({
   const hostParticipates = state?.hostParticipates ?? true
   const allowRoleRedeal = state?.roleSelectorSettings?.allowRedeal ?? false
   const roleSelectorScriptMode = state?.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
+  const missingBotcScript =
+    isRoleSelectorRoom &&
+    roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
+    !state?.botcScriptSummary
   const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
@@ -156,7 +160,7 @@ export default function Lobby({
 
     const onRoleSelectorHostCounts = (payload: RoleSelectorHostCountsPayload) => {
       if (payload.roomId !== cleanRoomId) return
-      setHostRoleCounts(payload.counts)
+      setHostRoleCounts(payload)
     }
 
     const onBotcScriptImported = (
@@ -411,26 +415,25 @@ export default function Lobby({
           {isRoleSelectorRoom ? (
             <>
               {!state?.gameStarted &&
-                (roleSelectorScriptMode === "REGULAR_MAFIA" ? (
-                  <button
-                    style={actionButtonStyle}
-                    onClick={startRoleSelector}
-                  >
-                    Deal Roles & Lock Room
-                  </button>
-                ) : (
-                  <button
-                    style={{
-                      ...actionButtonStyle,
-                      opacity: 0.65,
-                      cursor: "not-allowed",
-                    }}
-                    disabled
-                    title="BOCT role dealing is not implemented yet."
-                  >
-                    BOCT Deal (Coming Soon)
-                  </button>
-                ))}
+                <button
+                  style={{
+                    ...actionButtonStyle,
+                    ...(missingBotcScript
+                      ? { opacity: 0.65, cursor: "not-allowed" as const }
+                      : {}),
+                  }}
+                  onClick={startRoleSelector}
+                  disabled={missingBotcScript}
+                  title={
+                    missingBotcScript
+                      ? "Import a BOCT script first."
+                      : undefined
+                  }
+                >
+                  {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+                    ? "Deal BOCT Roles & Lock Room"
+                    : "Deal Roles & Lock Room"}
+                </button>}
 
               {state?.gameStarted && allowRoleRedeal && (
                 <button
@@ -504,7 +507,7 @@ export default function Lobby({
               {roleSelectorScriptMode === "REGULAR_MAFIA"
                 ? "Waiting for host to deal roles."
                 : state.botcScriptSummary
-                ? "BOCT script imported. Role dealing for BOCT is coming soon."
+                ? "BOCT script imported. Waiting for host to deal roles."
                 : "Waiting for host to import a BOCT script."}
             </div>
           )}
@@ -514,11 +517,23 @@ export default function Lobby({
               <div style={{ marginBottom: 6 }}>
                 <strong>Host view:</strong> role counts only
               </div>
-              <div>
-                Mafia: {hostRoleCounts?.mafia ?? 0} | Doctor: {hostRoleCounts?.doctor ?? 0} | Detective:{" "}
-                {hostRoleCounts?.detective ?? 0} | Sheriff: {hostRoleCounts?.sheriff ?? 0} | Civilian:{" "}
-                {hostRoleCounts?.civilian ?? 0}
-              </div>
+              {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" ? (
+                <div>
+                  Townsfolk: {hostRoleCounts?.botcCounts?.townsfolk ?? 0} | Outsiders:{" "}
+                  {hostRoleCounts?.botcCounts?.outsiders ?? 0} | Minions:{" "}
+                  {hostRoleCounts?.botcCounts?.minions ?? 0} | Demons:{" "}
+                  {hostRoleCounts?.botcCounts?.demons ?? 0} | Other:{" "}
+                  {hostRoleCounts?.botcCounts?.others ?? 0}
+                </div>
+              ) : (
+                <div>
+                  Mafia: {hostRoleCounts?.counts.mafia ?? 0} | Doctor:{" "}
+                  {hostRoleCounts?.counts.doctor ?? 0} | Detective:{" "}
+                  {hostRoleCounts?.counts.detective ?? 0} | Sheriff:{" "}
+                  {hostRoleCounts?.counts.sheriff ?? 0} | Civilian:{" "}
+                  {hostRoleCounts?.counts.civilian ?? 0}
+                </div>
+              )}
             </div>
           )}
 

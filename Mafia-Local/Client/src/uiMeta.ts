@@ -1,4 +1,5 @@
 import type {
+  AssignedPlayerRole,
   MafiaPhase,
   MafiaPlayer,
   MafiaPlayerRole,
@@ -75,7 +76,14 @@ const ROLE_ACTION_UI_META: Record<
 
 export const getPhaseLabel = (phase: MafiaPhase): string => PHASE_UI_META[phase].label
 
-export const getRoleLabel = (role: MafiaPlayerRole): string => ROLE_UI_META[role].label
+const isKnownRole = (role: string): role is MafiaPlayerRole =>
+  Object.prototype.hasOwnProperty.call(ROLE_UI_META, role)
+
+export const getRoleLabel = (role: AssignedPlayerRole): string => {
+  const nextRole = String(role || "").trim()
+  if (!nextRole) return "Unknown"
+  return isKnownRole(nextRole) ? ROLE_UI_META[nextRole].label : nextRole
+}
 
 export const getStatusLabel = (status: MafiaPlayerStatus): string =>
   PLAYER_STATUS_UI_META[status].label
