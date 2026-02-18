@@ -4,6 +4,7 @@ import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
 import RoleSelectorSettingsModal from "../components/RoleSelectorSettings.js"
 import RoleCatalogModal from "../components/RoleCatalogModal.js"
+import RoleInfoModal from "../components/RoleInfoModal.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
   BotcScriptSummaryPayload,
@@ -19,6 +20,7 @@ import type {
   YourRolePayload,
 } from "../../Shared/events.js"
 import { getPlayerTags, getRoleLabel, getStatusLabel } from "../src/uiMeta.js"
+import { getBotcRoleInfo } from "../src/constants/botcRoleInfo.js"
 
 type Props = {
   roomId: string
@@ -43,6 +45,7 @@ export default function Lobby({
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [roleCatalogOpen, setRoleCatalogOpen] = useState(false)
+  const [myRoleInfoOpen, setMyRoleInfoOpen] = useState(false)
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
   const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
@@ -64,6 +67,16 @@ export default function Lobby({
     isRoleSelectorRoom &&
     roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
     !state?.botcScriptSummary
+  const myBotcRoleInfo =
+    roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole
+      ? getBotcRoleInfo(String(myRole))
+      : null
+  const myRoleLabel =
+    myRole == null
+      ? null
+      : roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+        ? myBotcRoleInfo?.roleName ?? String(myRole)
+        : getRoleLabel(myRole)
   const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
@@ -82,6 +95,12 @@ export default function Lobby({
     border: amReady ? "1px solid #d46a6a" : "1px solid #5ea66d",
     background: amReady ? "#fff2f2" : "#f2fff4",
   }
+
+  useEffect(() => {
+    if (roleSelectorScriptMode !== "BLOOD_ON_THE_CLOCKTOWER" || !myRole) {
+      setMyRoleInfoOpen(false)
+    }
+  }, [myRole, roleSelectorScriptMode])
 
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
@@ -539,7 +558,26 @@ export default function Lobby({
 
           {state.gameStarted && !isHost && !amSpectator && (
             <div style={{ fontSize: 14, color: "#222" }}>
-              <strong>Your role:</strong> {myRole ? getRoleLabel(myRole) : "Waiting for assignment..."}
+              <strong>Your role:</strong> {myRoleLabel ?? "Waiting for assignment..."}
+              {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole && (
+                <button
+                  type="button"
+                  onClick={() => setMyRoleInfoOpen(true)}
+                  title="Show role details"
+                  style={{
+                    marginLeft: 8,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    border: "1px solid #bbb",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  ?
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -637,12 +675,28 @@ export default function Lobby({
       )}
 
       {state && isRoleSelectorRoom && (
-        <RoleCatalogModal
-          open={roleCatalogOpen}
-          onClose={() => setRoleCatalogOpen(false)}
-          scriptMode={roleSelectorScriptMode}
-          botcScriptSummary={state.botcScriptSummary}
-        />
+        <>
+          <RoleCatalogModal
+            open={roleCatalogOpen}
+            onClose={() => setRoleCatalogOpen(false)}
+            scriptMode={roleSelectorScriptMode}
+            botcScriptSummary={state.botcScriptSummary}
+          />
+
+          <RoleInfoModal
+            open={
+              myRoleInfoOpen &&
+              roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
+              Boolean(myRole)
+            }
+            onClose={() => setMyRoleInfoOpen(false)}
+            roleName={myBotcRoleInfo?.roleName ?? String(myRole ?? "")}
+            description={
+              myBotcRoleInfo?.description ??
+              (myRole ? `No description available yet for "${myRole}".` : "")
+            }
+          />
+        </>
       )}
     </div>
   )
