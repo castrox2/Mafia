@@ -138,6 +138,6 @@ Output files:
 
 ## Publish A Release
 
-1. Create a new GitHub release (for example `v0.8.4`).
+1. Create a new GitHub release (for example `v0.9.3`).
 2. Upload the installer from `Mafia-Local/Electron/dist`.
 3. Publish release so players can download it directly.

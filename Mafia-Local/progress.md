@@ -126,18 +126,18 @@ TODO / next-agent suggestions:
 ---
 
 - New task: align project version metadata with latest patch line.
-- Updated version from `0.7.5` -> `0.8.4` in:
+- Updated version from `0.7.5` -> `0.9.3` in:
   - Root `package.json` + `package-lock.json`
   - `Mafia-Local/Client/package.json` + `package-lock.json`
   - `Mafia-Local/Server/package.json` + `package-lock.json`
   - `Mafia-Local/Electron/package.json` + `package-lock.json`
 - Updated docs release example:
-  - `Mafia-Local/README.md`: `v0.7.5` -> `v0.8.4`.
+  - `Mafia-Local/README.md`: `v0.7.5` -> `v0.9.3`.
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron`.
   - Generated installer artifacts include:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
 
 ---
 
@@ -149,8 +149,8 @@ TODO / next-agent suggestions:
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after config change.
   - Refreshed installer artifacts:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
 
 ---
 
@@ -166,8 +166,8 @@ TODO / next-agent suggestions:
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron`.
   - Installer rebuilt successfully:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
 
 ---
 
@@ -188,8 +188,8 @@ TODO / next-agent suggestions:
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after NSIS include/icon changes.
   - Installer rebuilt successfully:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
   - Silent install check confirmed desktop shortcut now carries explicit custom icon location:
     - `C:\Users\User\AppData\Local\Programs\electron\resources\Mafia-Icon.ico,0`
 
@@ -260,3 +260,4 @@ TODO / next-agent suggestions:
 TODO / next-agent suggestions:
 - If desired, add a `Back to Menu` affordance directly inside Lobby/Game (currently users can leave room, then return to menu via app flow).
 - If desired, split join copy/placeholders slightly further between modes (e.g., join button text for role assigner mode).
+
