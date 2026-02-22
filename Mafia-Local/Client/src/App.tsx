@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from "react"
+import MainMenu from "../pages/MainMenu.js"
 import Join from "../pages/Join.js"
 import Lobby from "../pages/Lobby.js"
 import Game from "../pages/Game.js"
 import { onReconnected } from "./socket.js"
 
+type EntryMode = "PLAY_GAME" | "ROLE_ASSIGNER"
+
 export default function App() {
-  const [screen, setScreen] = useState<"JOIN" | "LOBBY" | "GAME">("JOIN")
+  const [screen, setScreen] = useState<"MENU" | "JOIN" | "LOBBY" | "GAME">("MENU")
+  const [entryMode, setEntryMode] = useState<EntryMode | null>(null)
 
   const [roomId, setRoomId] = useState("")
   const [playerName, setPlayerName] = useState("")
@@ -26,14 +30,31 @@ export default function App() {
   }, [])
 
   const onExit = () => {
+    const hadEntryMode = entryMode != null
+
     setRoomId("")
     setPlayerName("")
     setJoinUrl("")
     setQrDataUrl("")
-    setScreen("JOIN")
+    setScreen(hadEntryMode ? "JOIN" : "MENU")
 
     // Optional: clear URL query if QR brought you here
     window.history.replaceState({}, "", "/")
+  }
+
+  if (screen === "MENU") {
+    return (
+      <MainMenu
+        onSelectPlayGame={() => {
+          setEntryMode("PLAY_GAME")
+          setScreen("JOIN")
+        }}
+        onSelectRoleAssigner={() => {
+          setEntryMode("ROLE_ASSIGNER")
+          setScreen("JOIN")
+        }}
+      />
+    )
   }
 
   /* ------------------------------------------------------
@@ -44,6 +65,11 @@ export default function App() {
   if (!roomId || !playerName || screen === "JOIN") {
     return (
       <Join
+        mode={entryMode ?? "PLAY_GAME"}
+        onBackToMenu={() => {
+          setEntryMode(null)
+          setScreen("MENU")
+        }}
         onEnterLobby={(newRoomId, name, joinUrl, qrDataUrl) => {
           setRoomId(newRoomId)
           setPlayerName(name)

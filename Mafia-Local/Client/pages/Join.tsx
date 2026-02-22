@@ -13,11 +13,15 @@ import type {
   RoomIdPayload,
 } from "../../Shared/events.js"
 
+export type JoinMode = "PLAY_GAME" | "ROLE_ASSIGNER"
+
 type Props = {
+    mode: JoinMode
+    onBackToMenu: () => void
     onEnterLobby: (roomId: string, playerName: string, joinUrl: string, qrDataUrl: string) => void
 }
 
-export default function Join({ onEnterLobby }: Props) {
+export default function Join({ mode, onBackToMenu, onEnterLobby }: Props) {
     const [name, setName] = useState("")
     const [room, setRoom] = useState("")
     const [status, setStatus] = useState("")
@@ -144,20 +148,45 @@ export default function Join({ onEnterLobby }: Props) {
         socket.emit("joinRoom", { roomId: cleanRoom, playerName: cleanName })
     }
 
+    const isRoleAssignerMode = mode === "ROLE_ASSIGNER"
+    const title = isRoleAssignerMode
+      ? "Mafia - Role Assigner"
+      : "Mafia - Play Game"
+    const subtitle = isRoleAssignerMode
+      ? "Create or join a role assignment room."
+      : "Create a classic room or join an existing room."
+
     return (
         <div style={{ padding: 20, maxWidth: 560, fontFamily: "sans-serif" }}>
+        <div style={{ marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={onBackToMenu}
+              style={{
+                padding: "8px 10px",
+                fontSize: 14,
+                borderRadius: 8,
+                border: "1px solid #cbd1da",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Back to Menu
+            </button>
+        </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
             <img
             src="/assets/Mafia-Icon.png"
-            alt="Mafia Local logo"
+            alt="Mafia logo"
             style={{ width: 72, height: 72, objectFit: "contain" }}
             onError={(event) => {
                 event.currentTarget.style.display = "none"
             }}
             />
             <div>
-            <h1 style={{ marginBottom: 8, marginTop: 0 }}>Mafia Local - Join</h1>
-            <p style={{ marginTop: 0 }}>Create a room or join an existing room!</p>
+            <h1 style={{ marginBottom: 8, marginTop: 0 }}>{title}</h1>
+            <p style={{ marginTop: 0 }}>{subtitle}</p>
             </div>
         </div>
 
@@ -180,12 +209,15 @@ export default function Join({ onEnterLobby }: Props) {
         </div>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-            <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoom}>
-            Create Room
-            </button>
-            <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoleSelectorRoom}>
-            Role Selector
-            </button>
+            {isRoleAssignerMode ? (
+              <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoleSelectorRoom}>
+                Create Role Assigner Room
+              </button>
+            ) : (
+              <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoom}>
+                Create Room
+              </button>
+            )}
             <button style={{ padding: "10px 12px", fontSize: 16 }} disabled={!validRoomCode || !validName} onClick={joinRoom}>
             Join Room
             </button>

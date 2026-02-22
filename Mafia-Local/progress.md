@@ -233,3 +233,30 @@ TODO / next-agent suggestions:
     - `Mafia-Local/Client/src/styles/phases/gameover.css`
 - Build/package validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after scaffolding changes.
+
+---
+
+- New task: add first-launch main menu split between Play Game and Role Assigner, with back navigation between both entry flows.
+- Full project scan performed before implementation (Client routing/pages, shared events, server room typing, Electron packaging setup).
+- Added `Client/pages/MainMenu.tsx`:
+  - First-launch screen with two options:
+    - `Play Game`
+    - `Role Assigner`
+- Updated `Client/src/App.tsx`:
+  - Added app screen state `MENU` and entry mode tracking (`PLAY_GAME` / `ROLE_ASSIGNER`).
+  - New flow:
+    - `MENU -> JOIN(mode) -> LOBBY -> GAME`
+  - Exit now returns to `MENU` so users can switch between paths.
+- Updated `Client/pages/Join.tsx`:
+  - Added `mode` + `onBackToMenu` props.
+  - Mode-specific behavior:
+    - `PLAY_GAME`: `Create Room` + `Join Room`
+    - `ROLE_ASSIGNER`: `Create Role Assigner Room` (role selector room type) + `Join Room`
+  - Added `Back to Menu` button on join screen.
+- Validation:
+  - Ran `npm --prefix Mafia-Local/Electron run dist` successfully.
+  - Client build, server TypeScript build, and installer packaging all passed.
+
+TODO / next-agent suggestions:
+- If desired, add a `Back to Menu` affordance directly inside Lobby/Game (currently users can leave room, then return to menu via app flow).
+- If desired, split join copy/placeholders slightly further between modes (e.g., join button text for role assigner mode).

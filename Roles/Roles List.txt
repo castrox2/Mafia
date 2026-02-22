@@ -577,33 +577,75 @@ Doctor
         
 -----------------------------------------------     Traveler❗     -----------------------------------------------
 
-        -- A
-            - Apprentice
-        -- B
-            - Barista
-            - Bishop
-            - Bone Collector
-            - Bureaucrat
-            - Butcher
-        -- D
-            - Deviant
-        -- G
-            - Gangster
-            - Gnome
-            - Gunslinger
-        -- H
-            - Harlot
-        -- J
-            - Judge
-        -- M
-            - Matron
-        -- S
-            - Scapegoat
-        -- T
-            - Thief
-        -- V
-            - Voudon
-    
+        🅰️ A
+
+            Apprentice
+                Gain the ability of a Townsfolk in play.
+                If good, they are sober & healthy. If evil, they are drunk.
+
+        🅱️ B
+
+            Barista
+                Each night, choose a player: if they are good, they act twice tonight; if evil, they are poisoned tonight.
+
+            Bishop
+                Only the Storyteller may nominate.
+
+            Bone Collector
+                Once per game, choose a dead player: they regain their ability until dusk.
+
+            Bureaucrat
+                Each night, choose a player: tomorrow their vote counts as 3 or 0 (Storyteller’s choice).
+
+            Butcher
+                Each day, after the first execution, you may execute one additional player.
+
+        🅳 D
+
+            Deviant
+                If you are executed, your team loses.
+
+        🅶 G
+            
+            Gangster
+                Each day, you may publicly choose a player; if they are evil, they die. If good, nothing happens.
+
+            Gnome
+                If the Demon kills you, good wins.
+
+            Gunslinger
+                Each day, you may publicly choose a player to die. If you choose wrong, you might die.
+
+        🅷 H
+
+            Harlot
+                Each night, choose a player: if they die tonight, you die too.
+
+        🅹 J
+
+            Judge
+                Once per game, choose a player: if they are executed today, their team loses.
+
+        🅼 M
+
+            Matron
+                Private conversations are not allowed.
+
+        🆂 S
+
+            Scapegoat
+                If no player is executed during the day, you are executed instead.
+
+        🆃 T
+
+            Thief
+                Each night, choose a player: if they are good, they are poisoned; if evil, they become good.
+
+        🆅 V
+
+            Voudon
+                Only you may nominate, and only you may vote.
+        
 -----------------------------------------------     Fabled❗     -----------------------------------------------
 
         -- A
@@ -733,36 +775,3 @@ Doctor
             - Effect: This introduces a massive new problem. The core assumption that the Demon is on the Evil team is shattered. 
                       The Good team must now deduce which Outsider is secretly the killer, and the Evil team has a bizarre, public-facing Demon. 
                       It warps every piece of logic in the game.
-
-
------------------------------------------------     Trouble Brewing Script❗     -----------------------------------------------
-
-    Townsfolke:
-        - Washerwoman
-        - Librarian
-        - Investigator
-        - Chef
-        - Empath
-        - Fortune Teller
-        - Undertaker
-        - Monk
-        - Ravenkeeper
-        - Virgin
-        - Slayer
-        - Soldier
-        - Mayor
-    
-    Outsider:
-        - Butler
-        - Drunk
-        - Recluse
-        - Saint
-
-    Minions:
-        - Poisoner
-        - Spy
-        - Scarlet Woman
-        - Baron
-
-    Demons:
-        - Imp

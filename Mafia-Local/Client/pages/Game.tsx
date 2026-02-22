@@ -433,7 +433,7 @@ useEffect(() => {
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
             <img
             src="/assets/Mafia-Icon.png"
-            alt="Mafia Local logo"
+            alt="Mafia logo"
             style={{ width: 56, height: 56, objectFit: "contain" }}
             onError={(event) => {
                 event.currentTarget.style.display = "none"
