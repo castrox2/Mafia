@@ -261,3 +261,57 @@ TODO / next-agent suggestions:
 - If desired, add a `Back to Menu` affordance directly inside Lobby/Game (currently users can leave room, then return to menu via app flow).
 - If desired, split join copy/placeholders slightly further between modes (e.g., join button text for role assigner mode).
 
+---
+
+- New task: fix Role Assigner linking so it consistently creates/joins role-assignment rooms.
+- Root issue addressed:
+  - Join flow did not enforce room-mode compatibility.
+  - Role Assigner and Play Game could join each other's room types with no guard.
+- Implemented room-type-safe linking:
+  - `Shared/events.ts`:
+    - `JoinRoomPayload` now includes optional `expectedRoomType`.
+  - `Client/pages/Join.tsx`:
+    - Create action now always sends explicit room type by mode:
+      - `PLAY_GAME` -> `CLASSIC`
+      - `ROLE_ASSIGNER` -> `ROLE_SELECTOR`
+    - Join action now sends `expectedRoomType` based on selected entry mode.
+  - `Server/index.ts`:
+    - Passes `expectedRoomType` from socket `joinRoom` payload into room manager.
+  - `Server/rooms.ts`:
+    - `joinRoomLocal` now validates expected mode against actual room type and rejects mismatches with `roomInvalid` reason.
+- Validation:
+  - `Client`: `npm run build` passes.
+  - `Server`: `npm run build` passes.
+  - Playwright skill script run and screenshot reviewed:
+    - `output/web-game/shot-0.png` shows Role Assigner join screen after menu navigation.
+---
+
+- New task: installed app showed `Cannot GET /` on launch.
+- Root cause addressed:
+  - In packaged mode, backend sometimes launched without a resolved client dist directory, so Express had no route/static handler for `/`.
+- Implemented packaged routing hardening:
+  - `Electron/main.js`:
+    - Added packaged client dist resolver (`getPackagedClientDistPath`).
+    - When packaged, now sets `process.env.MAFIA_CLIENT_DIST_DIR` before importing server entry.
+  - `Server/index.ts`:
+    - Added `CLIENT_INDEX_PATH` derivation.
+    - Added explicit fallback routes for `/` and non-API deep links to serve client `index.html` when available.
+- Validation:
+  - `Client`: `npm run build` passes.
+  - `Server`: `npm run build` passes.
+  - `Electron`: `npm run dist` passes; installer artifacts refreshed for `0.9.3`.
+---
+
+- New task: `Cannot GET /` persisted after install.
+- Root cause found:
+  - Packaged app had stale `Server/dist/index.js` plus current `Server/dist/Server/index.js`.
+  - Electron startup path preferred stale `Server/dist/index.js`, so latest server routing fixes were bypassed.
+- Implemented fix:
+  - `Electron/main.js`: `getServerEntryPath` now prioritizes `Server/dist/Server/index.js` across packaged path candidates.
+  - `Server/package.json`: build now clears `dist` before TypeScript compile, preventing stale duplicate entry files.
+- Validation:
+  - `npm run build` in `Mafia-Local/Server` passes.
+  - `Server/dist` now only contains `Server/` and `Shared/` (no stale top-level `index.js`).
+  - `npm run dist` in `Mafia-Local/Electron` passes.
+  - Asar check confirms `\Server\dist\Server\index.js` exists and stale `\Server\dist\index.js` is absent.
+  - Runtime smoke (`node` import of `Server/dist/Server/index.js` with `MAFIA_CLIENT_DIST_DIR`) returns HTTP 200 for `/`.

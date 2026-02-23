@@ -117,19 +117,18 @@ export default function Join({ mode, onBackToMenu, onEnterLobby }: Props) {
     const cleanName = name.trim()
     const cleanRoom = normalizeRoomId(room)
 
-    const createRoom = () => {
+    const createRoomForMode = () => {
         if (!cleanName) return alert("Enter Name First!")
-        setStatus("Creating room...")
-        socket.emit("createRoom", { playerName: cleanName, baseUrl: baseUrll })
-    }
-
-    const createRoleSelectorRoom = () => {
-        if (!cleanName) return alert("Enter Name First!")
-        setStatus("Creating role selector room...")
+        const roomType = isRoleAssignerMode ? "ROLE_SELECTOR" : "CLASSIC"
+        setStatus(
+          isRoleAssignerMode
+            ? "Creating role selector room..."
+            : "Creating room..."
+        )
         socket.emit("createRoom", {
             playerName: cleanName,
             baseUrl: baseUrll,
-            roomType: "ROLE_SELECTOR",
+            roomType,
         })
     }
 
@@ -145,7 +144,11 @@ export default function Join({ mode, onBackToMenu, onEnterLobby }: Props) {
         setPendingRoom(cleanRoom)
 
         // ask the SERVER to join (server accepts or rejects)
-        socket.emit("joinRoom", { roomId: cleanRoom, playerName: cleanName })
+        socket.emit("joinRoom", {
+            roomId: cleanRoom,
+            playerName: cleanName,
+            expectedRoomType: isRoleAssignerMode ? "ROLE_SELECTOR" : "CLASSIC",
+        })
     }
 
     const isRoleAssignerMode = mode === "ROLE_ASSIGNER"
@@ -210,11 +213,11 @@ export default function Join({ mode, onBackToMenu, onEnterLobby }: Props) {
 
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
             {isRoleAssignerMode ? (
-              <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoleSelectorRoom}>
+              <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoomForMode}>
                 Create Role Assigner Room
               </button>
             ) : (
-              <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoom}>
+              <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoomForMode}>
                 Create Room
               </button>
             )}

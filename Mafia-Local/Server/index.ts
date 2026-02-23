@@ -90,6 +90,9 @@ const resolveServerPublicDir = (): string | null => {
 }
 
 const CLIENT_DIST_DIR = resolveClientDistDir()
+const CLIENT_INDEX_PATH = CLIENT_DIST_DIR
+  ? path.join(CLIENT_DIST_DIR, "index.html")
+  : null
 const CLIENT_PORT_FOR_JOIN_URL = parsePort(
   process.env.MAFIA_CLIENT_PORT,
   CLIENT_DIST_DIR ? SERVER_PORT : DEFAULT_DEV_CLIENT_PORT
@@ -129,6 +132,17 @@ if (CLIENT_DIST_DIR) {
 app.get("/health", (req, res) => {
   res.send("OK")
 })
+
+// Packaged app fallback: ensure "/" and deep links resolve to client app.
+if (CLIENT_INDEX_PATH && fs.existsSync(CLIENT_INDEX_PATH)) {
+  app.get("/", (_req, res) => {
+    res.sendFile(CLIENT_INDEX_PATH)
+  })
+
+  app.get(/^\/(?!socket\.io\/|health$).*/, (_req, res) => {
+    res.sendFile(CLIENT_INDEX_PATH)
+  })
+}
 
 // Helper:
 function getLanIp(): string {
@@ -196,8 +210,14 @@ io.on("connection", (socket) => {
     }
   )
 
-  socket.on("joinRoom", ({ roomId, playerName }: JoinRoomPayload) => {
-    roomsManager.joinRoomLocal(socket, roomId, playerName, socket.data.clientId)
+  socket.on("joinRoom", ({ roomId, playerName, expectedRoomType }: JoinRoomPayload) => {
+    roomsManager.joinRoomLocal(
+      socket,
+      roomId,
+      playerName,
+      socket.data.clientId,
+      expectedRoomType
+    )
   })
 
   socket.on("leaveRoom", (roomId: string) => {

@@ -369,6 +369,7 @@ export type CreateRoomPayload = {
 export type JoinRoomPayload = {
   roomId: string
   playerName: string
+  expectedRoomType?: MafiaRoomType
 }
 
 export interface MafiaClientToServerEvents {

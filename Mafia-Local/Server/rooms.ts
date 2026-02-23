@@ -1552,7 +1552,8 @@ const updateRoomSettings = (
     socket: MafiaServerSocket,
     roomId: string,
     playerName: string,
-    clientId: string
+    clientId: string,
+    expectedRoomType?: MafiaRoomType
   ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
@@ -1576,6 +1577,15 @@ const updateRoomSettings = (
     const room = rooms[cleanRoomId]
     if (!room) {
       socket.emit("roomInvalid", { reason: "Room Does Not Exist" })
+      return
+    }
+
+    if (expectedRoomType && room.roomType !== expectedRoomType) {
+      const expectedLabel =
+        expectedRoomType === "ROLE_SELECTOR" ? "Role Assigner" : "Play Game"
+      socket.emit("roomInvalid", {
+        reason: `This room was created for a different mode. Please join from ${expectedLabel}.`,
+      })
       return
     }
 
