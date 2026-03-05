@@ -1,12 +1,12 @@
 {
   "name": "mafia-local",
-  "version": "0.8.4",
+  "version": "0.9.5",
   "description": "Web game based on the party game mafia and its different variations",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --loader ts-node/esm index.ts",
-    "build": "tsc -p tsconfig.json --outDir dist --rootDir ..",
+    "build": "node -e \"require('fs').rmSync('dist',{ recursive:true, force:true })\" && tsc -p tsconfig.json --outDir dist --rootDir ..",
     "start": "node dist/Server/index.js"
   },
   "keywords": [],

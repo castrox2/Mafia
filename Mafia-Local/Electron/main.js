@@ -44,10 +44,15 @@ const shouldAutoStartBackend = () => {
 const getServerEntryPath = () => {
   const appPath = app.getAppPath()
   const candidates = [
+    path.join(appPath, "Server", "dist", "Server", "index.js"),
     path.join(appPath, "Server", "dist", "index.js"),
+    path.join(__dirname, "..", "Server", "dist", "Server", "index.js"),
     path.join(__dirname, "..", "Server", "dist", "index.js"),
+    path.join(__dirname, "Server", "dist", "Server", "index.js"),
     path.join(__dirname, "Server", "dist", "index.js"),
+    path.join(process.resourcesPath, "Server", "dist", "Server", "index.js"),
     path.join(process.resourcesPath, "Server", "dist", "index.js"),
+    path.join(process.resourcesPath, "app", "Server", "dist", "Server", "index.js"),
     path.join(process.resourcesPath, "app", "Server", "dist", "index.js"),
   ]
 
@@ -69,6 +74,22 @@ const getPackagedClientIndexPath = () => {
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return candidate
+  }
+
+  return null
+}
+
+const getPackagedClientDistPath = () => {
+  const appPath = app.getAppPath()
+  const candidates = [
+    path.join(appPath, "Client", "dist"),
+    path.join(__dirname, "..", "Client", "dist"),
+    path.join(process.resourcesPath, "Client", "dist"),
+    path.join(process.resourcesPath, "app", "Client", "dist"),
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, "index.html"))) return candidate
   }
 
   return null
@@ -121,6 +142,12 @@ const startBackend = async () => {
     const clientPort = shouldUseDevRenderer() ? "5173" : String(SERVER_PORT)
     process.env.MAFIA_SERVER_PORT = String(SERVER_PORT)
     process.env.MAFIA_CLIENT_PORT = clientPort
+    if (!shouldUseDevRenderer()) {
+      const packagedClientDistPath = getPackagedClientDistPath()
+      if (packagedClientDistPath) {
+        process.env.MAFIA_CLIENT_DIST_DIR = packagedClientDistPath
+      }
+    }
 
     if (!backendStartedInProcess) {
       await import(pathToFileURL(serverEntryPath).href)

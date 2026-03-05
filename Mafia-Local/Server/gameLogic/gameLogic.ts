@@ -118,7 +118,7 @@ export const returnPlayerRole = (
     rooms: Rooms,
     roomId: string,
     clientId: string,
-): PlayerRole | false => {
+): Player["role"] | false => {
     const player = getPlayerByClientId(rooms, roomId, clientId)
     if (!player) return false
 

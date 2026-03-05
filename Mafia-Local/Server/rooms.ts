@@ -11,8 +11,13 @@ import {
   normalizeRoomId,
 } from "../Shared/events.js"
 import type {
+  BotcRoleDistributionPayload,
+  BotcRoleGroupKey,
+  BotcScriptSource,
+  BotcScriptSummaryPayload,
   GameSettingsPayload,
   HostParticipationRefusedPayload,
+  ImportBotcScriptPayload,
   MafiaClientToServerEvents,
   MafiaPhase,
   MafiaRoomType,
@@ -83,6 +88,8 @@ type Room = {
   players: Player[]
   settings: GameSettings
   roleSelectorSettings: RoleSelectorSettingsPayload | null
+  botcScriptSummary: BotcScriptSummaryPayload | null
+  botcScriptRaw: unknown | null
   roomLocked: boolean
 
   // Game State
@@ -96,6 +103,13 @@ type Room = {
   // Phase Scheduling
   phaseTimeoutId?: NodeJS.Timeout | null
   phaseEndingTimeoutId?: NodeJS.Timeout | null
+}
+
+type BotcRoleDistribution = {
+  townsfolk: number
+  outsiders: number
+  minions: number
+  demons: number
 }
 
 /* ======================================================
@@ -136,6 +150,276 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     scriptMode: "REGULAR_MAFIA",
     allowRedeal: false,
   })
+
+  const MAX_BOTC_SCRIPT_BYTES = 200_000
+
+  const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+  }
+
+  const buildFallbackScriptId = () => `custom-${Date.now().toString(36)}`
+
+  const extractRoleIdsDeep = (
+    value: unknown,
+    opts?: { includeObjectId?: boolean }
+  ): string[] => {
+    const roleIds: string[] = []
+    const includeObjectId = opts?.includeObjectId ?? true
+
+    const walk = (node: unknown, allowObjectId: boolean) => {
+      if (typeof node === "string") {
+        const next = node.trim()
+        if (next && next !== "_meta") roleIds.push(next)
+        return
+      }
+
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          walk(item, true)
+        }
+        return
+      }
+
+      if (!isPlainObject(node)) return
+
+      if (allowObjectId) {
+        const id = typeof node.id === "string" ? node.id.trim() : ""
+        if (id && id !== "_meta") roleIds.push(id)
+      }
+
+      for (const next of Object.values(node)) {
+        if (Array.isArray(next) || isPlainObject(next)) {
+          walk(next, true)
+        }
+      }
+    }
+
+    walk(value, includeObjectId)
+    return roleIds
+  }
+
+  const dedupeRoleIds = (roleIds: string[]): string[] => {
+    const seen = new Set<string>()
+    const unique: string[] = []
+
+    for (const roleId of roleIds) {
+      const clean = roleId.trim()
+      if (!clean) continue
+      if (seen.has(clean)) continue
+      seen.add(clean)
+      unique.push(clean)
+    }
+
+    return unique
+  }
+
+  const normalizeBotcRoleKey = (value: string): string =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+
+  const BOTC_ROLE_GROUPS = {
+    TOWNSFOLK: [
+      "Acrobat", "Alchemist", "Amnesiac", "Artist", "Atheist", "Balloonist",
+      "Banshee", "Bounty Hunter", "Cannibal", "Chambermaid", "Chef", "Choirboy",
+      "Clockmaker", "Courtier", "Cult Leader", "Dreamer", "Empath", "Engineer",
+      "Exorcist", "Farmer", "Fisherman", "Flowergirl", "Fool", "Fortune Teller",
+      "Gambler", "General", "Gossip", "Grandmother", "High Priestess", "Huntsman",
+      "Innkeeper", "Investigator", "Juggler", "King", "Knight", "Librarian",
+      "Lycanthrope", "Lyncanthrope", "Magician", "Mathematician", "Mayor",
+      "Minstrel", "Monk", "Nightwatchman", "Noble", "Oracle", "Pacifist",
+      "Philosopher", "Pixie", "Poppy Grower", "Preacher", "Princess",
+      "Professor", "Ravenkeeper", "Sage", "Sailor", "Savant", "Seamstress",
+      "Seamstres", "Shugenja", "Slayer", "Snake Charmer", "Soldier", "Steward",
+      "Tea Lady", "Town Crier", "Undertaker", "Village Idiot", "Virgin",
+      "Washerwoman",
+    ],
+    OUTSIDER: [
+      "Barber", "Butler", "Damsel", "Drunk", "Golem", "Goon", "Hatter",
+      "Heretic", "Hermit", "Klutz", "Lunatic", "Moonchild", "Mutant", "Ogre",
+      "Plague Doctor", "Politician", "Puzzlemaster", "Recluse", "Saint",
+      "Snitch", "Sweetheart", "Tinker", "Zealot",
+    ],
+    MINION: [
+      "Assassin", "Boffin", "Boomdandy", "Cerenovus", "Devil's Advocate",
+      "Evil Twin", "Fearmonger", "Fearmongerer", "Goblin", "Godfather", "Harpy",
+      "Marionette", "Mastermind", "Mezepheles", "Organ Grinder", "Pit-Hag",
+      "Poisoner", "Psychopath", "Scarlet Woman", "Spy", "Summoner", "Vizier",
+      "Widow", "Witch", "Wizard", "Wraith", "Xaan", "Baron",
+    ],
+    DEMON: [
+      "Al-Hadikhia", "Fang Gu", "Imp", "Kazali", "Legion", "Leviathan",
+      "Lil' Monsta", "Lleech", "Lord of Typhon", "Lord of Typhoon", "No Dashii",
+      "Ojo", "Po", "Pukka", "Riot", "Shabaloth", "Vigormortis", "Vortox",
+      "Yaggababble", "Zombuul",
+    ],
+  } as const
+
+  const BOTC_ROLE_GROUP_BY_KEY = (() => {
+    const map = new Map<string, BotcRoleGroupKey>()
+
+    const addNames = (group: BotcRoleGroupKey, names: readonly string[]) => {
+      for (const name of names) {
+        map.set(normalizeBotcRoleKey(name), group)
+      }
+    }
+
+    addNames("TOWNSFOLK", BOTC_ROLE_GROUPS.TOWNSFOLK)
+    addNames("OUTSIDER", BOTC_ROLE_GROUPS.OUTSIDER)
+    addNames("MINION", BOTC_ROLE_GROUPS.MINION)
+    addNames("DEMON", BOTC_ROLE_GROUPS.DEMON)
+    return map
+  })()
+
+  const groupBotcRoleIds = (roleIds: string[]) => {
+    const grouped = {
+      townsfolk: [] as string[],
+      outsiders: [] as string[],
+      minions: [] as string[],
+      demons: [] as string[],
+      others: [] as string[],
+    }
+
+    for (const roleId of roleIds) {
+      const key = normalizeBotcRoleKey(roleId)
+      const group = BOTC_ROLE_GROUP_BY_KEY.get(key) ?? "OTHER"
+
+      if (group === "TOWNSFOLK") grouped.townsfolk.push(roleId)
+      else if (group === "OUTSIDER") grouped.outsiders.push(roleId)
+      else if (group === "MINION") grouped.minions.push(roleId)
+      else if (group === "DEMON") grouped.demons.push(roleId)
+      else grouped.others.push(roleId)
+    }
+
+    const sortAsc = (values: string[]) => values.sort((a, b) => a.localeCompare(b))
+
+    return {
+      townsfolk: sortAsc(grouped.townsfolk),
+      outsiders: sortAsc(grouped.outsiders),
+      minions: sortAsc(grouped.minions),
+      demons: sortAsc(grouped.demons),
+      others: sortAsc(grouped.others),
+    }
+  }
+
+  const BOTC_DISTRIBUTION_BY_PLAYER_COUNT: Record<number, BotcRoleDistribution> = {
+    5: { townsfolk: 3, outsiders: 0, minions: 1, demons: 1 },
+    6: { townsfolk: 3, outsiders: 1, minions: 1, demons: 1 },
+    7: { townsfolk: 5, outsiders: 0, minions: 1, demons: 1 },
+    8: { townsfolk: 5, outsiders: 1, minions: 1, demons: 1 },
+    9: { townsfolk: 5, outsiders: 2, minions: 1, demons: 1 },
+    10: { townsfolk: 7, outsiders: 0, minions: 2, demons: 1 },
+    11: { townsfolk: 7, outsiders: 1, minions: 2, demons: 1 },
+    12: { townsfolk: 7, outsiders: 2, minions: 2, demons: 1 },
+    13: { townsfolk: 9, outsiders: 0, minions: 3, demons: 1 },
+    14: { townsfolk: 9, outsiders: 1, minions: 3, demons: 1 },
+    15: { townsfolk: 9, outsiders: 2, minions: 3, demons: 1 },
+  }
+
+  const getBotcDistributionForPlayerCount = (
+    playerCount: number
+  ): BotcRoleDistribution | null => {
+    if (playerCount < 5) return null
+    if (playerCount <= 15) {
+      return BOTC_DISTRIBUTION_BY_PLAYER_COUNT[playerCount] ?? null
+    }
+
+    // "15+" script setup: keep outsider/minion/demon counts stable and add extra seats as townsfolk.
+    const base = BOTC_DISTRIBUTION_BY_PLAYER_COUNT[15]!
+    return {
+      ...base,
+      townsfolk: base.townsfolk + (playerCount - 15),
+    }
+  }
+
+  const getBotcRoleGroupForRoleId = (roleId: string): BotcRoleGroupKey =>
+    BOTC_ROLE_GROUP_BY_KEY.get(normalizeBotcRoleKey(roleId)) ?? "OTHER"
+
+  const validateBotcScriptForDistribution = (
+    summary: BotcScriptSummaryPayload,
+    distribution: BotcRoleDistribution
+  ): string | null => {
+    const shortages: string[] = []
+
+    if (summary.groupedRoleIds.townsfolk.length < distribution.townsfolk) {
+      shortages.push(
+        `townsfolk ${summary.groupedRoleIds.townsfolk.length}/${distribution.townsfolk}`
+      )
+    }
+    if (summary.groupedRoleIds.outsiders.length < distribution.outsiders) {
+      shortages.push(
+        `outsiders ${summary.groupedRoleIds.outsiders.length}/${distribution.outsiders}`
+      )
+    }
+    if (summary.groupedRoleIds.minions.length < distribution.minions) {
+      shortages.push(
+        `minions ${summary.groupedRoleIds.minions.length}/${distribution.minions}`
+      )
+    }
+    if (summary.groupedRoleIds.demons.length < distribution.demons) {
+      shortages.push(
+        `demons ${summary.groupedRoleIds.demons.length}/${distribution.demons}`
+      )
+    }
+
+    if (shortages.length <= 0) return null
+    return `Script \"${summary.name}\" does not have enough roles for BOCT distribution (${shortages.join(", ")}).`
+  }
+
+  const parseBotcScript = (rawJson: string, source: BotcScriptSource) => {
+    const parsed = JSON.parse(rawJson) as unknown
+
+    let scriptName = "Custom BOCT Script"
+    let scriptId = ""
+    let roleIds: string[] = []
+
+    if (Array.isArray(parsed)) {
+      roleIds = extractRoleIdsDeep(parsed, { includeObjectId: true })
+
+      const meta = parsed.find((item) => {
+        if (!isPlainObject(item)) return false
+        return String(item.id || "").trim() === "_meta"
+      })
+
+      if (isPlainObject(meta)) {
+        const maybeName = typeof meta.name === "string" ? meta.name.trim() : ""
+        const maybeId = typeof meta.scriptId === "string" ? meta.scriptId.trim() : ""
+        if (maybeName) scriptName = maybeName
+        if (maybeId) scriptId = maybeId
+      }
+    } else if (isPlainObject(parsed)) {
+      const maybeName = typeof parsed.name === "string" ? parsed.name.trim() : ""
+      const maybeId = typeof parsed.id === "string" ? parsed.id.trim() : ""
+      if (maybeName) scriptName = maybeName
+      if (maybeId) scriptId = maybeId
+
+      roleIds = extractRoleIdsDeep(parsed, { includeObjectId: false })
+    } else {
+      throw new Error("Script JSON must be an object or an array.")
+    }
+
+    const uniqueRoleIds = dedupeRoleIds(roleIds)
+
+    if (uniqueRoleIds.length <= 0) {
+      throw new Error("Script must contain at least one role id.")
+    }
+
+    const summary: BotcScriptSummaryPayload = {
+      id: scriptId || buildFallbackScriptId(),
+      name: scriptName,
+      source,
+      roleCount: uniqueRoleIds.length,
+      roleIds: uniqueRoleIds,
+      groupedRoleIds: groupBotcRoleIds(uniqueRoleIds),
+      importedAtMs: Date.now(),
+    }
+
+    return {
+      parsed,
+      summary,
+    }
+  }
 
   /* ------------------------------------------------------
             Role Bounds (based on player count)
@@ -342,6 +626,29 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     return counts
   }
 
+  const getAssignedBotcRoleCounts = (
+    room: Room
+  ): BotcRoleDistributionPayload => {
+    const counts: BotcRoleDistributionPayload = {
+      townsfolk: 0,
+      outsiders: 0,
+      minions: 0,
+      demons: 0,
+      others: 0,
+    }
+
+    for (const player of getActivePlayers(room)) {
+      const group = getBotcRoleGroupForRoleId(String(player.role || ""))
+      if (group === "TOWNSFOLK") counts.townsfolk += 1
+      else if (group === "OUTSIDER") counts.outsiders += 1
+      else if (group === "MINION") counts.minions += 1
+      else if (group === "DEMON") counts.demons += 1
+      else counts.others += 1
+    }
+
+    return counts
+  }
+
   const emitRoleSelectorHostCounts = (cleanRoomId: string) => {
     const room = rooms[cleanRoomId]
     if (!room) return
@@ -353,12 +660,20 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     const hostSocket = io.sockets.sockets.get(hostPlayer.id)
     if (!hostSocket) return
 
+    const scriptMode =
+      room.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
+
     const payload: RoleSelectorHostCountsPayload = {
       roomId: cleanRoomId,
       gameNumber: room.gameNumber,
       started: room.gameStarted,
       roomLocked: room.roomLocked,
+      scriptMode,
       counts: getAssignedRoleCounts(room),
+      botcCounts:
+        scriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+          ? getAssignedBotcRoleCounts(room)
+          : null,
     }
 
     hostSocket.emit("roleSelectorHostCounts", payload)
@@ -411,6 +726,7 @@ export const createRoomsManager = (io: MafiaIoServer) => {
 
       settings: room.settings,
       roleSelectorSettings: room.roleSelectorSettings,
+      botcScriptSummary: room.botcScriptSummary,
       roleBounds: getRoleBounds(getActivePlayerCount(room)),
       gameStarted: room.gameStarted,
       roomLocked: room.roomLocked,
@@ -1068,6 +1384,8 @@ type Winner = MafiaWinner
       settings: defaultSettings(),
       roleSelectorSettings:
         roomType === "ROLE_SELECTOR" ? defaultRoleSelectorSettings() : null,
+      botcScriptSummary: null,
+      botcScriptRaw: null,
       roomLocked: false,
 
       gameStarted: false,
@@ -1154,23 +1472,75 @@ const updateRoomSettings = (
     }
 
     const current = room.roleSelectorSettings ?? defaultRoleSelectorSettings()
-    let next = normalizeRoleSelectorSettings(settings, current)
+    room.roleSelectorSettings = normalizeRoleSelectorSettings(settings, current)
+    emitRoomState(cleanRoomId)
+  }
 
-    if (
-      settings.scriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
-      current.scriptMode !== "BLOOD_ON_THE_CLOCKTOWER"
-    ) {
+  const importBotcScriptLocal = (
+    socket: MafiaServerSocket,
+    payload: ImportBotcScriptPayload
+  ) => {
+    const cleanRoomId = normalizeRoomId(payload.roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    if (room.roomType !== "ROLE_SELECTOR") {
       socket.emit("settingsRefused", {
-        reason: "Blood on the Clocktower scripts are not implemented yet.",
+        reason: "This room does not support BOCT scripts.",
       })
-      next = {
-        ...next,
-        scriptMode: current.scriptMode,
-      }
+      return
     }
 
-    room.roleSelectorSettings = next
-    emitRoomState(cleanRoomId)
+    if (room.hostId !== socket.data.clientId) {
+      socket.emit("settingsRefused", {
+        reason: "Only the host can import BOCT scripts.",
+      })
+      return
+    }
+
+    const roleSelectorSettings =
+      room.roleSelectorSettings ?? defaultRoleSelectorSettings()
+
+    if (roleSelectorSettings.scriptMode !== "BLOOD_ON_THE_CLOCKTOWER") {
+      socket.emit("settingsRefused", {
+        reason:
+          "Switch room mode to Blood on the Clocktower in Role Selector settings before importing.",
+      })
+      return
+    }
+
+    const rawJson = String(payload.rawJson || "").trim()
+    if (!rawJson) {
+      socket.emit("settingsRefused", { reason: "Script import failed: empty JSON." })
+      return
+    }
+
+    if (rawJson.length > MAX_BOTC_SCRIPT_BYTES) {
+      socket.emit("settingsRefused", {
+        reason: `Script import failed: JSON is too large (max ${MAX_BOTC_SCRIPT_BYTES} chars).`,
+      })
+      return
+    }
+
+    const source: BotcScriptSource =
+      payload.source === "UPLOAD" ? "UPLOAD" : "PASTE"
+
+    try {
+      const { parsed, summary } = parseBotcScript(rawJson, source)
+      room.botcScriptRaw = parsed
+      room.botcScriptSummary = summary
+      emitRoomState(cleanRoomId)
+      io.to(cleanRoomId).emit("botcScriptImported", {
+        roomId: cleanRoomId,
+        summary,
+      })
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Invalid script format."
+      socket.emit("settingsRefused", {
+        reason: `Script import failed: ${message}`,
+      })
+    }
   }
 
 
@@ -1182,7 +1552,8 @@ const updateRoomSettings = (
     socket: MafiaServerSocket,
     roomId: string,
     playerName: string,
-    clientId: string
+    clientId: string,
+    expectedRoomType?: MafiaRoomType
   ) => {
     const cleanRoomId = normalizeRoomId(roomId)
     const cleanName = normalizeName(playerName)
@@ -1206,6 +1577,15 @@ const updateRoomSettings = (
     const room = rooms[cleanRoomId]
     if (!room) {
       socket.emit("roomInvalid", { reason: "Room Does Not Exist" })
+      return
+    }
+
+    if (expectedRoomType && room.roomType !== expectedRoomType) {
+      const expectedLabel =
+        expectedRoomType === "ROLE_SELECTOR" ? "Role Assigner" : "Play Game"
+      socket.emit("roomInvalid", {
+        reason: `This room was created for a different mode. Please join from ${expectedLabel}.`,
+      })
       return
     }
 
@@ -1287,11 +1667,77 @@ const updateRoomSettings = (
     return arr
   }
 
-  const assignRolesForNewGame = (room: Room) => {
+  const assignRolesForNewGame = (
+    room: Room
+  ): { ok: true } | { ok: false; reason: string } => {
     const activePlayers = getActivePlayers(room)
 
     // Safety: if no active players, nothing to do
-    if (activePlayers.length === 0) return
+    if (activePlayers.length === 0) {
+      return { ok: false, reason: "At least one participant is required to deal roles." }
+    }
+
+    const roleSelectorSettings = room.roleSelectorSettings ?? defaultRoleSelectorSettings()
+    const isBotcRoleSelector =
+      room.roomType === "ROLE_SELECTOR" &&
+      roleSelectorSettings.scriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+
+    if (isBotcRoleSelector) {
+      const summary = room.botcScriptSummary
+      if (!summary) {
+        return { ok: false, reason: "Import a BOCT script first before dealing roles." }
+      }
+
+      const distribution = getBotcDistributionForPlayerCount(activePlayers.length)
+      if (!distribution) {
+        return {
+          ok: false,
+          reason: "BOCT role dealing requires at least 5 active players.",
+        }
+      }
+
+      const validationError = validateBotcScriptForDistribution(summary, distribution)
+      if (validationError) {
+        return { ok: false, reason: validationError }
+      }
+
+      const pickRandomUnique = (source: string[], count: number): string[] => {
+        if (count <= 0) return []
+        return shuffleInPlace([...source]).slice(0, count)
+      }
+
+      const pool: string[] = [
+        ...pickRandomUnique(summary.groupedRoleIds.townsfolk, distribution.townsfolk),
+        ...pickRandomUnique(summary.groupedRoleIds.outsiders, distribution.outsiders),
+        ...pickRandomUnique(summary.groupedRoleIds.minions, distribution.minions),
+        ...pickRandomUnique(summary.groupedRoleIds.demons, distribution.demons),
+      ]
+
+      if (pool.length !== activePlayers.length) {
+        return {
+          ok: false,
+          reason:
+            "BOCT role dealing could not satisfy this player count with the imported script.",
+        }
+      }
+
+      shuffleInPlace(activePlayers)
+      shuffleInPlace(pool)
+
+      let idx = 0
+      for (const p of activePlayers) {
+        p.role = pool[idx] ?? "CIVILIAN"
+        idx += 1
+      }
+
+      for (const p of room.players) {
+        if (p.isSpectator === true) {
+          p.role = "CIVILIAN"
+        }
+      }
+
+      return { ok: true }
+    }
 
     const rc = room.settings.roleCount
 
@@ -1326,6 +1772,8 @@ const updateRoomSettings = (
         p.role = "CIVILIAN"
       }
     }
+
+    return { ok: true }
   }
 
   /* ------------------------------------------------------
@@ -1417,6 +1865,15 @@ const updateRoomSettings = (
         room.roleSelectorSettings ?? defaultRoleSelectorSettings()
       room.roleSelectorSettings = roleSelectorSettings
 
+      if (roleSelectorSettings.scriptMode === "BLOOD_ON_THE_CLOCKTOWER") {
+        if (!room.botcScriptSummary) {
+          socket.emit("startRefused", {
+            reason: "Import a BOCT script first before starting this room.",
+          })
+          return
+        }
+      }
+
       if (room.gameStarted) {
         socket.emit("startRefused", {
           reason: roleSelectorSettings.allowRedeal
@@ -1428,7 +1885,10 @@ const updateRoomSettings = (
 
       resetPlayersForRoleSelectorDeal(room)
 
-      const playerCount = normalizeRoleCountsForRoom(room)
+      const playerCount =
+        roleSelectorSettings.scriptMode === "REGULAR_MAFIA"
+          ? normalizeRoleCountsForRoom(room)
+          : getActivePlayerCount(room)
       if (playerCount <= 0) {
         socket.emit("startRefused", {
           reason: "At least one participant is required to deal roles.",
@@ -1444,7 +1904,16 @@ const updateRoomSettings = (
       room.gameNumber += 1
 
       clearGameplayRoleActions(cleanRoomId)
-      assignRolesForNewGame(room)
+      const roleAssignment = assignRolesForNewGame(room)
+      if (!roleAssignment.ok) {
+        room.roomLocked = false
+        room.gameStarted = false
+        room.gameNumber = Math.max(0, room.gameNumber - 1)
+        socket.emit("startRefused", { reason: roleAssignment.reason })
+        emitRoomState(cleanRoomId)
+        return
+      }
+
       emitPrivateRolesToRoom(cleanRoomId)
       emitRoomState(cleanRoomId)
 
@@ -1610,9 +2079,19 @@ const updateRoomSettings = (
       return
     }
 
-    normalizeRoleCountsForRoom(room)
+    if (roleSelectorSettings.scriptMode === "REGULAR_MAFIA") {
+      normalizeRoleCountsForRoom(room)
+    }
+
     room.gameNumber += 1
-    assignRolesForNewGame(room)
+    const roleAssignment = assignRolesForNewGame(room)
+    if (!roleAssignment.ok) {
+      room.gameNumber = Math.max(1, room.gameNumber - 1)
+      socket.emit("startRefused", { reason: roleAssignment.reason })
+      emitRoomState(cleanRoomId)
+      return
+    }
+
     emitPrivateRolesToRoom(cleanRoomId)
     emitRoomState(cleanRoomId)
   }
@@ -2074,6 +2553,7 @@ const updateRoomSettings = (
     setPlayerStatus,
     updateRoomSettings,
     updateRoleSelectorSettingsLocal,
+    importBotcScriptLocal,
     handleReconnect,
     startGameLocal,
     redealRoleSelectorLocal,

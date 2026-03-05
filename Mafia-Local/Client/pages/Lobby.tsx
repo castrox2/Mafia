@@ -3,8 +3,11 @@ import { socket, clientId } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
 import HostSettingsModal from "../components/HostSettings.js"
 import RoleSelectorSettingsModal from "../components/RoleSelectorSettings.js"
+import RoleCatalogModal from "../components/RoleCatalogModal.js"
+import RoleInfoModal from "../components/RoleInfoModal.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
+  BotcScriptSummaryPayload,
   GameStartedPayload,
   HostParticipationRefusedEvent,
   HostParticipationRefusedPayload,
@@ -17,6 +20,7 @@ import type {
   YourRolePayload,
 } from "../../Shared/events.js"
 import { getPlayerTags, getRoleLabel, getStatusLabel } from "../src/uiMeta.js"
+import { getBotcRoleInfo } from "../src/constants/botcRoleInfo.js"
 
 type Props = {
   roomId: string
@@ -40,11 +44,13 @@ export default function Lobby({
   onEnterGame,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [roleCatalogOpen, setRoleCatalogOpen] = useState(false)
+  const [myRoleInfoOpen, setMyRoleInfoOpen] = useState(false)
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
   const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
   const [hostRoleCounts, setHostRoleCounts] =
-    useState<RoleSelectorHostCountsPayload["counts"] | null>(null)
+    useState<RoleSelectorHostCountsPayload | null>(null)
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
@@ -57,6 +63,20 @@ export default function Lobby({
   const hostParticipates = state?.hostParticipates ?? true
   const allowRoleRedeal = state?.roleSelectorSettings?.allowRedeal ?? false
   const roleSelectorScriptMode = state?.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
+  const missingBotcScript =
+    isRoleSelectorRoom &&
+    roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
+    !state?.botcScriptSummary
+  const myBotcRoleInfo =
+    roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole
+      ? getBotcRoleInfo(String(myRole))
+      : null
+  const myRoleLabel =
+    myRole == null
+      ? null
+      : roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+        ? myBotcRoleInfo?.roleName ?? String(myRole)
+        : getRoleLabel(myRole)
   const amReady = me?.status === "READY"
   const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
@@ -75,6 +95,12 @@ export default function Lobby({
     border: amReady ? "1px solid #d46a6a" : "1px solid #5ea66d",
     background: amReady ? "#fff2f2" : "#f2fff4",
   }
+
+  useEffect(() => {
+    if (roleSelectorScriptMode !== "BLOOD_ON_THE_CLOCKTOWER" || !myRole) {
+      setMyRoleInfoOpen(false)
+    }
+  }, [myRole, roleSelectorScriptMode])
 
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
@@ -153,7 +179,16 @@ export default function Lobby({
 
     const onRoleSelectorHostCounts = (payload: RoleSelectorHostCountsPayload) => {
       if (payload.roomId !== cleanRoomId) return
-      setHostRoleCounts(payload.counts)
+      setHostRoleCounts(payload)
+    }
+
+    const onBotcScriptImported = (
+      payload: RoomIdPayload & { summary: BotcScriptSummaryPayload }
+    ) => {
+      if (payload.roomId !== cleanRoomId) return
+      setStatus(
+        `BOCT script imported: ${payload.summary.name} (${payload.summary.roleCount} roles).`
+      )
     }
 
     socket.on("roomState", onRoomState)
@@ -164,6 +199,7 @@ export default function Lobby({
     socket.on("gameStarted", onGameStarted)
     socket.on("yourRole", onYourRole)
     socket.on("roleSelectorHostCounts", onRoleSelectorHostCounts)
+    socket.on("botcScriptImported", onBotcScriptImported)
     socket.on("kicked", onKicked)
 
     /// If user navigates here directly, make sure we joined
@@ -194,6 +230,7 @@ export default function Lobby({
       socket.off("gameStarted", onGameStarted)
       socket.off("yourRole", onYourRole)
       socket.off("roleSelectorHostCounts", onRoleSelectorHostCounts)
+      socket.off("botcScriptImported", onBotcScriptImported)
       socket.off("kicked", onKicked)
     }
   }, [cleanRoomId, cleanPlayerName, onExit, onEnterGame])
@@ -245,7 +282,7 @@ export default function Lobby({
       >
         <img
           src="/assets/Mafia-Icon.png"
-          alt="Mafia Local logo"
+          alt="Mafia logo"
           style={{ width: 56, height: 56, objectFit: "contain" }}
           onError={(event) => {
             event.currentTarget.style.display = "none"
@@ -264,6 +301,17 @@ export default function Lobby({
             onClick={() => setSettingsOpen(true)}
           >
             {isRoleSelectorRoom ? "Role Selector Settings" : "Host Settings"}
+          </button>
+        </div>
+      )}
+
+      {isRoleSelectorRoom && (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            style={actionButtonStyle}
+            onClick={() => setRoleCatalogOpen(true)}
+          >
+            Available Roles
           </button>
         </div>
       )}
@@ -334,8 +382,16 @@ export default function Lobby({
             <strong>Mode:</strong>{" "}
             {roleSelectorScriptMode === "REGULAR_MAFIA"
               ? "Regular Mafia"
-              : "Blood on the Clocktower (placeholder)"}
+              : "Blood on the Clocktower"}
           </div>
+          {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
+            <div style={{ marginBottom: 4 }}>
+              <strong>Script:</strong>{" "}
+              {state.botcScriptSummary
+                ? `${state.botcScriptSummary.name} (${state.botcScriptSummary.roleCount} roles)`
+                : "Not imported yet"}
+            </div>
+          )}
           <div style={{ marginBottom: 4 }}>
             <strong>Room lock:</strong>{" "}
             {state.roomLocked ? "Locked (started)" : "Open"}
@@ -379,14 +435,26 @@ export default function Lobby({
         <div className="ui-action-row" style={{ marginBottom: 10 }}>
           {isRoleSelectorRoom ? (
             <>
-              {!state?.gameStarted && (
+              {!state?.gameStarted &&
                 <button
-                  style={actionButtonStyle}
+                  style={{
+                    ...actionButtonStyle,
+                    ...(missingBotcScript
+                      ? { opacity: 0.65, cursor: "not-allowed" as const }
+                      : {}),
+                  }}
                   onClick={startRoleSelector}
+                  disabled={missingBotcScript}
+                  title={
+                    missingBotcScript
+                      ? "Import a BOCT script first."
+                      : undefined
+                  }
                 >
-                  Deal Roles & Lock Room
-                </button>
-              )}
+                  {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+                    ? "Deal BOCT Roles & Lock Room"
+                    : "Deal Roles & Lock Room"}
+                </button>}
 
               {state?.gameStarted && allowRoleRedeal && (
                 <button
@@ -457,7 +525,11 @@ export default function Lobby({
         >
           {!state.gameStarted && (
             <div style={{ fontSize: 13, color: "#444" }}>
-              Waiting for host to deal roles.
+              {roleSelectorScriptMode === "REGULAR_MAFIA"
+                ? "Waiting for host to deal roles."
+                : state.botcScriptSummary
+                ? "BOCT script imported. Waiting for host to deal roles."
+                : "Waiting for host to import a BOCT script."}
             </div>
           )}
 
@@ -466,17 +538,48 @@ export default function Lobby({
               <div style={{ marginBottom: 6 }}>
                 <strong>Host view:</strong> role counts only
               </div>
-              <div>
-                Mafia: {hostRoleCounts?.mafia ?? 0} | Doctor: {hostRoleCounts?.doctor ?? 0} | Detective:{" "}
-                {hostRoleCounts?.detective ?? 0} | Sheriff: {hostRoleCounts?.sheriff ?? 0} | Civilian:{" "}
-                {hostRoleCounts?.civilian ?? 0}
-              </div>
+              {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" ? (
+                <div>
+                  Townsfolk: {hostRoleCounts?.botcCounts?.townsfolk ?? 0} | Outsiders:{" "}
+                  {hostRoleCounts?.botcCounts?.outsiders ?? 0} | Minions:{" "}
+                  {hostRoleCounts?.botcCounts?.minions ?? 0} | Demons:{" "}
+                  {hostRoleCounts?.botcCounts?.demons ?? 0} | Other:{" "}
+                  {hostRoleCounts?.botcCounts?.others ?? 0}
+                </div>
+              ) : (
+                <div>
+                  Mafia: {hostRoleCounts?.counts.mafia ?? 0} | Doctor:{" "}
+                  {hostRoleCounts?.counts.doctor ?? 0} | Detective:{" "}
+                  {hostRoleCounts?.counts.detective ?? 0} | Sheriff:{" "}
+                  {hostRoleCounts?.counts.sheriff ?? 0} | Civilian:{" "}
+                  {hostRoleCounts?.counts.civilian ?? 0}
+                </div>
+              )}
             </div>
           )}
 
           {state.gameStarted && !isHost && !amSpectator && (
             <div style={{ fontSize: 14, color: "#222" }}>
-              <strong>Your role:</strong> {myRole ? getRoleLabel(myRole) : "Waiting for assignment..."}
+              <strong>Your role:</strong> {myRoleLabel ?? "Waiting for assignment..."}
+              {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole && (
+                <button
+                  type="button"
+                  onClick={() => setMyRoleInfoOpen(true)}
+                  title="Show role details"
+                  style={{
+                    marginLeft: 8,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    border: "1px solid #bbb",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  ?
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -535,6 +638,14 @@ export default function Lobby({
               open={settingsOpen}
               onClose={() => setSettingsOpen(false)}
               roomState={state}
+              botcScriptSummary={state.botcScriptSummary}
+              onImportBotcScript={({ source, rawJson }) => {
+                socket.emit("importBotcScript", {
+                  roomId: cleanRoomId,
+                  source,
+                  rawJson,
+                })
+              }}
               onSave={({ roleCount, roleSelectorSettings }) => {
                 socket.emit("updateSettings", {
                   roomId: cleanRoomId,
@@ -562,6 +673,31 @@ export default function Lobby({
               }}
             />
           )}
+        </>
+      )}
+
+      {state && isRoleSelectorRoom && (
+        <>
+          <RoleCatalogModal
+            open={roleCatalogOpen}
+            onClose={() => setRoleCatalogOpen(false)}
+            scriptMode={roleSelectorScriptMode}
+            botcScriptSummary={state.botcScriptSummary}
+          />
+
+          <RoleInfoModal
+            open={
+              myRoleInfoOpen &&
+              roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
+              Boolean(myRole)
+            }
+            onClose={() => setMyRoleInfoOpen(false)}
+            roleName={myBotcRoleInfo?.roleName ?? String(myRole ?? "")}
+            description={
+              myBotcRoleInfo?.description ??
+              (myRole ? `No description available yet for "${myRole}".` : "")
+            }
+          />
         </>
       )}
     </div>

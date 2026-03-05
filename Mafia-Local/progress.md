@@ -126,18 +126,18 @@ TODO / next-agent suggestions:
 ---
 
 - New task: align project version metadata with latest patch line.
-- Updated version from `0.7.5` -> `0.8.4` in:
+- Updated version from `0.7.5` -> `0.9.3` in:
   - Root `package.json` + `package-lock.json`
   - `Mafia-Local/Client/package.json` + `package-lock.json`
   - `Mafia-Local/Server/package.json` + `package-lock.json`
   - `Mafia-Local/Electron/package.json` + `package-lock.json`
 - Updated docs release example:
-  - `Mafia-Local/README.md`: `v0.7.5` -> `v0.8.4`.
+  - `Mafia-Local/README.md`: `v0.7.5` -> `v0.9.3`.
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron`.
   - Generated installer artifacts include:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
 
 ---
 
@@ -149,8 +149,8 @@ TODO / next-agent suggestions:
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after config change.
   - Refreshed installer artifacts:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
 
 ---
 
@@ -166,8 +166,8 @@ TODO / next-agent suggestions:
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron`.
   - Installer rebuilt successfully:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
 
 ---
 
@@ -188,8 +188,8 @@ TODO / next-agent suggestions:
 - Packaging/build validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after NSIS include/icon changes.
   - Installer rebuilt successfully:
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe`
-    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.8.4.exe.blockmap`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.3.exe.blockmap`
   - Silent install check confirmed desktop shortcut now carries explicit custom icon location:
     - `C:\Users\User\AppData\Local\Programs\electron\resources\Mafia-Icon.ico,0`
 
@@ -233,45 +233,85 @@ TODO / next-agent suggestions:
     - `Mafia-Local/Client/src/styles/phases/gameover.css`
 - Build/package validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after scaffolding changes.
+
 ---
 
-- New task: apply provided CSS direction to Join screen and make it match desktop/mobile references.
-- Implemented Join page redesign (`Client/pages/Join.tsx` + `Client/src/styles/pages/join.css`):
-  - Added dedicated visual layout with:
-    - top brand row
-    - centered hero title/subtitle
-    - dark bordered card for join/create actions
-    - room/name inputs
-    - Join button, OR divider, gradient Create button
-    - min-players helper line
-    - Role Selector action preserved as separate button
-    - footer + status text styling
-  - Kept existing join/create room logic intact.
-- Wired page CSS directly from Join component:
-  - `import "../src/styles/pages/join.css"`
+- New task: add first-launch main menu split between Play Game and Role Assigner, with back navigation between both entry flows.
+- Full project scan performed before implementation (Client routing/pages, shared events, server room typing, Electron packaging setup).
+- Added `Client/pages/MainMenu.tsx`:
+  - First-launch screen with two options:
+    - `Play Game`
+    - `Role Assigner`
+- Updated `Client/src/App.tsx`:
+  - Added app screen state `MENU` and entry mode tracking (`PLAY_GAME` / `ROLE_ASSIGNER`).
+  - New flow:
+    - `MENU -> JOIN(mode) -> LOBBY -> GAME`
+  - Exit now returns to `MENU` so users can switch between paths.
+- Updated `Client/pages/Join.tsx`:
+  - Added `mode` + `onBackToMenu` props.
+  - Mode-specific behavior:
+    - `PLAY_GAME`: `Create Room` + `Join Room`
+    - `ROLE_ASSIGNER`: `Create Role Assigner Room` (role selector room type) + `Join Room`
+  - Added `Back to Menu` button on join screen.
+- Validation:
+  - Ran `npm --prefix Mafia-Local/Electron run dist` successfully.
+  - Client build, server TypeScript build, and installer packaging all passed.
+
+TODO / next-agent suggestions:
+- If desired, add a `Back to Menu` affordance directly inside Lobby/Game (currently users can leave room, then return to menu via app flow).
+- If desired, split join copy/placeholders slightly further between modes (e.g., join button text for role assigner mode).
+
+---
+
+- New task: fix Role Assigner linking so it consistently creates/joins role-assignment rooms.
+- Root issue addressed:
+  - Join flow did not enforce room-mode compatibility.
+  - Role Assigner and Play Game could join each other's room types with no guard.
+- Implemented room-type-safe linking:
+  - `Shared/events.ts`:
+    - `JoinRoomPayload` now includes optional `expectedRoomType`.
+  - `Client/pages/Join.tsx`:
+    - Create action now always sends explicit room type by mode:
+      - `PLAY_GAME` -> `CLASSIC`
+      - `ROLE_ASSIGNER` -> `ROLE_SELECTOR`
+    - Join action now sends `expectedRoomType` based on selected entry mode.
+  - `Server/index.ts`:
+    - Passes `expectedRoomType` from socket `joinRoom` payload into room manager.
+  - `Server/rooms.ts`:
+    - `joinRoomLocal` now validates expected mode against actual room type and rejects mismatches with `roomInvalid` reason.
 - Validation:
   - `Client`: `npm run build` passes.
+  - `Server`: `npm run build` passes.
   - Playwright skill script run and screenshot reviewed:
-    - `output/web-game/shot-0.png` (desktop join layout)
-  - Additional mobile viewport screenshot reviewed:
-    - `output/web-game/join-mobile.png` (375x667)
-
+    - `output/web-game/shot-0.png` shows Role Assigner join screen after menu navigation.
 ---
 
-- New task: make Join page full-screen on desktop/mobile and replace placeholder/shield-style icon usage with project logo.
-- Updated Join layout behavior to full-bleed:
-  - `Client/src/styles/global.css`: added `.ui-app-shell--join` override (no outer padding, stretch layout, dark background).
-  - `Client/src/styles/pages/join.css`: Join page now spans full viewport (`100dvh`) with safe-area padding (`env(safe-area-inset-*)`), while content remains centered with max width.
-- Updated mobile viewport handling:
-  - `Client/index.html`: viewport now includes `viewport-fit=cover` to avoid top inset gaps.
-- Updated icon usage in Join screen:
-  - `Client/pages/Join.tsx`: replaced malformed placeholder icon in Join button with `/assets/Mafia-Icon.png` image.
-  - `Client/pages/Join.tsx`: cleaned footer text encoding artifact to `(c)`.
+- New task: installed app showed `Cannot GET /` on launch.
+- Root cause addressed:
+  - In packaged mode, backend sometimes launched without a resolved client dist directory, so Express had no route/static handler for `/`.
+- Implemented packaged routing hardening:
+  - `Electron/main.js`:
+    - Added packaged client dist resolver (`getPackagedClientDistPath`).
+    - When packaged, now sets `process.env.MAFIA_CLIENT_DIST_DIR` before importing server entry.
+  - `Server/index.ts`:
+    - Added `CLIENT_INDEX_PATH` derivation.
+    - Added explicit fallback routes for `/` and non-API deep links to serve client `index.html` when available.
 - Validation:
   - `Client`: `npm run build` passes.
-  - Playwright skill script executed:
-    - `node C:/Users/User/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js --url http://127.0.0.1:5173 --click 100,100 --click-selector button --iterations 1 --pause-ms 250`
-    - Reviewed `output/web-game/shot-0.png` (full-bleed desktop render confirmed).
-  - Additional mobile screenshot check:
-    - `output/web-game/join-mobile-after.png` (375x667) confirms no top white strip.
-  - `Electron`: `npm run dist` passes and refreshed installer artifacts for current package version (`0.8.4`).
+  - `Server`: `npm run build` passes.
+  - `Electron`: `npm run dist` passes; installer artifacts refreshed for `0.9.3`.
+---
+
+- New task: `Cannot GET /` persisted after install.
+- Root cause found:
+  - Packaged app had stale `Server/dist/index.js` plus current `Server/dist/Server/index.js`.
+  - Electron startup path preferred stale `Server/dist/index.js`, so latest server routing fixes were bypassed.
+- Implemented fix:
+  - `Electron/main.js`: `getServerEntryPath` now prioritizes `Server/dist/Server/index.js` across packaged path candidates.
+  - `Server/package.json`: build now clears `dist` before TypeScript compile, preventing stale duplicate entry files.
+- Validation:
+  - `npm run build` in `Mafia-Local/Server` passes.
+  - `Server/dist` now only contains `Server/` and `Shared/` (no stale top-level `index.js`).
+  - `npm run dist` in `Mafia-Local/Electron` passes.
+  - Asar check confirms `\Server\dist\Server\index.js` exists and stale `\Server\dist\index.js` is absent.
+  - Runtime smoke (`node` import of `Server/dist/Server/index.js` with `MAFIA_CLIENT_DIST_DIR`) returns HTTP 200 for `/`.
