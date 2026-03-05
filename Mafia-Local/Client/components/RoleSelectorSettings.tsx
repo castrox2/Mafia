@@ -56,7 +56,6 @@ export default function RoleSelectorSettingsModal({
 
   const roleBounds = roomState.roleBounds
   const activePlayerCount = roomState.players.filter((player) => !player.isSpectator).length
-  const persistedScriptMode = roomState.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
 
   const regularAvailableRoles = [
     getRoleLabel("CIVILIAN"),
@@ -97,16 +96,16 @@ export default function RoleSelectorSettingsModal({
       return
     }
 
-    if (persistedScriptMode !== "BLOOD_ON_THE_CLOCKTOWER") {
-      setImportHint("Save settings with BOCT mode first, then import.")
+    if (scriptMode !== "BLOOD_ON_THE_CLOCKTOWER") {
+      setImportHint("Switch room mode to Blood on the Clocktower before importing.")
       return
     }
 
     onImportBotcScript({ source, rawJson: nextRaw })
     setImportHint(
       source === "UPLOAD"
-        ? "Upload import request sent."
-        : "Paste import request sent."
+        ? "Upload import request sent. If refused, save settings and retry."
+        : "Paste import request sent. If refused, save settings and retry."
     )
   }
 

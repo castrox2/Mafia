@@ -432,3 +432,24 @@ TODO / next-agent suggestions:
   - `Client`: `npm run build` passes.
   - Visual check screenshot: `output/web-game/role-catalog-dark.png`.
   - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).
+
+---
+
+- New task: re-check BOCT import regression after merge/runtime confusion.
+- Investigation findings:
+  - Server BOCT import handlers are wired and functional (`updateRoleSelectorSettings` + `importBotcScript`).
+  - End-to-end socket integration check confirms successful flow:
+    - create ROLE_SELECTOR room
+    - switch scriptMode to `BLOOD_ON_THE_CLOCKTOWER`
+    - import JSON
+    - receive `botcScriptImported`
+- UX fix implemented for import gating:
+  - `Client/components/RoleSelectorSettings.tsx`
+    - Import validation now uses the currently selected modal mode (`scriptMode`) instead of only persisted room mode.
+    - This prevents false client-side blocking when host selected BOCT but room-state sync is slightly behind.
+    - Import hint text updated to explain retry path (`save settings and retry`) if server refuses.
+- Validation:
+  - `npm --prefix Mafia-Local/Client run build` passes.
+  - `npm --prefix Mafia-Local/Server run build` passes.
+  - `npm --prefix Mafia-Local/Electron run build` passes.
+  - Socket integration check passes: `botcScriptImported` emitted with script summary.
