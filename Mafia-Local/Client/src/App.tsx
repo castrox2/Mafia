@@ -43,16 +43,18 @@ export default function App() {
   ------------------------------------------------------ */
   if (!roomId || !playerName || screen === "JOIN") {
     return (
-      <Join
-        onEnterLobby={(newRoomId, name, joinUrl, qrDataUrl) => {
-          setRoomId(newRoomId)
-          setPlayerName(name)
-          setJoinUrl(joinUrl)
-          setQrDataUrl(qrDataUrl)
+      <div className="ui-app-shell ui-app-shell--join">
+        <Join
+          onEnterLobby={(newRoomId, name, joinUrl, qrDataUrl) => {
+            setRoomId(newRoomId)
+            setPlayerName(name)
+            setJoinUrl(joinUrl)
+            setQrDataUrl(qrDataUrl)
 
-          setScreen("LOBBY")
-        }}
-      />
+            setScreen("LOBBY")
+          }}
+        />
+      </div>
     )
   }
 
@@ -63,12 +65,14 @@ export default function App() {
   ------------------------------------------------------ */
   if (screen === "GAME") {
     return (
-      <Game
-        roomId={roomId}
-        playerName={playerName}
-        onExit={onExit}
-        onBackToLobby={() => setScreen("LOBBY")}
-      />
+      <div className="ui-app-shell">
+        <Game
+          roomId={roomId}
+          playerName={playerName}
+          onExit={onExit}
+          onBackToLobby={() => setScreen("LOBBY")}
+        />
+      </div>
     )
   }
 
@@ -76,13 +80,15 @@ export default function App() {
         LOBBY screen (default once in a room)
   ------------------------------------------------------ */
   return (
-    <Lobby
-      roomId={roomId}
-      playerName={playerName}
-      joinUrl={joinUrl}
-      qrDataUrl={qrDataUrl}
-      onExit={onExit}
-      onEnterGame={() => setScreen("GAME")}
-    />
+    <div className="ui-app-shell">
+      <Lobby
+        roomId={roomId}
+        playerName={playerName}
+        joinUrl={joinUrl}
+        qrDataUrl={qrDataUrl}
+        onExit={onExit}
+        onEnterGame={() => setScreen("GAME")}
+      />
+    </div>
   )
 }

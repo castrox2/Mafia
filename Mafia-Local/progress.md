@@ -233,3 +233,45 @@ TODO / next-agent suggestions:
     - `Mafia-Local/Client/src/styles/phases/gameover.css`
 - Build/package validation:
   - Ran `npm run dist` in `Mafia-Local/Electron` after scaffolding changes.
+---
+
+- New task: apply provided CSS direction to Join screen and make it match desktop/mobile references.
+- Implemented Join page redesign (`Client/pages/Join.tsx` + `Client/src/styles/pages/join.css`):
+  - Added dedicated visual layout with:
+    - top brand row
+    - centered hero title/subtitle
+    - dark bordered card for join/create actions
+    - room/name inputs
+    - Join button, OR divider, gradient Create button
+    - min-players helper line
+    - Role Selector action preserved as separate button
+    - footer + status text styling
+  - Kept existing join/create room logic intact.
+- Wired page CSS directly from Join component:
+  - `import "../src/styles/pages/join.css"`
+- Validation:
+  - `Client`: `npm run build` passes.
+  - Playwright skill script run and screenshot reviewed:
+    - `output/web-game/shot-0.png` (desktop join layout)
+  - Additional mobile viewport screenshot reviewed:
+    - `output/web-game/join-mobile.png` (375x667)
+
+---
+
+- New task: make Join page full-screen on desktop/mobile and replace placeholder/shield-style icon usage with project logo.
+- Updated Join layout behavior to full-bleed:
+  - `Client/src/styles/global.css`: added `.ui-app-shell--join` override (no outer padding, stretch layout, dark background).
+  - `Client/src/styles/pages/join.css`: Join page now spans full viewport (`100dvh`) with safe-area padding (`env(safe-area-inset-*)`), while content remains centered with max width.
+- Updated mobile viewport handling:
+  - `Client/index.html`: viewport now includes `viewport-fit=cover` to avoid top inset gaps.
+- Updated icon usage in Join screen:
+  - `Client/pages/Join.tsx`: replaced malformed placeholder icon in Join button with `/assets/Mafia-Icon.png` image.
+  - `Client/pages/Join.tsx`: cleaned footer text encoding artifact to `(c)`.
+- Validation:
+  - `Client`: `npm run build` passes.
+  - Playwright skill script executed:
+    - `node C:/Users/User/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js --url http://127.0.0.1:5173 --click 100,100 --click-selector button --iterations 1 --pause-ms 250`
+    - Reviewed `output/web-game/shot-0.png` (full-bleed desktop render confirmed).
+  - Additional mobile screenshot check:
+    - `output/web-game/join-mobile-after.png` (375x667) confirms no top white strip.
+  - `Electron`: `npm run dist` passes and refreshed installer artifacts for current package version (`0.8.4`).

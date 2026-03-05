@@ -239,8 +239,10 @@ export default function Lobby({
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 700, fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+    <div className="ui-screen" style={{ maxWidth: 860 }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}
+      >
         <img
           src="/assets/Mafia-Icon.png"
           alt="Mafia Local logo"
@@ -359,7 +361,7 @@ export default function Lobby({
           <img
             src={qrDataUrl}
             alt="Room QR Code"
-            style={{ width: 220, height: 220 }}
+            style={{ width: "min(220px, 100%)", height: "auto" }}
           />
 
           {joinUrl && (
@@ -374,7 +376,7 @@ export default function Lobby({
       )}
 
       {isHost && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+        <div className="ui-action-row" style={{ marginBottom: 10 }}>
           {isRoleSelectorRoom ? (
             <>
               {!state?.gameStarted && (
@@ -418,7 +420,7 @@ export default function Lobby({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+      <div className="ui-action-row" style={{ marginBottom: 10 }}>
         {!amSpectator && !isRoleSelectorRoom && (
           <button
             style={readyToggleButtonStyle}
@@ -480,7 +482,7 @@ export default function Lobby({
         </div>
       )}
 
-      <div style={{ fontWeight: 700, whiteSpace: "pre-wrap", marginBottom: 12 }}>
+      <div className="ui-status-text" style={{ marginBottom: 12 }}>
         {status}
       </div>
 

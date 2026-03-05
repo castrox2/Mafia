@@ -41,7 +41,7 @@ body,
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
@@ -49,6 +49,10 @@ body {
   color: var(--ui-color-text);
   background: var(--ui-color-bg);
   line-height: 1.45;
+}
+
+#root {
+  min-height: 100dvh;
 }
 
 img {
@@ -61,6 +65,13 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+input,
+select,
+textarea {
+  /* Keep iOS from zooming focused fields */
+  font-size: 16px;
 }
 
 button {
@@ -96,5 +107,76 @@ a {
 
 .ui-text-muted {
   color: var(--ui-color-text-muted);
+}
+
+.ui-app-shell {
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(8px, 2vw, 16px);
+}
+
+.ui-app-shell--join {
+  padding: 0;
+  align-items: stretch;
+  background: #06060b;
+}
+
+.ui-screen {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: clamp(12px, 2.8vw, 24px);
+}
+
+.ui-screen--narrow {
+  width: min(100%, 640px);
+}
+
+.ui-row-wrap {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ui-row-wrap > * {
+  min-width: 0;
+}
+
+.ui-mobile-full {
+  flex: 1 1 220px;
+}
+
+.ui-mobile-fixed {
+  flex: 1 1 180px;
+}
+
+.ui-action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ui-status-text {
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .ui-app-shell {
+    padding: 0;
+  }
+
+  .ui-screen {
+    padding: 16px;
+  }
+
+  .ui-mobile-full,
+  .ui-mobile-fixed,
+  .ui-action-row > * {
+    flex: 1 1 100%;
+  }
 }
 

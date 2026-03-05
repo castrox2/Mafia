@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react"
 import { socket } from "../src/socket.js"
 import type { RoomState } from "../src/types.js"
+import "../src/styles/pages/join.css"
 import {
   ROOM_CODE_LENGTH,
   ROOM_CODE_REGEX,
@@ -145,53 +146,101 @@ export default function Join({ onEnterLobby }: Props) {
     }
 
     return (
-        <div style={{ padding: 20, maxWidth: 560, fontFamily: "sans-serif" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+      <div className="join-page">
+        <header className="join-topbar">
+          <div className="join-brand">
             <img
-            src="/assets/Mafia-Icon.png"
-            alt="Mafia Local logo"
-            style={{ width: 72, height: 72, objectFit: "contain" }}
-            onError={(event) => {
+              src="/assets/Mafia-Icon.png"
+              alt="Mafia logo"
+              className="join-brand-logo"
+              onError={(event) => {
                 event.currentTarget.style.display = "none"
-            }}
+              }}
             />
-            <div>
-            <h1 style={{ marginBottom: 8, marginTop: 0 }}>Mafia Local - Join</h1>
-            <p style={{ marginTop: 0 }}>Create a room or join an existing room!</p>
+            <span className="join-brand-name">MafiaGame</span>
+          </div>
+          <div className="join-top-actions">
+            <button type="button" className="join-top-action">Login</button>
+            <button type="button" className="join-top-action join-top-action-signup">
+              Sign up
+            </button>
+          </div>
+        </header>
+
+        <main className="join-main">
+          <h1 className="join-title">Mafia</h1>
+          <p className="join-subtitle">The classic party game, now online!</p>
+
+          <section className="join-card">
+            <h2 className="join-card-title">Join or Create a Game</h2>
+            <p className="join-card-copy">
+              Enter a room code to join an existing game or create your own
+            </p>
+
+            <input
+              className="join-input"
+              placeholder="ENTER YOUR NAME"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+
+            <input
+              className="join-input"
+              placeholder="ENTER ROOM CODE (E.G., A2B4C)"
+              value={room}
+              onChange={(e) =>
+                setRoom(normalizeRoomId(e.target.value).slice(0, ROOM_CODE_LENGTH))
+              }
+              maxLength={ROOM_CODE_LENGTH}
+            />
+
+            <button
+              type="button"
+              className="join-button join-button-secondary"
+              disabled={!validRoomCode || !validName}
+              onClick={joinRoom}
+            >
+              <img
+                src="/assets/Mafia-Icon.png"
+                alt=""
+                className="join-button-icon"
+                aria-hidden="true"
+                onError={(event) => {
+                  event.currentTarget.style.display = "none"
+                }}
+              />
+              <span>Join Room</span>
+            </button>
+
+            <div className="join-divider" aria-hidden="true">
+              <span>OR</span>
             </div>
-        </div>
 
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-            <input
-            style={{ flex: 1, padding: 10, fontSize: 16 }}
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            />
-            <input
-            style={{ width: 160, padding: 10, fontSize: 16 }}
-            placeholder="Room code"
-            value={room}
-            onChange={(e) =>
-              setRoom(normalizeRoomId(e.target.value).slice(0, ROOM_CODE_LENGTH))
-            }
-            maxLength={ROOM_CODE_LENGTH}
-            />
-        </div>
+            <button
+              type="button"
+              className="join-button join-button-primary"
+              onClick={createRoom}
+            >
+              Create New Room
+            </button>
 
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-            <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoom}>
-            Create Room
-            </button>
-            <button style={{ padding: "10px 12px", fontSize: 16 }} onClick={createRoleSelectorRoom}>
-            Role Selector
-            </button>
-            <button style={{ padding: "10px 12px", fontSize: 16 }} disabled={!validRoomCode || !validName} onClick={joinRoom}>
-            Join Room
-            </button>
-        </div>
+            <p className="join-minimum">Minimum 4 players required to start a game</p>
 
-        <div style={{ fontWeight: 700, whiteSpace: "pre-wrap" }}>{status}</div>
-        </div>
+            <button
+              type="button"
+              className="join-role-selector"
+              onClick={createRoleSelectorRoom}
+            >
+              Create Role Selector Room
+            </button>
+          </section>
+
+          {status ? <div className="join-status">{status}</div> : null}
+        </main>
+
+        <footer className="join-footer">
+          (c) {new Date().getFullYear()} MafiaGame. All rights reserved.
+        </footer>
+      </div>
     )
 }

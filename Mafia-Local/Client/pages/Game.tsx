@@ -429,8 +429,8 @@ useEffect(() => {
 
 
     return (
-    <div style={{ padding: 20, maxWidth: 900, fontFamily: "sans-serif" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+    <div className="ui-screen" style={{ maxWidth: 980 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
             <img
             src="/assets/Mafia-Icon.png"
             alt="Mafia Local logo"
@@ -505,7 +505,7 @@ useEffect(() => {
         )}
 
       {/* Minimal actions (no flashy UI) */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <div className="ui-action-row" style={{ marginBottom: 16 }}>
         {isGameOverPhase ? (
           <>
             <button style={leaveButtonStyle} onClick={leaveRoom}>
