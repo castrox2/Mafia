@@ -414,3 +414,21 @@ TODO / next-agent suggestions:
     - `output/web-game/lobby-kick-spacing.png` (status + kick spacing verified)
     - `output/web-game/lobby-settings-modal.png` (settings dark theme verified)
   - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).
+
+---
+
+- New task: restyle Role Assigner "Available Roles" modal to match project dark theme and improve readability.
+- Added `Client/src/styles/components/role-catalog-modal.css`:
+  - Dark themed overlay/panels, readable typography, grouped list spacing, accessible contrast.
+  - Includes styles for both Role Catalog modal and Role Info modal.
+- Updated `Client/components/RoleCatalogModal.tsx`:
+  - Removed inline white styles.
+  - Switched to class-based dark modal layout and role list/button styling.
+- Updated `Client/components/RoleInfoModal.tsx`:
+  - Removed inline white styles.
+  - Switched to class-based dark modal layout to match Role Catalog and overall app theme.
+- Validation:
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npm run build` passes.
+  - Visual check screenshot: `output/web-game/role-catalog-dark.png`.
+  - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).

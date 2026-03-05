@@ -3,6 +3,7 @@ import type { BotcScriptSummaryPayload, RoleSelectorScriptMode } from "../../Sha
 import { getRoleLabel } from "../src/uiMeta.js"
 import { getBotcRoleInfo } from "../src/constants/botcRoleInfo.js"
 import RoleInfoModal from "./RoleInfoModal.js"
+import "../src/styles/components/role-catalog-modal.css"
 
 type Props = {
   open: boolean
@@ -83,56 +84,26 @@ export default function RoleCatalogModal({
   return (
     <>
       <div
+        className="role-catalog-overlay"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) closeCatalog()
         }}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.45)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 16,
-          zIndex: 10000,
-        }}
       >
-        <div
-          style={{
-            width: "min(760px, 100%)",
-            maxHeight: "80vh",
-            overflowY: "auto",
-            background: "white",
-            borderRadius: 12,
-            padding: 16,
-            boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
-            position: "relative",
-          }}
-        >
+        <div className="role-catalog-panel">
           <button
             onClick={closeCatalog}
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              background: "white",
-              cursor: "pointer",
-              fontSize: 16,
-            }}
+            className="role-catalog-close"
             aria-label="Close role catalog"
             title="Close"
+            type="button"
           >
             X
           </button>
 
-          <h2 style={{ marginTop: 0, marginBottom: 4 }}>Available Roles</h2>
+          <h2 className="role-catalog-title">Available Roles</h2>
 
           {scriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
-            <div style={{ marginBottom: 10, fontSize: 13, color: "#444" }}>
+            <div className="role-catalog-subtitle">
               Script:{" "}
               {botcScriptSummary
                 ? `${botcScriptSummary.name} (${botcScriptSummary.roleCount} roles)`
@@ -141,36 +112,28 @@ export default function RoleCatalogModal({
           )}
 
           {scriptMode === "REGULAR_MAFIA" ? (
-            <section style={{ border: "1px solid #e7e7e7", borderRadius: 10, padding: 10 }}>
-              <h3 style={{ margin: "0 0 8px 0" }}>Available</h3>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <section className="role-catalog-section">
+              <h3 className="role-catalog-section-title">Available</h3>
+              <ul className="role-catalog-list">
                 {REGULAR_MAFIA_ROLES.map((role) => (
-                  <li key={`available:${role}`}>{role}</li>
+                  <li key={`available:${role}`} className="role-catalog-list-item">
+                    {role}
+                  </li>
                 ))}
               </ul>
             </section>
           ) : groups.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="role-catalog-grid">
               {groups.map((section) => (
-                <section
-                  key={section.key}
-                  style={{ border: "1px solid #e7e7e7", borderRadius: 10, padding: 10 }}
-                >
-                  <h3 style={{ margin: "0 0 8px 0" }}>{section.title}</h3>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <section key={section.key} className="role-catalog-section">
+                  <h3 className="role-catalog-section-title">{section.title}</h3>
+                  <ul className="role-catalog-list">
                     {section.roles.map((role) => (
-                      <li key={`${section.key}:${role}`}>
+                      <li key={`${section.key}:${role}`} className="role-catalog-list-item">
                         <button
                           type="button"
                           onClick={() => openRoleInfo(role)}
-                          style={{
-                            border: "none",
-                            background: "transparent",
-                            color: "#0b5ea8",
-                            cursor: "pointer",
-                            padding: 0,
-                            textDecoration: "underline",
-                          }}
+                          className="role-catalog-role-button"
                         >
                           {getRoleDisplayName(role)}
                         </button>
@@ -181,7 +144,7 @@ export default function RoleCatalogModal({
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: "#666" }}>
+            <div className="role-catalog-empty">
               {scriptMode === "BLOOD_ON_THE_CLOCKTOWER"
                 ? "Import a BOCT script to view grouped roles."
                 : "No roles available."}
