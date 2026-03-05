@@ -21,6 +21,7 @@ import type {
 } from "../../Shared/events.js"
 import { getPlayerTags, getRoleLabel, getStatusLabel } from "../src/uiMeta.js"
 import { getBotcRoleInfo } from "../src/constants/botcRoleInfo.js"
+import "../src/styles/pages/lobby.css"
 
 type Props = {
   roomId: string
@@ -29,10 +30,28 @@ type Props = {
   qrDataUrl: string
   onExit: () => void
 
-  // IMPORTANT:
   // App controls which screen is shown.
   // Lobby notifies App when the game starts.
   onEnterGame: () => void
+}
+
+const shortPlayerId = (id: string): string => {
+  const clean = String(id || "").trim()
+  if (!clean) return "unknown"
+  if (clean === clientId) return "you"
+  return clean.slice(0, 8)
+}
+
+const initialForName = (name: string): string => {
+  const clean = String(name || "").trim()
+  return clean ? clean.charAt(0).toUpperCase() : "?"
+}
+
+const statusClassName = (status: string): string => {
+  if (status === "READY") return "is-ready"
+  if (status === "NOT READY") return "is-not-ready"
+  if (status === "DISCONNECTED") return "is-disconnected"
+  return "is-neutral"
 }
 
 export default function Lobby({
@@ -59,6 +78,8 @@ export default function Lobby({
   const isRoleSelectorRoom = roomType === "ROLE_SELECTOR"
   const isHost = state?.hostId === clientId
   const me = state?.players?.find((p) => p.clientId === clientId) ?? null
+  const players = state?.players ?? []
+
   const amSpectator = me?.isSpectator === true
   const hostParticipates = state?.hostParticipates ?? true
   const allowRoleRedeal = state?.roleSelectorSettings?.allowRedeal ?? false
@@ -67,34 +88,25 @@ export default function Lobby({
     isRoleSelectorRoom &&
     roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" &&
     !state?.botcScriptSummary
+
   const myBotcRoleInfo =
     roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole
       ? getBotcRoleInfo(String(myRole))
       : null
+
   const myRoleLabel =
     myRole == null
       ? null
       : roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
         ? myBotcRoleInfo?.roleName ?? String(myRole)
         : getRoleLabel(myRole)
+
   const amReady = me?.status === "READY"
-  const activePlayers = (state?.players ?? []).filter((p) => !p.isSpectator)
+  const activePlayers = players.filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
 
-  const actionButtonStyle: React.CSSProperties = {
-    padding: "10px 12px",
-    fontSize: 16,
-    borderRadius: 8,
-    border: "1px solid #bdbdbd",
-    background: "#fff",
-    cursor: "pointer",
-  }
-
-  const readyToggleButtonStyle: React.CSSProperties = {
-    ...actionButtonStyle,
-    border: amReady ? "1px solid #d46a6a" : "1px solid #5ea66d",
-    background: amReady ? "#fff2f2" : "#f2fff4",
-  }
+  const lobbyTitle = isRoleSelectorRoom ? "Role Selector Lobby" : "Lobby"
+  const joinLink = joinUrl || `${window.location.origin}/?room=${cleanRoomId}`
 
   useEffect(() => {
     if (roleSelectorScriptMode !== "BLOOD_ON_THE_CLOCKTOWER" || !myRole) {
@@ -105,7 +117,7 @@ export default function Lobby({
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
       setState(s)
-      setStatus(`In room: ${s.roomId}${clientId === s.hostId ? " (Host) " : ""}`)
+      setStatus(`In room: ${s.roomId}${clientId === s.hostId ? " (Host)" : ""}`)
 
       const currentPlayer = s.players.find((p) => p.clientId === clientId) ?? null
 
@@ -129,7 +141,6 @@ export default function Lobby({
       setMyRole(null)
       setHostRoleCounts(null)
 
-      // Classic room flow: go to Game screen after game starts.
       if (s.gameStarted) {
         onEnterGame()
       }
@@ -202,10 +213,6 @@ export default function Lobby({
     socket.on("botcScriptImported", onBotcScriptImported)
     socket.on("kicked", onKicked)
 
-    /// If user navigates here directly, make sure we joined
-    // IMPORTANT (reconnect-safe):
-    // When resuming after refresh, the server may have already reattached this client.
-    // In that case, skip this one-time auto-join to avoid duplicate player entries.
     const skipAutoJoin =
       window.sessionStorage.getItem("mafia_skip_lobby_autojoin") === "1"
     if (skipAutoJoin) {
@@ -261,10 +268,53 @@ export default function Lobby({
       roomId: cleanRoomId,
       participates: nextParticipates,
     }
+
     const emitSetHostParticipation: SetHostParticipationEvent = (nextPayload) => {
       socket.emit("setHostParticipation", nextPayload)
     }
+
     emitSetHostParticipation(payload)
+  }
+
+  const copyRoomCode = async () => {
+    try {
+      await navigator.clipboard.writeText(cleanRoomId)
+      setStatus(`Room code copied: ${cleanRoomId}`)
+    } catch (_err) {
+      setStatus("Could not copy room code in this environment.")
+    }
+  }
+
+  const shareRoom = async () => {
+    const shareText = `Join my Mafia room (${cleanRoomId})`
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "Mafia",
+          text: shareText,
+          url: joinLink,
+        })
+        return
+      } catch (_err) {
+        // User canceled or share failed; fall through to clipboard copy.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(joinLink)
+      setStatus("Invite link copied.")
+    } catch (_err) {
+      setStatus("Could not share or copy invite link.")
+    }
+  }
+
+  const startClassicGame = () => {
+    socket.emit("startGame", { roomId: cleanRoomId })
+  }
+
+  const forceStartClassicGame = () => {
+    socket.emit("forceStartGame", { roomId: cleanRoomId })
   }
 
   const startRoleSelector = () => {
@@ -276,361 +326,343 @@ export default function Lobby({
   }
 
   return (
-    <div className="ui-screen" style={{ maxWidth: 860 }}>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}
-      >
-        <img
-          src="/assets/Mafia-Icon.png"
-          alt="Mafia logo"
-          style={{ width: 56, height: 56, objectFit: "contain" }}
-          onError={(event) => {
-            event.currentTarget.style.display = "none"
-          }}
-        />
-        <h1 style={{ marginBottom: 0, marginTop: 0 }}>
-          {isRoleSelectorRoom ? "Role Selector Lobby" : "Lobby"}
-        </h1>
-      </div>
-
-      {/* Host settings modal */}
-      {clientId === state?.hostId && (
-        <div>
-          <button
-            style={{ ...actionButtonStyle, marginBottom: 12 }}
-            onClick={() => setSettingsOpen(true)}
-          >
-            {isRoleSelectorRoom ? "Role Selector Settings" : "Host Settings"}
-          </button>
-        </div>
-      )}
-
-      {isRoleSelectorRoom && (
-        <div style={{ marginBottom: 12 }}>
-          <button
-            style={actionButtonStyle}
-            onClick={() => setRoleCatalogOpen(true)}
-          >
-            Available Roles
-          </button>
-        </div>
-      )}
-
-      <div style={{ marginBottom: 10 }}>
-        <div>
-          <strong>Room:</strong> {cleanRoomId}
-        </div>
-        <div>
-          <strong>You:</strong> {cleanPlayerName}
-          {me
-            ? ` ${getPlayerTags(me, {
-                hostId: state?.hostId ?? "",
-                viewerClientId: clientId,
-              })
-                .filter((tag) => tag.key !== "YOU")
-                .map((tag) => `(${tag.label})`)
-                .join(" ")}`
-            : ""}
-        </div>
-      </div>
-
-      {isHost && (
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={hostParticipates}
-              disabled={state?.gameStarted === true}
-              onChange={(event) => toggleHostParticipation(event.target.checked)}
-            />
-            Host participates as a player
-          </label>
-          {state?.gameStarted && (
-            <div style={{ marginTop: 4, fontSize: 12, color: "#666" }}>
-              Host participation can only be changed before the game starts.
-            </div>
-          )}
-        </div>
-      )}
-
-      {state?.settings && !isRoleSelectorRoom && (
-        <div style={{ marginBottom: 12, fontSize: 12, color: "#444" }}>
-          <div>
-            <strong>Settings (server):</strong>
-          </div>
-          <div>
-            roles: mafia {state.settings.roleCount.mafia}, doctor{" "}
-            {state.settings.roleCount.doctor}, detective{" "}
-            {state.settings.roleCount.detective}, sheriff{" "}
-            {state.settings.roleCount.sheriff}
-          </div>
-        </div>
-      )}
-
-      {state && isRoleSelectorRoom && (
-        <div
-          style={{
-            marginBottom: 12,
-            border: "1px solid #e7e7e7",
-            borderRadius: 10,
-            padding: 10,
-            fontSize: 13,
-            color: "#333",
-          }}
-        >
-          <div style={{ marginBottom: 4 }}>
-            <strong>Mode:</strong>{" "}
-            {roleSelectorScriptMode === "REGULAR_MAFIA"
-              ? "Regular Mafia"
-              : "Blood on the Clocktower"}
-          </div>
-          {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
-            <div style={{ marginBottom: 4 }}>
-              <strong>Script:</strong>{" "}
-              {state.botcScriptSummary
-                ? `${state.botcScriptSummary.name} (${state.botcScriptSummary.roleCount} roles)`
-                : "Not imported yet"}
-            </div>
-          )}
-          <div style={{ marginBottom: 4 }}>
-            <strong>Room lock:</strong>{" "}
-            {state.roomLocked ? "Locked (started)" : "Open"}
-          </div>
-          <div style={{ marginBottom: 4 }}>
-            <strong>Redeal:</strong> {allowRoleRedeal ? "Enabled" : "Disabled"}
-          </div>
-          <div>
-            <strong>Configured roles:</strong> mafia {state.settings.roleCount.mafia}, doctor{" "}
-            {state.settings.roleCount.doctor}, detective {state.settings.roleCount.detective}, sheriff{" "}
-            {state.settings.roleCount.sheriff}
-          </div>
-        </div>
-      )}
-
-      {/* QR code for joining (handy for local play) */}
-      {qrDataUrl && state?.hostId === clientId && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>
-            Scan to join this room:
-          </div>
-
+    <div className="lobby-page">
+      <aside className="lobby-sidebar">
+        <div className="lobby-sidebar-brand">
           <img
-            src={qrDataUrl}
-            alt="Room QR Code"
-            style={{ width: "min(220px, 100%)", height: "auto" }}
+            src="/assets/Mafia-Icon.png"
+            alt="Mafia logo"
+            className="lobby-sidebar-logo"
+            onError={(event) => {
+              event.currentTarget.style.display = "none"
+            }}
           />
-
-          {joinUrl && (
-            <div style={{ marginTop: 6, fontSize: 12 }}>
-              Link:{" "}
-              <a href={joinUrl} target="_blank" rel="noreferrer">
-                {joinUrl}
-              </a>
-            </div>
-          )}
+          <span className="lobby-sidebar-brand-name">MafiaGame</span>
         </div>
-      )}
 
-      {isHost && (
-        <div className="ui-action-row" style={{ marginBottom: 10 }}>
-          {isRoleSelectorRoom ? (
-            <>
-              {!state?.gameStarted &&
-                <button
-                  style={{
-                    ...actionButtonStyle,
-                    ...(missingBotcScript
-                      ? { opacity: 0.65, cursor: "not-allowed" as const }
-                      : {}),
-                  }}
-                  onClick={startRoleSelector}
-                  disabled={missingBotcScript}
-                  title={
-                    missingBotcScript
-                      ? "Import a BOCT script first."
-                      : undefined
-                  }
-                >
-                  {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
-                    ? "Deal BOCT Roles & Lock Room"
-                    : "Deal Roles & Lock Room"}
-                </button>}
-
-              {state?.gameStarted && allowRoleRedeal && (
-                <button
-                  style={actionButtonStyle}
-                  onClick={redealRoleSelector}
-                >
-                  Redeal Roles
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <button
-                style={actionButtonStyle}
-                disabled={!allReady}
-                onClick={() => socket.emit("startGame", { roomId: cleanRoomId })}
-              >
-                Start Game
-              </button>
-
-              <button
-                style={actionButtonStyle}
-                onClick={() =>
-                  socket.emit("forceStartGame", { roomId: cleanRoomId })
-                }
-              >
-                Force Start
-              </button>
-            </>
-          )}
+        <div className="lobby-self-card">
+          <div className="lobby-self-avatar">{initialForName(cleanPlayerName)}</div>
+          <div className="lobby-self-meta">
+            <div className="lobby-self-name">You</div>
+            <div className="lobby-self-id">ID: {shortPlayerId(clientId)}</div>
+            {!isRoleSelectorRoom && me && (
+              <span className={`lobby-status-pill ${statusClassName(me.status)}`}>
+                {getStatusLabel(me.status)}
+              </span>
+            )}
+            {isRoleSelectorRoom && amSpectator && (
+              <span className="lobby-small-chip">Dealer Only</span>
+            )}
+          </div>
         </div>
-      )}
 
-      <div className="ui-action-row" style={{ marginBottom: 10 }}>
-        {!amSpectator && !isRoleSelectorRoom && (
+        <div className="lobby-sidebar-actions">
+          {isHost && (
+            <button
+              type="button"
+              className="lobby-side-button"
+              onClick={() => setSettingsOpen(true)}
+            >
+              {isRoleSelectorRoom ? "Role Selector Settings" : "Settings"}
+            </button>
+          )}
+
+          {isRoleSelectorRoom && (
+            <button
+              type="button"
+              className="lobby-side-button"
+              onClick={() => setRoleCatalogOpen(true)}
+            >
+              Available Roles
+            </button>
+          )}
+
+          {!amSpectator && !isRoleSelectorRoom && (
+            <button
+              type="button"
+              className={`lobby-side-button ${amReady ? "is-warning" : "is-good"}`}
+              onClick={toggleReady}
+            >
+              {amReady ? "Unready" : "Ready"}
+            </button>
+          )}
+
           <button
-            style={readyToggleButtonStyle}
-            onClick={toggleReady}
+            type="button"
+            className="lobby-side-button lobby-side-button-leave"
+            onClick={leaveRoom}
           >
-            {amReady ? "Unready" : "Ready"}
+            Leave
           </button>
-        )}
-        <button
-          style={actionButtonStyle}
-          onClick={leaveRoom}
-        >
-          Leave Room
-        </button>
-      </div>
-
-      {amSpectator && (
-        <div style={{ marginBottom: 10, fontSize: 12, color: "#555" }}>
-          {isRoleSelectorRoom
-            ? "You are dealer-only for this room and will not receive a role."
-            : "You are currently spectating and cannot ready up or receive a role."}
         </div>
-      )}
+      </aside>
 
-      {state && isRoleSelectorRoom && (
-        <div
-          style={{
-            marginBottom: 12,
-            border: "1px solid #e0e0e0",
-            borderRadius: 10,
-            padding: 10,
-            background: "#fafafa",
-          }}
-        >
-          {!state.gameStarted && (
-            <div style={{ fontSize: 13, color: "#444" }}>
-              {roleSelectorScriptMode === "REGULAR_MAFIA"
-                ? "Waiting for host to deal roles."
-                : state.botcScriptSummary
-                ? "BOCT script imported. Waiting for host to deal roles."
-                : "Waiting for host to import a BOCT script."}
+      <main className="lobby-main">
+        <header className="lobby-header">
+          <div className="lobby-heading-wrap">
+            <h1 className="lobby-heading">{lobbyTitle}</h1>
+            <div className="lobby-code-row">
+              <span className="lobby-code-label">Code: {cleanRoomId}</span>
+              <button type="button" className="lobby-inline-action" onClick={copyRoomCode}>
+                Copy
+              </button>
+              <button type="button" className="lobby-inline-action" onClick={shareRoom}>
+                Share
+              </button>
             </div>
-          )}
+          </div>
 
-          {state.gameStarted && isHost && (
-            <div style={{ fontSize: 13, color: "#222" }}>
-              <div style={{ marginBottom: 6 }}>
-                <strong>Host view:</strong> role counts only
-              </div>
-              {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" ? (
-                <div>
-                  Townsfolk: {hostRoleCounts?.botcCounts?.townsfolk ?? 0} | Outsiders:{" "}
-                  {hostRoleCounts?.botcCounts?.outsiders ?? 0} | Minions:{" "}
-                  {hostRoleCounts?.botcCounts?.minions ?? 0} | Demons:{" "}
-                  {hostRoleCounts?.botcCounts?.demons ?? 0} | Other:{" "}
-                  {hostRoleCounts?.botcCounts?.others ?? 0}
-                </div>
-              ) : (
-                <div>
-                  Mafia: {hostRoleCounts?.counts.mafia ?? 0} | Doctor:{" "}
-                  {hostRoleCounts?.counts.doctor ?? 0} | Detective:{" "}
-                  {hostRoleCounts?.counts.detective ?? 0} | Sheriff:{" "}
-                  {hostRoleCounts?.counts.sheriff ?? 0} | Civilian:{" "}
-                  {hostRoleCounts?.counts.civilian ?? 0}
-                </div>
-              )}
-            </div>
-          )}
+          <div className="lobby-header-actions">
+            <div className="lobby-player-pill">Players: {players.length}</div>
 
-          {state.gameStarted && !isHost && !amSpectator && (
-            <div style={{ fontSize: 14, color: "#222" }}>
-              <strong>Your role:</strong> {myRoleLabel ?? "Waiting for assignment..."}
-              {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole && (
+            {isHost && !isRoleSelectorRoom && (
+              <>
                 <button
                   type="button"
-                  onClick={() => setMyRoleInfoOpen(true)}
-                  title="Show role details"
-                  style={{
-                    marginLeft: 8,
-                    width: 24,
-                    height: 24,
-                    borderRadius: 999,
-                    border: "1px solid #bbb",
-                    background: "#fff",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                  }}
+                  className={`lobby-start-button ${allReady ? "is-ready" : "is-disabled"}`}
+                  disabled={!allReady}
+                  onClick={startClassicGame}
                 >
-                  ?
+                  Start Game
                 </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="ui-status-text" style={{ marginBottom: 12 }}>
-        {status}
-      </div>
-
-      <h3>Players in room:</h3>
-
-      <ul style={{ paddingLeft: 18 }}>
-        {(state?.players ?? []).map((p) => {
-          const tags = getPlayerTags(p, {
-            hostId: state?.hostId ?? "",
-            viewerClientId: clientId,
-          })
-            .map((tag) => `(${tag.label})`)
-            .join(" ")
-
-          return (
-            <li key={p.clientId} style={{ marginBottom: 6 }}>
-              {p.name}
-              {tags ? ` ${tags}` : ""}
-              {!isRoleSelectorRoom && (
-                <>
-                  {" - "}
-                  Status: {getStatusLabel(p.status)}
-                </>
-              )}
-              {isHost &&
-                p.clientId !== state?.hostId &&
-                p.clientId !== clientId && (
+                {!allReady && (
                   <button
-                    style={{ marginLeft: 10 }}
+                    type="button"
+                    className="lobby-force-start"
+                    onClick={forceStartClassicGame}
+                  >
+                    Force
+                  </button>
+                )}
+              </>
+            )}
+
+            {isHost && isRoleSelectorRoom && !state?.gameStarted && (
+              <button
+                type="button"
+                className={`lobby-start-button ${missingBotcScript ? "is-disabled" : "is-ready"}`}
+                disabled={missingBotcScript}
+                onClick={startRoleSelector}
+                title={missingBotcScript ? "Import a BOCT script first." : undefined}
+              >
+                {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+                  ? "Deal BOCT Roles"
+                  : "Deal Roles"}
+              </button>
+            )}
+
+            {isHost && isRoleSelectorRoom && state?.gameStarted && allowRoleRedeal && (
+              <button
+                type="button"
+                className="lobby-start-button is-ready"
+                onClick={redealRoleSelector}
+              >
+                Redeal Roles
+              </button>
+            )}
+          </div>
+        </header>
+
+        {isHost && (
+          <section className="lobby-info-panel">
+            <label className="lobby-host-toggle">
+              <input
+                type="checkbox"
+                checked={hostParticipates}
+                disabled={state?.gameStarted === true}
+                onChange={(event) => toggleHostParticipation(event.target.checked)}
+              />
+              <span>Host participates as a player</span>
+            </label>
+            {state?.gameStarted && (
+              <div className="lobby-info-muted">
+                Host participation can only be changed before the game starts.
+              </div>
+            )}
+          </section>
+        )}
+
+        {state?.settings && !isRoleSelectorRoom && (
+          <section className="lobby-info-panel">
+            <div>
+              roles: mafia {state.settings.roleCount.mafia}, doctor {state.settings.roleCount.doctor},
+              detective {state.settings.roleCount.detective}, sheriff {state.settings.roleCount.sheriff}
+            </div>
+          </section>
+        )}
+
+        {state && isRoleSelectorRoom && (
+          <section className="lobby-info-panel">
+            <div>
+              <strong>Mode:</strong>{" "}
+              {roleSelectorScriptMode === "REGULAR_MAFIA"
+                ? "Regular Mafia"
+                : "Blood on the Clocktower"}
+            </div>
+            {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
+              <div>
+                <strong>Script:</strong>{" "}
+                {state.botcScriptSummary
+                  ? `${state.botcScriptSummary.name} (${state.botcScriptSummary.roleCount} roles)`
+                  : "Not imported yet"}
+              </div>
+            )}
+            <div>
+              <strong>Room lock:</strong> {state.roomLocked ? "Locked" : "Open"}
+            </div>
+            <div>
+              <strong>Redeal:</strong> {allowRoleRedeal ? "Enabled" : "Disabled"}
+            </div>
+          </section>
+        )}
+
+        {qrDataUrl && state?.hostId === clientId && (
+          <section className="lobby-info-panel">
+            <div className="lobby-info-title">Scan to join this room</div>
+            <img src={qrDataUrl} alt="Room QR Code" className="lobby-qr-image" />
+            <div>
+              Link:{" "}
+              <a href={joinLink} target="_blank" rel="noreferrer" className="lobby-join-link">
+                {joinLink}
+              </a>
+            </div>
+          </section>
+        )}
+
+        {amSpectator && (
+          <section className="lobby-info-panel">
+            {isRoleSelectorRoom
+              ? "You are dealer-only for this room and will not receive a role."
+              : "You are currently spectating and cannot ready up or receive a role."}
+          </section>
+        )}
+
+        {state && isRoleSelectorRoom && (
+          <section className="lobby-info-panel">
+            {!state.gameStarted && (
+              <div>
+                {roleSelectorScriptMode === "REGULAR_MAFIA"
+                  ? "Waiting for host to deal roles."
+                  : state.botcScriptSummary
+                  ? "BOCT script imported. Waiting for host to deal roles."
+                  : "Waiting for host to import a BOCT script."}
+              </div>
+            )}
+
+            {state.gameStarted && isHost && (
+              <div>
+                <div className="lobby-info-title">Host view: role counts only</div>
+                {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" ? (
+                  <div>
+                    Townsfolk: {hostRoleCounts?.botcCounts?.townsfolk ?? 0} | Outsiders:{" "}
+                    {hostRoleCounts?.botcCounts?.outsiders ?? 0} | Minions:{" "}
+                    {hostRoleCounts?.botcCounts?.minions ?? 0} | Demons:{" "}
+                    {hostRoleCounts?.botcCounts?.demons ?? 0} | Other:{" "}
+                    {hostRoleCounts?.botcCounts?.others ?? 0}
+                  </div>
+                ) : (
+                  <div>
+                    Mafia: {hostRoleCounts?.counts.mafia ?? 0} | Doctor:{" "}
+                    {hostRoleCounts?.counts.doctor ?? 0} | Detective:{" "}
+                    {hostRoleCounts?.counts.detective ?? 0} | Sheriff:{" "}
+                    {hostRoleCounts?.counts.sheriff ?? 0} | Civilian:{" "}
+                    {hostRoleCounts?.counts.civilian ?? 0}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {state.gameStarted && !isHost && !amSpectator && (
+              <div>
+                <strong>Your role:</strong> {myRoleLabel ?? "Waiting for assignment..."}
+                {roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER" && myRole && (
+                  <button
+                    type="button"
+                    onClick={() => setMyRoleInfoOpen(true)}
+                    title="Show role details"
+                    className="lobby-role-help"
+                  >
+                    ?
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {status && <div className="lobby-status-line">{status}</div>}
+
+        <section className="lobby-player-grid">
+          {players.map((p) => {
+            const tags = getPlayerTags(p, {
+              hostId: state?.hostId ?? "",
+              viewerClientId: clientId,
+            }).filter((tag) => tag.key !== "YOU")
+
+            const canKick =
+              isHost &&
+              p.clientId !== state?.hostId &&
+              p.clientId !== clientId
+
+            const displayName = p.clientId === clientId ? "You" : p.name
+
+            return (
+              <article
+                key={p.clientId}
+                className={`lobby-player-card ${p.clientId === state?.hostId ? "is-host" : ""}`}
+              >
+                <div className="lobby-player-avatar">{initialForName(displayName)}</div>
+
+                <div className="lobby-player-body">
+                  <div className="lobby-player-topline">
+                    <div className="lobby-player-name-wrap">
+                      <span className="lobby-player-name">{displayName}</span>
+                      {p.clientId === state?.hostId && (
+                        <span className="lobby-small-chip">HOST</span>
+                      )}
+                    </div>
+
+                    {!isRoleSelectorRoom && (
+                      <span className={`lobby-status-pill ${statusClassName(p.status)}`}>
+                        {getStatusLabel(p.status)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="lobby-player-subline">ID: {shortPlayerId(p.clientId)}</div>
+
+                  {tags.length > 0 && (
+                    <div className="lobby-tag-row">
+                      {tags.map((tag) => (
+                        <span key={`${p.clientId}_${tag.key}`} className="lobby-tag-chip">
+                          {tag.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {canKick && (
+                  <button
+                    type="button"
+                    className="lobby-kick-button"
                     onClick={() =>
                       socket.emit("kickPlayer", {
                         roomId: cleanRoomId,
                         targetClientId: p.clientId,
                       })
                     }
+                    title="Remove player"
                   >
-                    Kick
+                    x
                   </button>
                 )}
-            </li>
-          )
-        })}
-      </ul>
+              </article>
+            )
+          })}
+        </section>
+      </main>
 
-      {/* Host Settings Modal */}
       {state && clientId === state.hostId && (
         <>
           {isRoleSelectorRoom ? (
@@ -664,7 +696,6 @@ export default function Lobby({
               onClose={() => setSettingsOpen(false)}
               roomState={state}
               onSave={(settings) => {
-                console.log("DEBUG: saving settings", settings)
                 socket.emit("updateSettings", {
                   roomId: cleanRoomId,
                   settings,
@@ -703,4 +734,3 @@ export default function Lobby({
     </div>
   )
 }
-

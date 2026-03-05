@@ -1,0 +1,170 @@
+.main-menu-page {
+  width: 100%;
+  min-height: 100dvh;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(147, 51, 234, 0.24) 0%, rgba(147, 51, 234, 0) 44%),
+    radial-gradient(120% 80% at 100% 100%, rgba(239, 68, 68, 0.24) 0%, rgba(239, 68, 68, 0) 42%),
+    #06060b;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  padding:
+    calc(12px + env(safe-area-inset-top, 0px))
+    calc(14px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px))
+    calc(14px + env(safe-area-inset-left, 0px));
+}
+
+.main-menu-topbar,
+.main-menu-main,
+.main-menu-footer {
+  width: min(100%, 860px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.main-menu-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.main-menu-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.main-menu-brand-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.main-menu-brand-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.main-menu-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.main-menu-title {
+  margin: 8px 0 0;
+  font-size: clamp(36px, 5vw, 42px);
+  line-height: 1.1;
+  font-weight: 700;
+  color: #d946ef;
+}
+
+.main-menu-subtitle {
+  margin: 6px 0 22px;
+  font-size: clamp(14px, 2.2vw, 16px);
+  color: #9ca3af;
+  text-align: center;
+}
+
+.main-menu-card {
+  width: min(100%, 370px);
+  border: 1px solid rgba(147, 51, 234, 0.32);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.86);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.main-menu-card-title {
+  margin: 0 0 4px;
+  text-align: center;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.main-menu-card-copy {
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #a9a2a2;
+}
+
+.main-menu-button {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.main-menu-button + .main-menu-button {
+  margin-top: 10px;
+}
+
+.main-menu-button-title {
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.main-menu-button-copy {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.92;
+}
+
+.main-menu-button-primary {
+  background: #2b1246;
+  color: #f3f4f6;
+  border: 1px solid rgba(147, 51, 234, 0.38);
+}
+
+.main-menu-button-secondary {
+  background: #2b1246;
+  color: #f3f4f6;
+  border: 1px solid rgba(147, 51, 234, 0.38);
+}
+
+.main-menu-footer {
+  padding-top: 6px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .main-menu-page {
+    width: 100%;
+    min-height: 100dvh;
+    padding:
+      calc(12px + env(safe-area-inset-top, 0px))
+      calc(12px + env(safe-area-inset-right, 0px))
+      calc(12px + env(safe-area-inset-bottom, 0px))
+      calc(12px + env(safe-area-inset-left, 0px));
+  }
+
+  .main-menu-main {
+    justify-content: flex-start;
+    padding-top: 24px;
+  }
+
+  .main-menu-title {
+    font-size: 42px;
+  }
+
+  .main-menu-card {
+    width: 100%;
+    max-width: 360px;
+  }
+}

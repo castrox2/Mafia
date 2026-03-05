@@ -106,7 +106,7 @@ export default function App() {
         LOBBY screen (default once in a room)
   ------------------------------------------------------ */
   return (
-    <div className="ui-app-shell">
+    <div className="ui-app-shell ui-app-shell--lobby">
       <Lobby
         roomId={roomId}
         playerName={playerName}

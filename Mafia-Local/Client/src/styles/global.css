@@ -124,6 +124,12 @@ a {
   background: #06060b;
 }
 
+.ui-app-shell--lobby {
+  padding: 0;
+  align-items: stretch;
+  background: #09090b;
+}
+
 .ui-screen {
   width: min(100%, 980px);
   margin: 0 auto;

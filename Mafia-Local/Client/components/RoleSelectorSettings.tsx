@@ -8,6 +8,7 @@ import type {
 } from "../../Shared/events.js"
 import type { RoomState } from "../src/types.js"
 import { getRoleLabel } from "../src/uiMeta.js"
+import "../src/styles/components/settings-modal.css"
 
 type Props = {
   open: boolean
@@ -34,8 +35,7 @@ export default function RoleSelectorSettingsModal({
   const [detective, setDetective] = useState(0)
   const [sheriff, setSheriff] = useState(0)
   const [allowRedeal, setAllowRedeal] = useState(false)
-  const [scriptMode, setScriptMode] =
-    useState<RoleSelectorScriptMode>("REGULAR_MAFIA")
+  const [scriptMode, setScriptMode] = useState<RoleSelectorScriptMode>("REGULAR_MAFIA")
   const [botcJsonDraft, setBotcJsonDraft] = useState("")
   const [importHint, setImportHint] = useState("")
   const [selectedFileName, setSelectedFileName] = useState("")
@@ -55,9 +55,16 @@ export default function RoleSelectorSettingsModal({
   }, [open, roomState])
 
   const roleBounds = roomState.roleBounds
-  const activePlayerCount = roomState.players.filter((p) => p.isSpectator !== true).length
-  const persistedScriptMode =
-    roomState.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
+  const activePlayerCount = roomState.players.filter((player) => !player.isSpectator).length
+  const persistedScriptMode = roomState.roleSelectorSettings?.scriptMode ?? "REGULAR_MAFIA"
+
+  const regularAvailableRoles = [
+    getRoleLabel("CIVILIAN"),
+    getRoleLabel("DOCTOR"),
+    getRoleLabel("DETECTIVE"),
+    getRoleLabel("SHERIFF"),
+    getRoleLabel("MAFIA"),
+  ]
 
   const helpText = useMemo(
     () =>
@@ -123,170 +130,140 @@ export default function RoleSelectorSettingsModal({
 
   if (!open) return null
 
-  const regularAvailableRoles = [
-    getRoleLabel("CIVILIAN"),
-    getRoleLabel("DOCTOR"),
-    getRoleLabel("DETECTIVE"),
-    getRoleLabel("SHERIFF"),
-    getRoleLabel("MAFIA"),
-  ]
-
   return (
     <div
+      className="settings-modal-overlay"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) discardAndClose()
       }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-        zIndex: 9999,
-      }}
     >
-      <div
-        style={{
-          width: "min(820px, 100%)",
-          background: "white",
-          borderRadius: 12,
-          padding: 16,
-          boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
-          position: "relative",
-        }}
-      >
+      <div className="settings-modal-panel" role="dialog" aria-modal="true">
         <button
           onClick={discardAndClose}
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            background: "white",
-            cursor: "pointer",
-            fontSize: 16,
-          }}
+          className="settings-modal-close"
           aria-label="Close settings"
           title="Close"
+          type="button"
         >
           X
         </button>
 
-        <h2 style={{ marginTop: 0, marginBottom: 6 }}>Role Selector Settings</h2>
-        <pre style={{ marginTop: 0, color: "#444", whiteSpace: "pre-wrap" }}>{helpText}</pre>
+        <h2 className="settings-modal-title">Role Selector Settings</h2>
+        <p className="settings-modal-help">{helpText}</p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Role Counts</h3>
+        <div className="settings-modal-grid">
+          <section className="settings-modal-section">
+            <h3 className="settings-modal-section-title">Role Counts</h3>
 
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Mafia ({roleBounds.mafia.min}-{roleBounds.mafia.max}):
+            <label className="settings-field settings-row">
+              <span>
+                Mafia ({roleBounds.mafia.min}-{roleBounds.mafia.max}):
+              </span>
               <input
+                className="settings-field-input"
                 type="number"
                 value={mafia}
                 min={roleBounds.mafia.min}
                 max={roleBounds.mafia.max}
-                onChange={(e) => setMafia(Number(e.target.value))}
-                style={{ marginLeft: 8, width: 100 }}
+                onChange={(event) => setMafia(Number(event.target.value))}
               />
             </label>
 
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Doctor ({roleBounds.doctor.min}-{roleBounds.doctor.max}):
+            <label className="settings-field settings-row">
+              <span>
+                Doctor ({roleBounds.doctor.min}-{roleBounds.doctor.max}):
+              </span>
               <input
+                className="settings-field-input"
                 type="number"
                 value={doctor}
                 min={roleBounds.doctor.min}
                 max={roleBounds.doctor.max}
-                onChange={(e) => setDoctor(Number(e.target.value))}
-                style={{ marginLeft: 8, width: 100 }}
+                onChange={(event) => setDoctor(Number(event.target.value))}
               />
             </label>
 
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Detective ({roleBounds.detective.min}-{roleBounds.detective.max}):
+            <label className="settings-field settings-row">
+              <span>
+                Detective ({roleBounds.detective.min}-{roleBounds.detective.max}):
+              </span>
               <input
+                className="settings-field-input"
                 type="number"
                 value={detective}
                 min={roleBounds.detective.min}
                 max={roleBounds.detective.max}
-                onChange={(e) => setDetective(Number(e.target.value))}
-                style={{ marginLeft: 8, width: 100 }}
+                onChange={(event) => setDetective(Number(event.target.value))}
               />
             </label>
 
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Sheriff ({roleBounds.sheriff.min}-{roleBounds.sheriff.max}):
+            <label className="settings-field settings-row">
+              <span>
+                Sheriff ({roleBounds.sheriff.min}-{roleBounds.sheriff.max}):
+              </span>
               <input
+                className="settings-field-input"
                 type="number"
                 value={sheriff}
                 min={roleBounds.sheriff.min}
                 max={roleBounds.sheriff.max}
-                onChange={(e) => setSheriff(Number(e.target.value))}
-                style={{ marginLeft: 8, width: 100 }}
+                onChange={(event) => setSheriff(Number(event.target.value))}
               />
             </label>
-          </div>
+          </section>
 
-          <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Mode</h3>
+          <section className="settings-modal-section">
+            <h3 className="settings-modal-section-title">Mode</h3>
 
-            <label style={{ display: "block", marginBottom: 8 }}>
+            <label className="settings-choice">
               <input
                 type="radio"
                 checked={scriptMode === "REGULAR_MAFIA"}
                 onChange={() => setScriptMode("REGULAR_MAFIA")}
-              />{" "}
-              Regular Mafia
+              />
+              <span>Regular Mafia</span>
             </label>
 
-            <label style={{ display: "block", marginBottom: 8 }}>
+            <label className="settings-choice">
               <input
                 type="radio"
                 checked={scriptMode === "BLOOD_ON_THE_CLOCKTOWER"}
                 onChange={() => setScriptMode("BLOOD_ON_THE_CLOCKTOWER")}
-              />{" "}
-              Blood on the Clocktower
+              />
+              <span>Blood on the Clocktower</span>
             </label>
 
-            <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+            <div className="settings-note">
               BOCT import and scripted role dealing are enabled with standard BOCT distribution rules.
             </div>
 
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <label className="settings-choice">
               <input
                 type="checkbox"
                 checked={allowRedeal}
-                onChange={(e) => setAllowRedeal(e.target.checked)}
+                onChange={(event) => setAllowRedeal(event.target.checked)}
               />
-              Allow host to redeal and overwrite assignments
+              <span>Allow host to redeal and overwrite assignments</span>
             </label>
 
-            <details style={{ marginTop: 12 }}>
-              <summary style={{ cursor: "pointer", fontWeight: 700 }}>
-                Available Roles
-              </summary>
-              <div style={{ marginTop: 8 }}>
+            <details className="settings-details">
+              <summary>Available Roles</summary>
+              <div>
                 {scriptMode === "REGULAR_MAFIA" ? (
                   <div>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Available</div>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    <div className="settings-script-title">Available</div>
+                    <ul className="settings-group-list">
                       {regularAvailableRoles.map((roleId) => (
                         <li key={`available:${roleId}`}>{roleId}</li>
                       ))}
                     </ul>
                   </div>
                 ) : botcScriptSummary ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div className="settings-group-grid">
                     {botcScriptSummary.groupedRoleIds.townsfolk.length > 0 && (
                       <div>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Townsfolk</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <div className="settings-script-title">Townsfolk</div>
+                        <ul className="settings-group-list">
                           {botcScriptSummary.groupedRoleIds.townsfolk.map((roleId) => (
                             <li key={`townsfolk:${roleId}`}>{roleId}</li>
                           ))}
@@ -295,8 +272,8 @@ export default function RoleSelectorSettingsModal({
                     )}
                     {botcScriptSummary.groupedRoleIds.outsiders.length > 0 && (
                       <div>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Outsiders</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <div className="settings-script-title">Outsiders</div>
+                        <ul className="settings-group-list">
                           {botcScriptSummary.groupedRoleIds.outsiders.map((roleId) => (
                             <li key={`outsiders:${roleId}`}>{roleId}</li>
                           ))}
@@ -305,8 +282,8 @@ export default function RoleSelectorSettingsModal({
                     )}
                     {botcScriptSummary.groupedRoleIds.minions.length > 0 && (
                       <div>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Minions</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <div className="settings-script-title">Minions</div>
+                        <ul className="settings-group-list">
                           {botcScriptSummary.groupedRoleIds.minions.map((roleId) => (
                             <li key={`minions:${roleId}`}>{roleId}</li>
                           ))}
@@ -315,8 +292,8 @@ export default function RoleSelectorSettingsModal({
                     )}
                     {botcScriptSummary.groupedRoleIds.demons.length > 0 && (
                       <div>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Demons</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <div className="settings-script-title">Demons</div>
+                        <ul className="settings-group-list">
                           {botcScriptSummary.groupedRoleIds.demons.map((roleId) => (
                             <li key={`demons:${roleId}`}>{roleId}</li>
                           ))}
@@ -325,8 +302,8 @@ export default function RoleSelectorSettingsModal({
                     )}
                     {botcScriptSummary.groupedRoleIds.others.length > 0 && (
                       <div>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Other / Unclassified</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <div className="settings-script-title">Other / Unclassified</div>
+                        <ul className="settings-group-list">
                           {botcScriptSummary.groupedRoleIds.others.map((roleId) => (
                             <li key={`others:${roleId}`}>{roleId}</li>
                           ))}
@@ -335,7 +312,7 @@ export default function RoleSelectorSettingsModal({
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: "#666" }}>
+                  <div className="settings-note">
                     Import a BOCT script to view all available script roles.
                   </div>
                 )}
@@ -343,42 +320,26 @@ export default function RoleSelectorSettingsModal({
             </details>
 
             {scriptMode === "BLOOD_ON_THE_CLOCKTOWER" && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>BOCT Script Import</div>
+              <div className="settings-script-area">
+                <div className="settings-script-title">BOCT Script Import</div>
 
                 <textarea
+                  className="settings-script-textarea"
                   placeholder="Paste BOCT script JSON here..."
                   value={botcJsonDraft}
                   onChange={(event) => setBotcJsonDraft(event.target.value)}
-                  style={{
-                    width: "100%",
-                    minHeight: 130,
-                    resize: "vertical",
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    padding: 8,
-                    boxSizing: "border-box",
-                  }}
                 />
 
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <div className="settings-script-actions">
                   <button
-                    style={{ padding: "8px 10px" }}
+                    className="settings-button"
                     type="button"
                     onClick={() => importScript("PASTE", botcJsonDraft)}
                   >
                     Import Pasted JSON
                   </button>
 
-                  <label
-                    style={{
-                      border: "1px solid #ccc",
-                      borderRadius: 6,
-                      padding: "8px 10px",
-                      cursor: "pointer",
-                      background: "#fafafa",
-                    }}
-                  >
+                  <label className="settings-upload-label">
                     Upload .json
                     <input
                       type="file"
@@ -390,32 +351,30 @@ export default function RoleSelectorSettingsModal({
                 </div>
 
                 {selectedFileName && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: "#444" }}>
-                    Selected file: {selectedFileName}
-                  </div>
+                  <div className="settings-inline-text">Selected file: {selectedFileName}</div>
                 )}
 
                 {botcScriptSummary && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: "#222" }}>
+                  <div className="settings-inline-text">
                     Imported: {botcScriptSummary.name} ({botcScriptSummary.roleCount} roles)
                   </div>
                 )}
 
-                {importHint && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
-                    {importHint}
-                  </div>
-                )}
+                {importHint && <div className="settings-inline-text">{importHint}</div>}
               </div>
             )}
-          </div>
+          </section>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
-          <button onClick={discardAndClose} style={{ padding: "10px 12px" }}>
+        <div className="settings-actions">
+          <button onClick={discardAndClose} className="settings-button" type="button">
             Cancel
           </button>
-          <button onClick={save} style={{ padding: "10px 12px", fontWeight: 700 }}>
+          <button
+            onClick={save}
+            className="settings-button settings-button-primary"
+            type="button"
+          >
             Save Settings
           </button>
         </div>

@@ -315,3 +315,102 @@ TODO / next-agent suggestions:
   - `npm run dist` in `Mafia-Local/Electron` passes.
   - Asar check confirms `\Server\dist\Server\index.js` exists and stale `\Server\dist\index.js` is absent.
   - Runtime smoke (`node` import of `Server/dist/Server/index.js` with `MAFIA_CLIENT_DIST_DIR`) returns HTTP 200 for `/`.
+
+---
+
+- New task: replace shield-like UI icon usage with the current Mafia icon asset.
+- Updated icon assets (without changing existing code references):
+  - Replaced `Client/public/assets/Mafia-Icon.png` with a 256x256 transparent icon render derived from `Electron/assets/Mafia-Icon.ico`.
+  - Replaced `Electron/assets/Mafia-Icon.png` with the same icon render for consistency in fallback/runtime contexts.
+- Visual validation:
+  - Playwright screenshot re-run confirms Join page brand/button now show the Mafia icon instead of shield-like placeholders.
+- Packaging/build validation:
+  - Ran `npm run dist` in `Mafia-Local/Electron` successfully.
+  - Refreshed installer artifact: `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.5.exe`.
+
+---
+
+- New task: restyle Main Menu to match Join page visual direction.
+- Updated `Client/pages/MainMenu.tsx`:
+  - Removed inline light-theme styles.
+  - Switched to class-based structure and imported new page CSS.
+  - Added Join-like layout sections: top brand row, centered hero, dark menu card, gradient + secondary action buttons, and footer.
+- Added `Client/src/styles/pages/main-menu.css`:
+  - Full-bleed dark gradient background and safe-area padding.
+  - Centered card with Join-consistent border, typography scale, and button treatments.
+  - Responsive mobile behavior aligned with Join page breakpoints.
+- Validation:
+  - `Client`: `npm run build` passes.
+  - Playwright screenshot reviewed: `output/web-game/shot-0.png` (Main Menu now visually aligned with Join style).
+  - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).
+
+---
+
+- New task: verify MainMenu error before further UI changes, then make both Main Menu buttons dark purple.
+- Root cause identified for reported MainMenu error:
+  - TypeScript (`npx tsc --noEmit`) failed on CSS side-effect imports (`TS2307`) due missing CSS module declarations in Client.
+- Fix implemented:
+  - Added `Client/src/vite-env.d.ts` with:
+    - `/// <reference types="vite/client" />`
+    - `declare module "*.css"`
+  - This resolves TypeScript CSS import errors for `MainMenu.tsx`, `Join.tsx`, and `src/main.tsx`.
+- Requested UI change implemented:
+  - Updated `Client/src/styles/pages/main-menu.css` so both menu buttons use the same dark purple style (removed bright pink gradient).
+- Validation:
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npm run build` passes.
+  - Playwright screenshot reviewed (`output/web-game/shot-0.png`) confirms both Main Menu buttons are dark purple.
+  - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).
+
+---
+
+- New task: redesign Lobby screens to match provided desktop/mobile references and start-button ready state.
+- Updated `Client/pages/Lobby.tsx`:
+  - Replaced inline-style layout with structured desktop/mobile lobby shell:
+    - Left sidebar (brand, local player profile, settings/ready/leave actions)
+    - Main content area (lobby title/code/share, player count, start controls, info panels, player card grid)
+  - Preserved existing lobby logic/events:
+    - start/force start, ready toggle, leave room, host participation toggle, kick player
+    - role-selector behaviors (deal/redeal/request role, host counts, script status)
+    - host settings + role selector settings modals + role catalog/info modals
+  - Added room-code copy/share actions with clipboard/share API fallback.
+  - Added dynamic Start button states for classic rooms:
+    - disabled style when not all ready
+    - gradient enabled style when all ready
+- Updated `Client/src/styles/pages/lobby.css`:
+  - Implemented full dark lobby theme based on provided references.
+  - Added responsive behavior for desktop and mobile layouts.
+  - Added player cards, status pills, action buttons, and start-state styles.
+- Updated shell wrapper for lobby full-bleed rendering:
+  - `Client/src/App.tsx`: lobby now uses `ui-app-shell ui-app-shell--lobby`
+  - `Client/src/styles/global.css`: added `.ui-app-shell--lobby`.
+- Validation:
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npm run build` passes.
+  - Playwright captures (new):
+    - `output/web-game/lobby-desktop-disabled.png`
+    - `output/web-game/lobby-desktop-ready.png`
+    - `output/web-game/lobby-mobile.png`
+  - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).
+
+---
+
+- New task: fix status/kick overlap in lobby player cards and restyle settings menus to match project dark UI theme.
+- Fixed kick/status overlap:
+  - `Client/src/styles/pages/lobby.css`: changed `.lobby-kick-button` from absolute positioning to normal flow (`position: static`, own spacing).
+  - Result: kick `x` no longer overlaps Ready/Not Ready status pill.
+- Settings menu visual refresh (project-consistent dark style):
+  - Added shared settings modal stylesheet:
+    - `Client/src/styles/components/settings-modal.css`
+  - Updated `Client/components/HostSettings.tsx`:
+    - migrated from inline white modal styling to shared dark modal classes.
+    - fixed close button text rendering to plain `X`.
+  - Updated `Client/components/RoleSelectorSettings.tsx`:
+    - migrated from inline white modal styling to shared dark modal classes.
+- Validation:
+  - `Client`: `npx tsc -p tsconfig.json --noEmit` passes.
+  - `Client`: `npm run build` passes.
+  - Visual screenshots captured:
+    - `output/web-game/lobby-kick-spacing.png` (status + kick spacing verified)
+    - `output/web-game/lobby-settings-modal.png` (settings dark theme verified)
+  - `Electron`: `npm run dist` passes; installer refreshed (`Mafia Local Setup 0.9.5.exe`).
