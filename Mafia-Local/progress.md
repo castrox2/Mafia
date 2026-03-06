@@ -453,3 +453,38 @@ TODO / next-agent suggestions:
   - `npm --prefix Mafia-Local/Server run build` passes.
   - `npm --prefix Mafia-Local/Electron run build` passes.
   - Socket integration check passes: `botcScriptImported` emitted with script summary.
+
+---
+
+- New task: wire splash screen so it shows first while app/renderer loads.
+- Implemented Electron splash startup flow in `Electron/main.js`:
+  - Added dedicated splash window (`ui/splash.html`) that opens immediately on app start.
+  - Main window now starts hidden (`show: false`) and loads renderer in background.
+  - Main window is shown only after `ready-to-show`, then splash closes.
+  - Added minimum splash visibility window (`SPLASH_MIN_VISIBLE_MS = 900`) to prevent flash/flicker.
+  - Added fallback to close splash and show main window even if `ready-to-show` does not fire.
+- Build/package validation:
+  - `npm --prefix Mafia-Local/Electron run build` passes.
+  - Default `npm --prefix Mafia-Local/Electron run dist` failed due OS file lock on old `dist/win-unpacked/resources/app.asar`.
+  - Successful packaged installer generated via alternate output directory:
+    - `Mafia-Local/Electron/dist2/Mafia Local Setup 0.9.5.exe`
+    - `Mafia-Local/Electron/dist2/Mafia Local Setup 0.9.5.exe.blockmap`
+
+---
+
+- New task: packaged installer did not show splash screen.
+- Root cause found:
+  - `Electron/electron-builder.json` `files` whitelist did not include `ui/**/*`, so `ui/splash.html` and `ui/splash.css` were missing from packaged `app.asar`.
+- Fix implemented:
+  - Added `ui/**/*` to `Electron/electron-builder.json` `files` array.
+- Validation:
+  - `npm --prefix Mafia-Local/Electron run dist` still hit existing file lock on `dist/win-unpacked/resources/app.asar`.
+  - Built successfully to new output folder: `dist3`.
+  - Confirmed packaged asar now includes splash files:
+    - `\ui\splash.html`
+    - `\ui\splash.css`
+  - Copied new installer artifacts into standard release path:
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.5.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.5.exe.blockmap`
+- Additional ignore cleanup:
+  - `.gitignore` now includes `Mafia-Local/Electron/dist*/` to avoid future generated output clutter.

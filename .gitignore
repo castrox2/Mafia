@@ -12,6 +12,9 @@ client/node_modules/
 # Electron build output
 electron/dist/
 electron/node_modules/
+Mafia-Local/Electron/dist/
+Mafia-Local/Electron/dist2/
+Mafia-Local/Electron/node_modules/
 
 # TypeScript compiled files
 *.tsbuildinfo

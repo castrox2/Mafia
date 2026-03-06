@@ -8,6 +8,7 @@
     "main.js",
     "package.json",
     "assets/**/*",
+    "ui/**/*",
     {
       "from": "../Server/dist",
       "to": "Server/dist",

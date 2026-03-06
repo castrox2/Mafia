@@ -20,8 +20,10 @@ const parsePort = (value, fallback) => {
 
 const SERVER_PORT = parsePort(process.env.MAFIA_SERVER_PORT || process.env.PORT, 3100)
 const SERVER_URL = process.env.ELECTRON_SERVER_URL || `http://127.0.0.1:${SERVER_PORT}`
+const SPLASH_MIN_VISIBLE_MS = 900
 
 let win
+let splashWin
 let backendStartedInProcess = false
 let backendStartPromise = null
 
@@ -196,10 +198,69 @@ const loadRenderer = async () => {
   await win.loadURL(DEV_RENDERER_URL)
 }
 
-function createWindow() {
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const closeSplashWindow = () => {
+  if (splashWin && !splashWin.isDestroyed()) {
+    splashWin.destroy()
+  }
+  splashWin = null
+}
+
+const createSplashWindow = () => {
+  const splashPath = path.join(__dirname, "ui", "splash.html")
+  if (!fs.existsSync(splashPath)) return
+
+  const splashOptions = {
+    width: 540,
+    height: 380,
+    minWidth: 540,
+    minHeight: 380,
+    maxWidth: 540,
+    maxHeight: 380,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    center: true,
+    show: false,
+    alwaysOnTop: true,
+    backgroundColor: "#0b1220",
+  }
+
+  if (fs.existsSync(WINDOW_ICON_PATH)) {
+    splashOptions.icon = WINDOW_ICON_PATH
+  }
+
+  splashWin = new BrowserWindow(splashOptions)
+  splashWin.setMenuBarVisibility(false)
+
+  splashWin.once("ready-to-show", () => {
+    if (splashWin && !splashWin.isDestroyed()) {
+      splashWin.show()
+    }
+  })
+
+  splashWin.on("closed", () => {
+    splashWin = null
+  })
+
+  splashWin.loadFile(splashPath).catch((error) => {
+    console.error("Failed to load splash screen:", error)
+  })
+}
+
+async function createWindow() {
+  const splashStartedAt = Date.now()
+  createSplashWindow()
+
   const windowOptions = {
     width: 1100,
     height: 750,
+    show: false,
+    backgroundColor: "#05070f",
   }
 
   if (fs.existsSync(WINDOW_ICON_PATH)) {
@@ -208,9 +269,33 @@ function createWindow() {
 
   win = new BrowserWindow(windowOptions)
 
-  loadRenderer().catch((err) => {
-    console.error("Failed to load renderer:", err)
+  win.once("ready-to-show", async () => {
+    const elapsed = Date.now() - splashStartedAt
+    const waitMs = Math.max(0, SPLASH_MIN_VISIBLE_MS - elapsed)
+    if (waitMs > 0) await wait(waitMs)
+
+    closeSplashWindow()
+
+    if (win && !win.isDestroyed()) {
+      win.show()
+    }
   })
+
+  try {
+    await loadRenderer()
+  } catch (err) {
+    console.error("Failed to load renderer:", err)
+  }
+
+  // Fallback: if ready-to-show never fires (load issues), still reveal the main window.
+  if (win && !win.isDestroyed() && !win.isVisible()) {
+    const elapsed = Date.now() - splashStartedAt
+    const waitMs = Math.max(0, SPLASH_MIN_VISIBLE_MS - elapsed)
+    if (waitMs > 0) await wait(waitMs)
+
+    closeSplashWindow()
+    win.show()
+  }
 
   win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     console.error("did-fail-load:", { errorCode, errorDescription, validatedURL })
@@ -238,4 +323,8 @@ process.on("unhandledRejection", (reason, _promise) => {
   console.error("Unhandled Rejection at:", "reason:", reason)
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow().catch((error) => {
+    console.error("Failed to create main window:", error)
+  })
+})
