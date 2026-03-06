@@ -1,6 +1,7 @@
 :root {
-  --splash-bg-a: #111827;
-  --splash-bg-b: #1f2937;
+  --splash-bg: #05070f;
+  --splash-overlay-strong: rgba(5, 7, 15, 0.62);
+  --splash-overlay-soft: rgba(5, 7, 15, 0.35);
   --splash-accent: #ef4444;
   --splash-text: #f9fafb;
   --splash-muted: #d1d5db;
@@ -21,54 +22,80 @@ body {
 
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: radial-gradient(circle at 25% 20%, var(--splash-bg-b), var(--splash-bg-a));
+  background: var(--splash-bg);
   color: var(--splash-text);
+  overflow: hidden;
 }
 
 .splash-root {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 12px;
+  background-image: url("../assets/Mafia Splash Screen.png");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
   text-align: center;
   padding: 24px;
 }
 
-.splash-logo {
-  width: 128px;
-  height: 128px;
-  object-fit: contain;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
+.splash-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 72% 52% at 50% 50%,
+      var(--splash-overlay-soft) 0%,
+      rgba(5, 7, 15, 0.52) 52%,
+      var(--splash-overlay-strong) 100%
+    ),
+    linear-gradient(180deg, rgba(5, 7, 15, 0.42) 0%, rgba(5, 7, 15, 0.72) 100%);
 }
 
 .splash-title {
+  position: absolute;
+  left: 50%;
+  bottom: 104px;
+  transform: translateX(-50%);
   margin: 0;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  font-size: clamp(40px, 8vw, 58px);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  z-index: 1;
 }
 
 .splash-subtitle {
+  position: absolute;
+  left: 50%;
+  bottom: 66px;
+  transform: translateX(-50%);
   margin: 0;
+  font-size: clamp(16px, 2.2vw, 22px);
   color: var(--splash-muted);
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+  z-index: 1;
 }
 
 .splash-loader {
-  width: 160px;
-  height: 4px;
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  transform: translateX(-50%);
+  width: min(56vw, 360px);
+  height: 6px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.16);
-  position: relative;
+  background: rgba(255, 255, 255, 0.22);
+  z-index: 1;
 }
 
 .splash-loader::before {
   content: "";
   position: absolute;
   inset: 0;
-  width: 45%;
+  width: 34%;
   border-radius: inherit;
   background: linear-gradient(90deg, transparent, var(--splash-accent), transparent);
   animation: splash-loader 1.2s ease-in-out infinite;

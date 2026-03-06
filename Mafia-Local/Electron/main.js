@@ -212,12 +212,12 @@ const createSplashWindow = () => {
   if (!fs.existsSync(splashPath)) return
 
   const splashOptions = {
-    width: 540,
-    height: 380,
-    minWidth: 540,
-    minHeight: 380,
-    maxWidth: 540,
-    maxHeight: 380,
+    width: 960,
+    height: 540,
+    minWidth: 960,
+    minHeight: 540,
+    maxWidth: 960,
+    maxHeight: 540,
     frame: false,
     resizable: false,
     movable: false,

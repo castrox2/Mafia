@@ -488,3 +488,34 @@ TODO / next-agent suggestions:
     - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.5.exe.blockmap`
 - Additional ignore cleanup:
   - `.gitignore` now includes `Mafia-Local/Electron/dist*/` to avoid future generated output clutter.
+
+---
+
+- Follow-up: persistent lock on `Electron/dist/win-unpacked/resources/app.asar` blocked direct `npm run dist` output into `dist`.
+- Workaround used (without creating new project dist folders):
+  - Built installer to temp output outside repo:
+    - `C:\Users\User\AppData\Local\Temp\mafia-electron-dist-temp`
+  - Verified packaged splash files are present in asar (`\ui\splash.html`, `\ui\splash.css`).
+  - Replaced setup artifacts in standard release folder:
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.5.exe`
+    - `Mafia-Local/Electron/dist/Mafia Local Setup 0.9.5.exe.blockmap`
+  - Deleted temp output folder after copy.
+
+---
+
+- New task: make splash use full-screen artwork background and keep title/subtitle/loader.
+- Implemented splash redesign:
+  - `Electron/ui/splash.html`:
+    - Removed inline logo element; splash now uses full background image layout.
+    - Kept title/subtitle/loading bar.
+  - `Electron/ui/splash.css`:
+    - Full background image (`Mafia Splash Screen.png`) with `background-size: cover`.
+    - Added dark overlay layers for readability.
+    - Positioned loader near center/finger-point area (`top: 56%`) without image distortion.
+    - Title/subtitle remain visible near lower center.
+  - `Electron/main.js`:
+    - Splash window resized to fixed 16:9 (`960x540`).
+- Validation:
+  - `npm --prefix Mafia-Local/Electron run build` passes.
+  - Preview screenshot generated to root output folder:
+    - `output/splash-fullbg-preview.png`
