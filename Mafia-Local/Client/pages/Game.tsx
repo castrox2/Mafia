@@ -11,6 +11,7 @@ import type {
   MafiaWinner,
   PhaseEndingPayload,
   PhaseStartedPayload,
+  PublicAnnouncementsPayload,
   PrivateMessagePayload,
   ReasonPayload,
   RoomIdPayload,
@@ -52,7 +53,7 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
     const [rolemateClientIds, setRolemateClientIds] = useState<string[]>([])
 
     // UI-friendly transient banners (night/vote summaries)
-    const [banner, setBanner] = useState<null | { kind: "NIGHT" | "VOTING"; text: string }>(null)
+    const [banner, setBanner] = useState<null | { kind: "NIGHT" | "VOTING" | "PUBLIC"; text: string }>(null)
 
     // Private messages (ex: Detective result). UI teammate can turn into toast/modal later.
     const [privateMessages, setPrivateMessages] = useState<PrivateMessagePayload[]>([])
@@ -302,6 +303,31 @@ useEffect(() => {
     console.log("voteSummary", payload)
   }
 
+  const onPublicAnnouncements = (payload: PublicAnnouncementsPayload) => {
+    if (payload.roomId !== cleanRoomId) return
+    if (!Array.isArray(payload.announcements) || payload.announcements.length <= 0) return
+
+    const sheriffAnnouncement = payload.announcements.find(
+      (announcement) => announcement.type === "SHERIFF_USED"
+    )
+
+    if (sheriffAnnouncement && sheriffAnnouncement.type === "SHERIFF_USED") {
+      setBanner({
+        kind: "PUBLIC",
+        text: sheriffAnnouncement.mafiaKilled
+          ? "Sheriff shot landed: mafia target eliminated."
+          : "Sheriff shot landed: target was not mafia.",
+      })
+
+      if (bannerTimeoutRef.current) {
+        window.clearTimeout(bannerTimeoutRef.current)
+      }
+      bannerTimeoutRef.current = window.setTimeout(() => {
+        setBanner(null)
+      }, 1800)
+    }
+  }
+
   const onGameOver = (payload: GameOverPayload) => {
     if (payload.roomId !== cleanRoomId) return
 
@@ -331,6 +357,7 @@ useEffect(() => {
   socket.on("privateMessage", onPrivateMessage)
   socket.on("nightSummary", onNightSummary)
   socket.on("voteSummary", onVoteSummary)
+  socket.on("publicAnnouncements", onPublicAnnouncements)
   socket.on("gameOver", onGameOver)
   socket.on("actionAccepted", onActionAccepted)
   socket.on("actionRefused", onActionRefused)
@@ -349,6 +376,7 @@ useEffect(() => {
     socket.off("privateMessage", onPrivateMessage)
     socket.off("nightSummary", onNightSummary)
     socket.off("voteSummary", onVoteSummary)
+    socket.off("publicAnnouncements", onPublicAnnouncements)
     socket.off("gameOver", onGameOver)
     socket.off("actionAccepted", onActionAccepted)
     socket.off("actionRefused", onActionRefused)

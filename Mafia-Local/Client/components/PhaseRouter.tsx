@@ -32,7 +32,7 @@ import "../src/styles/phases/day.css"
 
 type Phase = RoomState["phase"]
 
-type Banner = null | { kind: "NIGHT" | "VOTING"; text: string }
+type Banner = null | { kind: "NIGHT" | "VOTING" | "PUBLIC"; text: string }
 type Winner = MafiaWinner
 type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
 
@@ -215,7 +215,12 @@ type ScreenProps = {
 const BannerView = ({ banner }: { banner: Banner }) => {
   if (!banner) return null
 
-  const phaseLabel = banner.kind === "NIGHT" ? getPhaseLabel("NIGHT") : getPhaseLabel("VOTING")
+  const phaseLabel =
+    banner.kind === "NIGHT"
+      ? getPhaseLabel("NIGHT")
+      : banner.kind === "VOTING"
+        ? getPhaseLabel("VOTING")
+        : "Announcement"
 
   return (
     <div className="phase-banner" style={{ marginBottom: 10, padding: 10, border: "1px solid #ddd" }}>
@@ -251,7 +256,45 @@ const LobbyScreen = ({ isHost, isSpectator, myRole, banner, actionFeedback }: Sc
   </div>
 )
 
-const DayScreen = ({ banner, actionFeedback }: ScreenProps) => (
+const SheriffActionPanel = ({
+  state,
+  me,
+  isSpectator,
+  myRole,
+  submitRoleAction,
+}: Pick<ScreenProps, "state" | "me" | "isSpectator" | "myRole" | "submitRoleAction">) => {
+  if (myRole !== "SHERIFF") return null
+  if (isSpectator || me?.alive !== true) return null
+
+  const targets = state.players.filter(
+    (p) => p.alive === true && p.isSpectator !== true && p.clientId !== me.clientId
+  )
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <strong>Sheriff Action:</strong>
+      {targets.length <= 0 ? (
+        <div style={{ marginTop: 6, fontSize: 13 }}>No valid targets right now.</div>
+      ) : (
+        <ul style={{ marginTop: 8 }}>
+          {targets.map((p) => (
+            <li key={p.clientId} style={{ marginBottom: 8 }}>
+              {p.name}{" "}
+              <button onClick={() => submitRoleAction("SHERIFF_SHOOT", p.clientId)}>
+                Shoot
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button onClick={() => submitRoleAction("SHERIFF_SHOOT", SKIP_TARGET_CLIENT_ID)}>
+        Skip Shot
+      </button>
+    </div>
+  )
+}
+
+const DayScreen = ({ state, me, isSpectator, myRole, submitRoleAction, banner, actionFeedback }: ScreenProps) => (
   <section className="phase-day">
     <div className="phase-day__card">
       <h2 className="phase-day__title">{getPhaseLabel("DAY")}</h2>
@@ -262,25 +305,62 @@ const DayScreen = ({ banner, actionFeedback }: ScreenProps) => (
 
       <BannerView banner={banner} />
       <ActionFeedbackView actionFeedback={actionFeedback} />
+      <SheriffActionPanel
+        state={state}
+        me={me}
+        isSpectator={isSpectator}
+        myRole={myRole}
+        submitRoleAction={submitRoleAction}
+      />
     </div>
   </section>
 )
 
-const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
+const DiscussionScreen = ({
+  state,
+  me,
+  isSpectator,
+  myRole,
+  submitRoleAction,
+  banner,
+  actionFeedback,
+}: ScreenProps) => (
   <div>
     <h2>{getPhaseLabel("DISCUSSION")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Discussion phase content goes here.</div>
+    <SheriffActionPanel
+      state={state}
+      me={me}
+      isSpectator={isSpectator}
+      myRole={myRole}
+      submitRoleAction={submitRoleAction}
+    />
   </div>
 )
 
-const PubDiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
+const PubDiscussionScreen = ({
+  state,
+  me,
+  isSpectator,
+  myRole,
+  submitRoleAction,
+  banner,
+  actionFeedback,
+}: ScreenProps) => (
   <div>
     <h2>{getPhaseLabel("PUBDISCUSSION")}</h2>
     <BannerView banner={banner} />
     <ActionFeedbackView actionFeedback={actionFeedback} />
     <div>Public discussion content goes here.</div>
+    <SheriffActionPanel
+      state={state}
+      me={me}
+      isSpectator={isSpectator}
+      myRole={myRole}
+      submitRoleAction={submitRoleAction}
+    />
   </div>
 )
 

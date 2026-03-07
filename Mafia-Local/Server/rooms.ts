@@ -2638,7 +2638,11 @@ const updateRoomSettings = (
       if (phase !== "NIGHT") return refuse("Detective can only check during NIGHT.")
       if (actor.role !== "DETECTIVE") return refuse("Only Detective can submit checks.")
     } else if (kind === "SHERIFF_SHOOT") {
-      if (phase === "NIGHT") return refuse("Sheriff cannot shoot during NIGHT.")
+      const sheriffAllowedPhase =
+        phase === "DAY" || phase === "DISCUSSION" || phase === "PUBDISCUSSION"
+      if (!sheriffAllowedPhase) {
+        return refuse("Sheriff can only shoot during DAY and DISCUSSION phases.")
+      }
       if (actor.role !== "SHERIFF") return refuse("Only Sheriff can shoot.")
 
       // Sheriff one-time use per game
@@ -2666,6 +2670,15 @@ const updateRoomSettings = (
     })
 
     socket.emit("actionAccepted", { kind, targetClientId })
+
+    // Sheriff shots resolve immediately so players get direct feedback
+    // during DAY / DISCUSSION / PUBDISCUSSION.
+    if (kind === "SHERIFF_SHOOT") {
+      applySheriffResolution(room, cleanRoomId)
+      if (maybeEndGameFromAliveState(room, cleanRoomId)) return
+      emitRoomState(cleanRoomId)
+      return
+    }
 
     // If everyone has submitted a vote, skip remaining timer and resolve now.
     if (kind === "CIVILIAN_VOTE" && allEligibleVotersSubmitted(room, cleanRoomId)) {
