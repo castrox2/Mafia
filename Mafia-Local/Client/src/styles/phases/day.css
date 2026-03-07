@@ -1,4 +1,46 @@
-/* Phase scaffold: DAY */
+/* Phase skin: DAY (warm sunrise tone while preserving project vibe) */
 
-.phase-day {}
+.phase-day {
+  width: 100%;
+  min-height: 100%;
+  border-radius: 0;
+  border: 0;
+  background:
+    radial-gradient(120% 85% at 12% 10%, rgba(251, 191, 36, 0.24) 0%, rgba(251, 191, 36, 0) 48%),
+    radial-gradient(90% 72% at 92% 88%, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0) 56%),
+    linear-gradient(180deg, rgba(255, 244, 214, 0.92) 0%, rgba(255, 237, 193, 0.88) 100%);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.phase-day__card {
+  width: 100%;
+  min-height: 100%;
+  padding: clamp(18px, 2.4vw, 28px);
+  color: #3b1600;
+}
+
+.phase-day__title {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.05;
+  font-weight: 700;
+  color: #3a1400;
+}
+
+.phase-day__subtitle {
+  max-width: 800px;
+  margin: 12px 0 14px;
+  color: rgba(69, 34, 11, 0.85);
+  font-size: clamp(15px, 2vw, 18px);
+  line-height: 1.45;
+}
+
+.phase-day .phase-banner,
+.phase-day .phase-feedback {
+  margin-top: 14px;
+  border-radius: 10px;
+  border-color: rgba(181, 94, 0, 0.28) !important;
+  background: rgba(255, 250, 236, 0.72);
+}
 

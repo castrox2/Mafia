@@ -7,8 +7,10 @@ import RoleCatalogModal from "../components/RoleCatalogModal.js"
 import RoleInfoModal from "../components/RoleInfoModal.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
+  AddBotRefusedPayload,
   BotcScriptSummaryPayload,
   GameStartedPayload,
+  MafiaPlayerRole,
   HostParticipationRefusedEvent,
   HostParticipationRefusedPayload,
   RoleSelectorHostCountsPayload,
@@ -54,6 +56,14 @@ const statusClassName = (status: string): string => {
   return "is-neutral"
 }
 
+const TEST_ROLE_OPTIONS: MafiaPlayerRole[] = [
+  "CIVILIAN",
+  "MAFIA",
+  "DOCTOR",
+  "DETECTIVE",
+  "SHERIFF",
+]
+
 export default function Lobby({
   roomId,
   playerName,
@@ -70,6 +80,8 @@ export default function Lobby({
   const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
   const [hostRoleCounts, setHostRoleCounts] =
     useState<RoleSelectorHostCountsPayload | null>(null)
+  const [manualRolesOpen, setManualRolesOpen] = useState(false)
+  const [manualRoleDraft, setManualRoleDraft] = useState<Record<string, MafiaPlayerRole>>({})
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
@@ -104,6 +116,9 @@ export default function Lobby({
   const amReady = me?.status === "READY"
   const activePlayers = players.filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
+  const canUseManualRoleAssign = Boolean(
+    isHost && !isRoleSelectorRoom && state && !state.gameStarted
+  )
 
   const lobbyTitle = isRoleSelectorRoom ? "Role Selector Lobby" : "Lobby"
   const joinLink = joinUrl || `${window.location.origin}/?room=${cleanRoomId}`
@@ -113,6 +128,20 @@ export default function Lobby({
       setMyRoleInfoOpen(false)
     }
   }, [myRole, roleSelectorScriptMode])
+
+  useEffect(() => {
+    if (!manualRolesOpen) return
+    if (!state) return
+
+    setManualRoleDraft((prev) => {
+      const next: Record<string, MafiaPlayerRole> = {}
+      for (const player of state.players) {
+        if (player.isSpectator) continue
+        next[player.clientId] = prev[player.clientId] ?? "CIVILIAN"
+      }
+      return next
+    })
+  }, [manualRolesOpen, state])
 
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
@@ -183,6 +212,10 @@ export default function Lobby({
       onExit()
     }
 
+    const onAddBotRefused = ({ reason }: AddBotRefusedPayload) => {
+      alert(reason || "Unable to add bot.")
+    }
+
     const onYourRole = (payload: YourRolePayload) => {
       if (payload.roomId !== cleanRoomId) return
       setMyRole(payload.role)
@@ -212,6 +245,7 @@ export default function Lobby({
     socket.on("roleSelectorHostCounts", onRoleSelectorHostCounts)
     socket.on("botcScriptImported", onBotcScriptImported)
     socket.on("kicked", onKicked)
+    socket.on("addBotRefused", onAddBotRefused)
 
     const skipAutoJoin =
       window.sessionStorage.getItem("mafia_skip_lobby_autojoin") === "1"
@@ -239,6 +273,7 @@ export default function Lobby({
       socket.off("roleSelectorHostCounts", onRoleSelectorHostCounts)
       socket.off("botcScriptImported", onBotcScriptImported)
       socket.off("kicked", onKicked)
+      socket.off("addBotRefused", onAddBotRefused)
     }
   }, [cleanRoomId, cleanPlayerName, onExit, onEnterGame])
 
@@ -321,6 +356,43 @@ export default function Lobby({
     socket.emit("startGame", { roomId: cleanRoomId })
   }
 
+  const addBotPlayer = () => {
+    socket.emit("addBot", { roomId: cleanRoomId })
+  }
+
+  const openManualRoleAssign = () => {
+    if (!canUseManualRoleAssign) return
+    setManualRolesOpen(true)
+  }
+
+  const closeManualRoleAssign = () => {
+    setManualRolesOpen(false)
+  }
+
+  const setDraftRole = (targetClientId: string, role: MafiaPlayerRole) => {
+    setManualRoleDraft((prev) => ({
+      ...prev,
+      [targetClientId]: role,
+    }))
+  }
+
+  const applyManualRoleAssign = () => {
+    if (!canUseManualRoleAssign) return
+    if (!state) return
+
+    for (const player of state.players) {
+      if (player.isSpectator) continue
+      const role = manualRoleDraft[player.clientId] ?? "CIVILIAN"
+      socket.emit("setRole", {
+        roomId: cleanRoomId,
+        playerId: player.clientId,
+        role,
+      })
+    }
+
+    setManualRolesOpen(false)
+  }
+
   const redealRoleSelector = () => {
     socket.emit("redealRoleSelector", { roomId: cleanRoomId })
   }
@@ -364,6 +436,16 @@ export default function Lobby({
               onClick={() => setSettingsOpen(true)}
             >
               {isRoleSelectorRoom ? "Role Selector Settings" : "Settings"}
+            </button>
+          )}
+
+          {canUseManualRoleAssign && (
+            <button
+              type="button"
+              className="lobby-side-button"
+              onClick={openManualRoleAssign}
+            >
+              Manual Role Assign
             </button>
           )}
 
@@ -414,6 +496,17 @@ export default function Lobby({
 
           <div className="lobby-header-actions">
             <div className="lobby-player-pill">Players: {players.length}</div>
+
+            {isHost && !isRoleSelectorRoom && !state?.gameStarted && (
+              <button
+                type="button"
+                className="lobby-add-bot"
+                onClick={addBotPlayer}
+                title="Add a test bot player"
+              >
+                Add Bot
+              </button>
+            )}
 
             {isHost && !isRoleSelectorRoom && (
               <>
@@ -730,6 +823,67 @@ export default function Lobby({
             }
           />
         </>
+      )}
+
+      {manualRolesOpen && canUseManualRoleAssign && state && (
+        <div
+          className="lobby-manual-roles-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeManualRoleAssign()
+            }
+          }}
+        >
+          <div className="lobby-manual-roles-panel" role="dialog" aria-modal="true">
+            <h2 className="lobby-manual-roles-title">Manual Role Assignment (Testing)</h2>
+            <p className="lobby-manual-roles-help">
+              Temporary host-only tool for classic lobby testing.
+            </p>
+
+            <div className="lobby-manual-roles-list">
+              {state.players
+                .filter((player) => !player.isSpectator)
+                .map((player) => (
+                  <label key={player.clientId} className="lobby-manual-roles-row">
+                    <span className="lobby-manual-roles-name">{player.name}</span>
+                    <select
+                      className="lobby-manual-roles-select"
+                      value={manualRoleDraft[player.clientId] ?? "CIVILIAN"}
+                      onChange={(event) =>
+                        setDraftRole(
+                          player.clientId,
+                          event.target.value as MafiaPlayerRole
+                        )
+                      }
+                    >
+                      {TEST_ROLE_OPTIONS.map((roleOption) => (
+                        <option key={roleOption} value={roleOption}>
+                          {getRoleLabel(roleOption)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+            </div>
+
+            <div className="lobby-manual-roles-actions">
+              <button
+                type="button"
+                className="lobby-inline-action"
+                onClick={closeManualRoleAssign}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="lobby-start-button is-ready"
+                onClick={applyManualRoleAssign}
+              >
+                Apply Roles
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

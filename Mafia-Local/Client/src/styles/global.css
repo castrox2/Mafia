@@ -130,6 +130,17 @@ a {
   background: #09090b;
 }
 
+.ui-app-shell--game {
+  padding: 0;
+  align-items: stretch;
+  justify-content: flex-start;
+  background: #09090b;
+}
+
+.ui-app-shell--game > * {
+  width: 100%;
+}
+
 .ui-screen {
   width: min(100%, 980px);
   margin: 0 auto;

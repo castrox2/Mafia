@@ -4,6 +4,7 @@ import type { MafiaKillVoteAction, DoctorSaveAction, DetectiveCheckAction, Sheri
 import { SKIP_TARGET_CLIENT_ID } from "./roles/types.js"
 import type { Player, PlayerRole, PlayerStatus } from "./players.js"
 import {
+  ROOM_CODE_CHARSET,
   ROOM_CODE_LENGTH,
   TIMER_MAX_SECONDS,
   TIMER_MIN_SECONDS,
@@ -57,6 +58,15 @@ import {
 // UI animation lead time: emit "phaseEnding" shortly before the phase actually switches.
 // This does NOT change game logic timing; it's just a client-friendly hint.
 const PHASE_ENDING_LEAD_MS = 500
+const BOT_CLIENT_PREFIX = "bot-"
+const MAX_CLASSIC_ROOM_PLAYERS = 15
+const CLASSIC_ROLE_SET = new Set<PlayerRole>([
+  "CIVILIAN",
+  "MAFIA",
+  "DOCTOR",
+  "DETECTIVE",
+  "SHERIFF",
+])
 
 /* ======================================================
                           Types
@@ -86,6 +96,7 @@ type Room = {
   hostId: string
   hostParticipates: boolean
   players: Player[]
+  manualRoleOverrides: Record<string, PlayerRole> | null
   settings: GameSettings
   roleSelectorSettings: RoleSelectorSettingsPayload | null
   botcScriptSummary: BotcScriptSummaryPayload | null
@@ -125,6 +136,45 @@ export const createRoomsManager = (io: MafiaIoServer) => {
 
   const normalizeName = (name: string) =>
     (name || "").trim()
+
+  const isBotPlayer = (player: Player): boolean =>
+    player.isBot === true
+
+  const hasHumanPlayers = (room: Room): boolean =>
+    room.players.some((player) => !isBotPlayer(player))
+
+  const randomRoomToken = (length = 4): string => {
+    let token = ""
+    for (let i = 0; i < length; i += 1) {
+      const idx = Math.floor(Math.random() * ROOM_CODE_CHARSET.length)
+      token += ROOM_CODE_CHARSET[idx] ?? "X"
+    }
+    return token
+  }
+
+  const createUniqueBotClientId = (room: Room): string => {
+    const usedIds = new Set(room.players.map((p) => p.clientId))
+
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      const candidate = `${BOT_CLIENT_PREFIX}${randomRoomToken(4)}`
+      if (!usedIds.has(candidate)) return candidate
+    }
+
+    return `${BOT_CLIENT_PREFIX}${Date.now().toString(36)}`
+  }
+
+  const createUniqueBotName = (room: Room): string => {
+    const usedNames = new Set(
+      room.players.map((p) => String(p.name || "").trim().toLowerCase())
+    )
+
+    for (let idx = 1; idx <= 9999; idx += 1) {
+      const candidate = `Bot ${idx}`
+      if (!usedNames.has(candidate.toLowerCase())) return candidate
+    }
+
+    return `Bot ${Date.now().toString(36)}`
+  }
 
   /* ------------------------------------------------------
                   Default Game Settings
@@ -1295,7 +1345,7 @@ type Winner = MafiaWinner
   ------------------------------------------------------ */
 
   const assignNextHost = (room: Room) => {
-    const nextHost = room.players[0]
+    const nextHost = room.players.find((p) => !isBotPlayer(p)) ?? room.players[0]
     room.hostId = nextHost?.clientId ?? ""
     room.hostParticipates = nextHost ? nextHost.isSpectator !== true : false
   }
@@ -1322,7 +1372,7 @@ type Winner = MafiaWinner
       }
 
       if (before !== room.players.length) {
-        if (room.players.length === 0) {
+        if (room.players.length === 0 || !hasHumanPlayers(room)) {
           clearRoomRoleMemory(roomId)
           delete rooms[roomId]
           io.to(roomId).emit("roomClosed", { roomId })
@@ -1381,6 +1431,7 @@ type Winner = MafiaWinner
       hostId: clientId, // Host is stable identity
       hostParticipates: true,
       players: [],
+      manualRoleOverrides: null,
       settings: defaultSettings(),
       roleSelectorSettings:
         roomType === "ROLE_SELECTOR" ? defaultRoleSelectorSettings() : null,
@@ -1643,6 +1694,69 @@ const updateRoomSettings = (
       return
     }
 
+    if (!hasHumanPlayers(room)) {
+      clearRoomRoleMemory(cleanRoomId)
+      delete rooms[cleanRoomId]
+      io.to(cleanRoomId).emit("roomClosed", { roomId: cleanRoomId })
+      return
+    }
+
+    emitRoomState(cleanRoomId)
+  }
+
+  /* ------------------------------------------------------
+                        Add Bot
+      - Host-only
+      - Classic rooms only
+      - Lobby only (before game starts)
+  ------------------------------------------------------ */
+
+  const addBotLocal = (socket: MafiaServerSocket, roomId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    const refuse = (reason: string) => {
+      socket.emit("addBotRefused", { reason })
+    }
+
+    if (room.hostId !== socket.data.clientId) {
+      refuse("Only the host can add bots.")
+      return
+    }
+
+    if (room.roomType !== "CLASSIC") {
+      refuse("Bots are only available in regular game lobbies.")
+      return
+    }
+
+    if (room.gameStarted || room.phase !== "LOBBY") {
+      refuse("Bots can only be added before the game starts.")
+      return
+    }
+
+    if (room.players.length >= MAX_CLASSIC_ROOM_PLAYERS) {
+      refuse(`Room is full (max ${MAX_CLASSIC_ROOM_PLAYERS} players).`)
+      return
+    }
+
+    const botClientId = createUniqueBotClientId(room)
+    const botName = createUniqueBotName(room)
+
+    const botPlayer: Player = {
+      id: `bot-socket-${cleanRoomId}-${botClientId}`,
+      name: botName,
+      clientId: botClientId,
+      isBot: true,
+      alive: true,
+      role: "CIVILIAN",
+      status: "READY",
+      isSpectator: false,
+      voteCount: 0,
+      joinedAt: Date.now(),
+    }
+
+    room.players.push(botPlayer)
     emitRoomState(cleanRoomId)
   }
 
@@ -1668,7 +1782,8 @@ const updateRoomSettings = (
   }
 
   const assignRolesForNewGame = (
-    room: Room
+    room: Room,
+    opts?: { manualRoleOverrides?: Record<string, PlayerRole> | null }
   ): { ok: true } | { ok: false; reason: string } => {
     const activePlayers = getActivePlayers(room)
 
@@ -1728,6 +1843,27 @@ const updateRoomSettings = (
       for (const p of activePlayers) {
         p.role = pool[idx] ?? "CIVILIAN"
         idx += 1
+      }
+
+      for (const p of room.players) {
+        if (p.isSpectator === true) {
+          p.role = "CIVILIAN"
+        }
+      }
+
+      return { ok: true }
+    }
+
+    const manualRoleOverrides = opts?.manualRoleOverrides ?? null
+    const useManualRoleOverrides =
+      room.roomType === "CLASSIC" &&
+      manualRoleOverrides != null &&
+      Object.keys(manualRoleOverrides).length > 0
+
+    if (useManualRoleOverrides) {
+      for (const p of activePlayers) {
+        const overrideRole = manualRoleOverrides[p.clientId] ?? "CIVILIAN"
+        p.role = CLASSIC_ROLE_SET.has(overrideRole) ? overrideRole : "CIVILIAN"
       }
 
       for (const p of room.players) {
@@ -1951,6 +2087,10 @@ const updateRoomSettings = (
       }
     }
 
+    const manualRoleOverrides = room.manualRoleOverrides
+    const useManualRoleOverrides =
+      manualRoleOverrides != null && Object.keys(manualRoleOverrides).length > 0
+
     // Convert spectators into active players ONLY at new game boundary.
     resetPlayersForNewGame(room)
 
@@ -1975,7 +2115,12 @@ const updateRoomSettings = (
       - Refuse early so host gets a clear reason instead of
         a silent immediate GAMEOVER.
     ------------------------------------------------------ */
-    const plannedMafiaCount = Math.min(room.settings.roleCount.mafia, playerCount)
+    const plannedMafiaCount = useManualRoleOverrides
+      ? getActivePlayers(room).reduce((count, player) => {
+          const role = manualRoleOverrides?.[player.clientId]
+          return role === "MAFIA" ? count + 1 : count
+        }, 0)
+      : Math.min(room.settings.roleCount.mafia, playerCount)
     const plannedNonMafiaCount = Math.max(0, playerCount - plannedMafiaCount)
 
     if (plannedMafiaCount <= 0) {
@@ -2004,8 +2149,20 @@ const updateRoomSettings = (
     // Clear any buffered actions from previous games (safety)
     clearGameplayRoleActions(cleanRoomId)
 
-    // Assign roles now that the game is starting
-    assignRolesForNewGame(room)
+    // Assign roles now that the game is starting.
+    const roleAssignment = assignRolesForNewGame(room, {
+      manualRoleOverrides: useManualRoleOverrides ? manualRoleOverrides : null,
+    })
+    if (!roleAssignment.ok) {
+      room.gameStarted = false
+      room.gameNumber = Math.max(0, room.gameNumber - 1)
+      socket.emit("startRefused", { reason: roleAssignment.reason })
+      emitRoomState(cleanRoomId)
+      return
+    }
+
+    // Manual role overrides are a lobby testing helper; consume after successful use.
+    room.manualRoleOverrides = null
 
     startPhase(cleanRoomId, "DAY")
 
@@ -2043,6 +2200,59 @@ const updateRoomSettings = (
       if (r.gameNumber !== startedGameNumber) return
       emitPrivateRolesToRoom(cleanRoomId)
     }, 150)
+  }
+
+  const skipPhaseLocal = (socket: MafiaServerSocket, roomId: string) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
+    if (!room) return
+
+    if (room.hostId !== socket.data.clientId) {
+      socket.emit("startRefused", { reason: "Only the host can skip phases." })
+      return
+    }
+
+    if (room.roomType !== "CLASSIC") {
+      socket.emit("startRefused", {
+        reason: "Phase skip is only available in classic game rooms.",
+      })
+      return
+    }
+
+    if (!room.gameStarted) {
+      socket.emit("startRefused", { reason: "Game has not started yet." })
+      return
+    }
+
+    if (room.phase === "GAMEOVER") {
+      socket.emit("startRefused", { reason: "Cannot skip phase during game over." })
+      return
+    }
+
+    if (room.phase === "LOBBY") {
+      socket.emit("startRefused", { reason: "Cannot skip while still in lobby." })
+      return
+    }
+
+    if (room.phase === "VOTING") {
+      finalizeVotingPhase(room, cleanRoomId)
+      return
+    }
+
+    clearPhaseTimeout(room)
+    clearPhaseEndingTimeout(room)
+
+    if (room.phase === "NIGHT") {
+      applyNightResolution(room, cleanRoomId)
+      if (maybeEndGameFromAliveState(room, cleanRoomId)) return
+      emitRoomState(cleanRoomId)
+      if (maybeEndGameFromAliveState(room, cleanRoomId)) return
+      startPhase(cleanRoomId, nextPhase("NIGHT"))
+      return
+    }
+
+    if (maybeEndGameFromAliveState(room, cleanRoomId)) return
+    startPhase(cleanRoomId, nextPhase(room.phase))
   }
 
   const redealRoleSelectorLocal = (socket: MafiaServerSocket, roomId: string) => {
@@ -2261,11 +2471,26 @@ const updateRoomSettings = (
   }
 
   const setPlayerRole = (roomId: string, playerId: string, role: PlayerRole) => {
-    const room = rooms[normalizeRoomId(roomId)]
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = rooms[cleanRoomId]
     if (!room) return
     if (room.roomType === "ROLE_SELECTOR") return
+
+    if (!room.gameStarted) {
+      room.manualRoleOverrides = {
+        ...(room.manualRoleOverrides ?? {}),
+        [playerId]: role,
+      }
+    }
+
     room.players = setRoleList(room.players, playerId, role)
-    emitRoomState(roomId)
+    emitRoomState(cleanRoomId)
+
+    // Testing helper: if roles are adjusted mid-game, re-send private roles
+    // so clients immediately reflect the current assignment.
+    if (room.gameStarted) {
+      emitPrivateRolesToRoom(cleanRoomId)
+    }
   }
 
   const setPlayerStatus = (
@@ -2448,62 +2673,6 @@ const updateRoomSettings = (
     }
   }
 
-    /* ------------------------------------------------------
-        Helper: get my recorded actions (private)
-    - Used by UI / reconnect flows to restore a player’s current selection
-    - Reads from the in-memory action buffer and emits ONLY to requesting socket
-    - Uses current phase to pick the correct bucket:
-      NIGHT -> NIGHT
-      VOTING -> VOTING
-      everything else -> DAY (covers DAY/DISCUSSION/PUBDISCUSSION for sheriff)
-  ------------------------------------------------------ */
-
-  const requestMyActionsLocal = (socket: MafiaServerSocket, roomId: string) => {
-    const cleanRoomId = normalizeRoomId(roomId)
-    const room = rooms[cleanRoomId]
-    if (!room) {
-      socket.emit("myActions", { roomId: cleanRoomId, actions: [] })
-      return
-    }
-
-    if (room.roomType === "ROLE_SELECTOR") {
-      socket.emit("myActions", {
-        roomId: cleanRoomId,
-        gameNumber: room.gameNumber,
-        phase: room.phase,
-        bucket: "DAY",
-        actions: [],
-      })
-      return
-    }
-
-    const fromClientId = String(socket.data.clientId || "").trim()
-    if (!fromClientId) {
-      socket.emit("myActions", { roomId: cleanRoomId, actions: [] })
-      return
-    }
-
-    // Map current room phase -> action bucket
-    const bucket =
-      room.phase === "NIGHT" ? "NIGHT" : room.phase === "VOTING" ? "VOTING" : "DAY"
-
-    const mine = getRoleActions(cleanRoomId, bucket).filter(
-      (a: any) => a?.fromClientId === fromClientId
-    )
-
-    // Emit only the minimal, safe info needed by client UI
-    socket.emit("myActions", {
-      roomId: cleanRoomId,
-      gameNumber: room.gameNumber,
-      phase: room.phase,
-      bucket,
-      actions: mine.map((a: any) => ({
-        kind: a.kind,
-        targetClientId: a.targetClientId,
-        createdAtMs: a.createdAtMs,
-      })),
-    })
-  }
 
   /* ------------------------------------------------------
             Helper: re-send my private role (private)
@@ -2547,6 +2716,7 @@ const updateRoomSettings = (
     createRoomLocal,
     joinRoomLocal,
     leaveRoomLocal,
+    addBotLocal,
     setHostParticipationLocal,
     setPlayerAlive,
     setPlayerRole,
@@ -2556,10 +2726,10 @@ const updateRoomSettings = (
     importBotcScriptLocal,
     handleReconnect,
     startGameLocal,
+    skipPhaseLocal,
     redealRoleSelectorLocal,
     kickPlayerLocal,
     submitRoleActionLocal,
-    requestMyActionsLocal,
     requestMyRoleLocal,
   }
 }

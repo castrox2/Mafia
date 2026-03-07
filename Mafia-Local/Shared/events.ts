@@ -69,8 +69,6 @@ export type RoleActionKind =
   | "SHERIFF_SHOOT"
   | "CIVILIAN_VOTE"
 
-export type RoleActionBucket = "DAY" | "NIGHT" | "VOTING"
-
 export type PhaseTimersPayload = {
   daySec: number
   nightSec: number
@@ -144,6 +142,7 @@ export type MafiaPlayer = {
   id: string
   name: string
   clientId: string
+  isBot: boolean
   alive: boolean
   role: AssignedPlayerRole
   status: MafiaPlayerStatus
@@ -301,20 +300,6 @@ export type ActionRefusedPayload = {
   reason: string
 }
 
-export type MyRecordedActionPayload = {
-  kind: string
-  targetClientId: string
-  createdAtMs: number
-}
-
-export type MyActionsPayload = {
-  roomId: string
-  actions: MyRecordedActionPayload[]
-  gameNumber?: number
-  phase?: MafiaPhase
-  bucket?: RoleActionBucket
-}
-
 export type UpdateSettingsPayload = {
   roomId: string
   settings: Partial<GameSettingsPayload>
@@ -360,6 +345,14 @@ export type KickPlayerPayload = {
   targetClientId: string
 }
 
+export type AddBotPayload = {
+  roomId: string
+}
+
+export type AddBotRefusedPayload = {
+  reason: string
+}
+
 export type CreateRoomPayload = {
   playerName: string
   baseUrl?: string
@@ -383,7 +376,6 @@ export interface MafiaClientToServerEvents {
   importBotcScript: (payload: ImportBotcScriptPayload) => void
   setPlayerStatus: (payload: SetPlayerStatusPayload) => void
   setHostParticipation: (payload: SetHostParticipationPayload) => void
-  requestMyActions: (payload: RoomIdPayload) => void
   requestRoomState: (payload: RoomIdPayload) => void
   startGame: (payload: RoomIdPayload) => void
   forceStartGame: (payload: RoomIdPayload) => void
@@ -391,6 +383,8 @@ export interface MafiaClientToServerEvents {
   requestMyRole: (payload: RoomIdPayload) => void
   kickPlayer: (payload: KickPlayerPayload) => void
   redealRoleSelector: (payload: RoomIdPayload) => void
+  addBot: (payload: AddBotPayload) => void
+  skipPhase: (payload: RoomIdPayload) => void
 }
 
 export interface MafiaServerToClientEvents {
@@ -402,6 +396,7 @@ export interface MafiaServerToClientEvents {
   settingsRefused: (payload: ReasonPayload) => void
   startRefused: (payload: ReasonPayload) => void
   kickRefused: (payload: ReasonPayload) => void
+  addBotRefused: (payload: AddBotRefusedPayload) => void
   kicked: (payload: ReasonPayload & RoomIdPayload) => void
   hostParticipationRefused: (payload: HostParticipationRefusedPayload) => void
   gameStarted: (payload: GameStartedPayload) => void
@@ -416,7 +411,6 @@ export interface MafiaServerToClientEvents {
   privateMessage: (payload: PrivateMessagePayload) => void
   actionAccepted: (payload: ActionAcceptedPayload) => void
   actionRefused: (payload: ActionRefusedPayload) => void
-  myActions: (payload: MyActionsPayload) => void
   roleSelectorHostCounts: (payload: RoleSelectorHostCountsPayload) => void
   botcScriptImported: (payload: RoomIdPayload & { summary: BotcScriptSummaryPayload }) => void
   timerStarted: (payload: TimerStatePayload) => void

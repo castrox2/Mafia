@@ -136,6 +136,10 @@ export const getPlayerTags = (
   const tags: UiBadge[] = []
   const isHost = player.clientId === ctx.hostId
 
+  if (player.isBot) {
+    tags.push({ key: "BOT", label: "BOT", tone: "info" })
+  }
+
   if (isHost && player.isSpectator) {
     tags.push({ key: "HOST_DEVICE", label: "HOST DEVICE", tone: "info" })
   } else if (isHost) {

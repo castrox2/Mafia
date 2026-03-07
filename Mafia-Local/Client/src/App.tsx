@@ -91,7 +91,7 @@ export default function App() {
   ------------------------------------------------------ */
   if (screen === "GAME") {
     return (
-      <div className="ui-app-shell">
+      <div className="ui-app-shell ui-app-shell--game">
         <Game
           roomId={roomId}
           playerName={playerName}

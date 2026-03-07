@@ -3,7 +3,6 @@ import type { RoomState, Player } from "../src/types.js"
 import { SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
 import type {
   MafiaWinner,
-  MyRecordedActionPayload,
   PrivateMessagePayload,
   RoleActionKind,
   YourRolePayload,
@@ -14,6 +13,7 @@ import {
   getRoleLabel,
   getWinnerLabel,
 } from "../src/uiMeta.js"
+import "../src/styles/phases/day.css"
 
 /* ======================================================
                     PhaseRouter.tsx
@@ -46,7 +46,6 @@ type PhaseRouterProps = {
   // UI-supporting, non-authoritative (sent by events; roomState is the truth)
   myRole: YourRolePayload["role"] | null
   rolemateClientIds: string[]
-  myActions: MyRecordedActionPayload[]
   privateMessages: PrivateMessagePayload[]
   banner: Banner
   winner: Winner | null
@@ -62,7 +61,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
   isSpectator,
   myRole,
   rolemateClientIds,
-  myActions,
   privateMessages,
   banner,
   winner,
@@ -79,7 +77,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -97,7 +94,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -115,7 +111,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -133,7 +128,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -151,7 +145,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -169,7 +162,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -187,7 +179,6 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           isSpectator={isSpectator}
           myRole={myRole}
           rolemateClientIds={rolemateClientIds}
-          myActions={myActions}
           privateMessages={privateMessages}
           banner={banner}
           winner={winner}
@@ -214,7 +205,6 @@ type ScreenProps = {
   isSpectator: boolean
   myRole: YourRolePayload["role"] | null
   rolemateClientIds: string[]
-  myActions: MyRecordedActionPayload[]
   privateMessages: PrivateMessagePayload[]
   banner: Banner
   winner: Winner | null
@@ -228,7 +218,7 @@ const BannerView = ({ banner }: { banner: Banner }) => {
   const phaseLabel = banner.kind === "NIGHT" ? getPhaseLabel("NIGHT") : getPhaseLabel("VOTING")
 
   return (
-    <div style={{ marginBottom: 10, padding: 10, border: "1px solid #ddd" }}>
+    <div className="phase-banner" style={{ marginBottom: 10, padding: 10, border: "1px solid #ddd" }}>
       <strong>{phaseLabel}:</strong> {banner.text}
     </div>
   )
@@ -241,7 +231,7 @@ const ActionFeedbackView = ({ actionFeedback }: { actionFeedback: ActionFeedback
   const borderColor = isRefused ? "#c1121f" : "#2a9d8f"
 
   return (
-    <div style={{ marginBottom: 10, padding: 10, border: `1px solid ${borderColor}` }}>
+    <div className="phase-feedback" style={{ marginBottom: 10, padding: 10, border: `1px solid ${borderColor}` }}>
       <strong>{isRefused ? "Action refused" : "Action recorded"}:</strong> {actionFeedback.text}
     </div>
   )
@@ -261,17 +251,19 @@ const LobbyScreen = ({ isHost, isSpectator, myRole, banner, actionFeedback }: Sc
   </div>
 )
 
-const DayScreen = ({ isSpectator, myRole, banner, actionFeedback }: ScreenProps) => (
-  <div>
-    <h2>{getPhaseLabel("DAY")}</h2>
-    <BannerView banner={banner} />
-    <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Daytime phase content goes here.</div>
-    <div style={{ marginTop: 8 }}>
-      <div>Spectator: {isSpectator ? "Yes" : "No"}</div>
-      <div>My role: {myRole ? getRoleLabel(myRole) : "(unknown)"} </div>
+const DayScreen = ({ banner, actionFeedback }: ScreenProps) => (
+  <section className="phase-day">
+    <div className="phase-day__card">
+      <h2 className="phase-day__title">{getPhaseLabel("DAY")}</h2>
+
+      <p className="phase-day__subtitle">
+        Morning breaks over the town. Share reads, build trust, and get ready for voting.
+      </p>
+
+      <BannerView banner={banner} />
+      <ActionFeedbackView actionFeedback={actionFeedback} />
     </div>
-  </div>
+  </section>
 )
 
 const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
@@ -296,20 +288,10 @@ const VotingScreen = ({
   state,
   me,
   isSpectator,
-  myActions,
   banner,
   actionFeedback,
   submitRoleAction,
 }: ScreenProps) => {
-  const voteAction = myActions.find((a) => a.kind === "CIVILIAN_VOTE") ?? null
-  const hasVoted = voteAction != null
-  const votedTargetClientId = voteAction?.targetClientId ?? null
-
-  const votedTargetName =
-    votedTargetClientId === SKIP_TARGET_CLIENT_ID
-      ? "Skip Vote"
-      : state.players.find((p) => p.clientId === votedTargetClientId)?.name ?? "(unknown)"
-
   const actionButtonStyle: React.CSSProperties = {
     padding: "10px 12px",
     fontSize: 16,
@@ -332,7 +314,7 @@ const VotingScreen = ({
       <ActionFeedbackView actionFeedback={actionFeedback} />
       <div>Cast your vote or skip this round.</div>
 
-      {!isSpectator && me?.alive === true && !hasVoted && (
+      {!isSpectator && me?.alive === true && (
         <div style={{ marginTop: 10 }}>
           <ul>
             {state.players
@@ -359,25 +341,6 @@ const VotingScreen = ({
         </div>
       )}
 
-      {!isSpectator && me?.alive === true && hasVoted && (
-        <div style={{ marginTop: 10 }}>
-          <div>
-            <strong>You voted:</strong> {votedTargetName}
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>
-            Waiting for others...
-          </div>
-        </div>
-      )}
-
-      <div style={{ marginTop: 10 }}>
-        <strong>My recorded action(s):</strong>
-        <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(myActions, null, 2)}</pre>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          (UI teammate: use this to pre-select the player you voted for.)
-        </div>
-      </div>
-
       {isSpectator && (
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
           Spectators can view, but not vote.
@@ -393,8 +356,6 @@ const NightScreen = ({
   isSpectator,
   myRole,
   rolemateClientIds,
-  myActions,
-  privateMessages,
   banner,
   actionFeedback,
   submitRoleAction,
@@ -458,22 +419,6 @@ const NightScreen = ({
             </button>
           </div>
         )}
-
-        <div style={{ marginTop: 10 }}>
-          <strong>My recorded NIGHT action(s):</strong>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(myActions, null, 2)}</pre>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>
-            (UI teammate: use this to pre-select the target I chose.)
-          </div>
-        </div>
-
-        <div style={{ marginTop: 10 }}>
-          <strong>Private messages:</strong>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(privateMessages, null, 2)}</pre>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>
-            (Detective results should appear here; later turn into a modal/toast.)
-          </div>
-        </div>
 
         {isSpectator && (
           <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>

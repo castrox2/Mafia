@@ -3,13 +3,12 @@ import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/PhaseRouter.js"
 import type { RoomState } from "../src/types.js"
 import { normalizeRoomId } from "../../Shared/events.js"
+import "../src/styles/pages/game.css"
 import type {
   ActionAcceptedPayload,
   ActionRefusedPayload,
   GameOverPayload,
   MafiaWinner,
-  MyActionsPayload,
-  MyRecordedActionPayload,
   PhaseEndingPayload,
   PhaseStartedPayload,
   PrivateMessagePayload,
@@ -23,8 +22,7 @@ import {
   getActionRecordedLabel,
   getNightSummaryLabel,
   getPhaseLabel,
-  getPlayerLifeStateLabel,
-  getPlayerTags,
+  getRoleLabel,
 } from "../src/uiMeta.js"
 
 type Props = {
@@ -59,17 +57,17 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
     // Private messages (ex: Detective result). UI teammate can turn into toast/modal later.
     const [privateMessages, setPrivateMessages] = useState<PrivateMessagePayload[]>([])
 
-    // Optional: restore my current selections for a phase (from requestMyActions)
-    const [myActions, setMyActions] = useState<MyRecordedActionPayload[]>([])
-
     // End-game winner (authoritative event from server)
     const [winner, setWinner] = useState<Winner | null>(null)
 
     // Short-lived action feedback ("accepted"/"refused")
     const [actionFeedback, setActionFeedback] = useState<ActionFeedback>(null)
+    const [showRoleWhilePressed, setShowRoleWhilePressed] = useState(false)
+    const [quickMenuOpen, setQuickMenuOpen] = useState(false)
 
     const bannerTimeoutRef = useRef<number | null>(null)
     const actionFeedbackTimeoutRef = useRef<number | null>(null)
+    const quickMenuRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 500)
@@ -177,15 +175,13 @@ useEffect(() => {
         // UI teammate idea:
         // 1) Swap rendered phase screen (if not already swapped by roomState)
         // 2) Start enter animation for the new phase screen
-        // 3) Clear any per-phase UI selections (or requestMyActions to restore)
+        // 3) Clear any per-phase UI selections
         //
         // Example:
         // setTransition({ state: "entering", phase: payload.phase })
         //
         // Countdown should still be derived from roomState.phaseEndTime for accuracy.
-        setMyActions([])
         socket.emit("requestMyRole", { roomId: cleanRoomId })
-        socket.emit("requestMyActions", { roomId: cleanRoomId })
         console.log("phaseStarted", payload)
     }
 
@@ -220,7 +216,6 @@ useEffect(() => {
 // - yourRole: private role reveal (only to this socket)
 // - privateMessage: private info (ex: detective results)
 // - nightSummary / voteSummary: public, spoiler-safe summaries
-// - myActions: server echo of YOUR currently recorded action(s) for this phase
 //
 // Notes for UI teammate:
 // - These are the best "hooks" for banners/toasts/modals.
@@ -332,16 +327,6 @@ useEffect(() => {
     console.log("actionRefused", payload)
   }
 
-  const onMyActions = (payload: MyActionsPayload) => {
-    if (payload.roomId !== cleanRoomId) return
-
-    // UI teammate idea:
-    // - Pre-select buttons/radios based on existing action
-    // - Show "You selected X" status
-    setMyActions(payload.actions ?? [])
-    console.log("myActions", payload)
-  }
-
   socket.on("yourRole", onYourRole)
   socket.on("privateMessage", onPrivateMessage)
   socket.on("nightSummary", onNightSummary)
@@ -349,7 +334,6 @@ useEffect(() => {
   socket.on("gameOver", onGameOver)
   socket.on("actionAccepted", onActionAccepted)
   socket.on("actionRefused", onActionRefused)
-  socket.on("myActions", onMyActions)
 
   // Re-request role AFTER listeners are attached to avoid missing
   // fast server responses during initial Game mount.
@@ -368,45 +352,52 @@ useEffect(() => {
     socket.off("gameOver", onGameOver)
     socket.off("actionAccepted", onActionAccepted)
     socket.off("actionRefused", onActionRefused)
-    socket.off("myActions", onMyActions)
   }
 }, [cleanRoomId])
+
+useEffect(() => {
+  setQuickMenuOpen(false)
+  setShowRoleWhilePressed(false)
+}, [state?.phase])
+
+useEffect(() => {
+  if (!quickMenuOpen) return
+
+  const onPointerDown = (event: PointerEvent) => {
+    if (!quickMenuRef.current) return
+    if (quickMenuRef.current.contains(event.target as Node)) return
+    setQuickMenuOpen(false)
+    setShowRoleWhilePressed(false)
+  }
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return
+    setQuickMenuOpen(false)
+    setShowRoleWhilePressed(false)
+  }
+
+  window.addEventListener("pointerdown", onPointerDown)
+  window.addEventListener("keydown", onKeyDown)
+  return () => {
+    window.removeEventListener("pointerdown", onPointerDown)
+    window.removeEventListener("keydown", onKeyDown)
+  }
+}, [quickMenuOpen])
 
     const isHost = state?.hostId === clientId
     const me = state?.players?.find((p) => p.clientId === clientId) ?? null
     const amSpectator = me?.isSpectator === true
     const isGameOverPhase = state?.phase === "GAMEOVER"
+    const canUseTestingTools = Boolean(isHost && state?.roomType === "CLASSIC")
+    const myStatus = me?.alive === false ? "Dead" : "Alive"
+    const roleLabel = myRole ? getRoleLabel(myRole) : "Unknown"
 
-    const baseActionButtonStyle: React.CSSProperties = {
-      padding: "10px 12px",
-      fontSize: 16,
-      borderRadius: 8,
-      border: "1px solid #bdbdbd",
-      background: "#fff",
-      cursor: "pointer",
-    }
-
-    const leaveButtonStyle: React.CSSProperties = {
-      ...baseActionButtonStyle,
-      border: "1px solid #c47c7c",
-      background: "#fff4f4",
-    }
-
-    const backToLobbyButtonStyle: React.CSSProperties = {
-      ...baseActionButtonStyle,
-      border: "1px solid #7ea0c4",
-      background: "#f3f8ff",
-    }
-
-    const startNewGameButtonStyle: React.CSSProperties = {
-      ...baseActionButtonStyle,
-      border: "1px solid #5ea66d",
-      background: "#f2fff4",
-      opacity: isHost ? 1 : 0.65,
-      cursor: isHost ? "pointer" : "not-allowed",
-    }
+    const phaseLabel = state ? getPhaseLabel(state.phase) : "Loading"
+    const timerLabel = remainingSec === null ? "--" : `${remainingSec}s`
 
     const leaveRoom = () => {
+      setQuickMenuOpen(false)
+      setShowRoleWhilePressed(false)
       socket.emit("leaveRoom", cleanRoomId)
       onExit()
     }
@@ -424,115 +415,96 @@ useEffect(() => {
 
     const submitRoleAction = (kind: RoleActionKind, targetClientId: string) => {
       socket.emit("submitRoleAction", { roomId: cleanRoomId, kind, targetClientId })
-      socket.emit("requestMyActions", { roomId: cleanRoomId })
     }
 
+    const startRolePeek = () => {
+      setShowRoleWhilePressed(true)
+    }
+
+    const stopRolePeek = () => {
+      setShowRoleWhilePressed(false)
+    }
+
+    const toggleQuickMenu = () => {
+      setQuickMenuOpen((prev) => !prev)
+      if (quickMenuOpen) {
+        setShowRoleWhilePressed(false)
+      }
+    }
+
+    const skipPhaseForTesting = () => {
+      if (!isHost) return
+      if (!state) return
+      if (state.phase === "GAMEOVER") return
+
+      setQuickMenuOpen(false)
+      setShowRoleWhilePressed(false)
+      socket.emit("skipPhase", { roomId: cleanRoomId })
+    }
 
     return (
-    <div className="ui-screen" style={{ maxWidth: 980 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-            <img
-            src="/assets/Mafia-Icon.png"
-            alt="Mafia logo"
-            style={{ width: 56, height: 56, objectFit: "contain" }}
-            onError={(event) => {
-                event.currentTarget.style.display = "none"
-            }}
-            />
-            <h1 style={{ marginBottom: 0, marginTop: 0 }}>Game</h1>
-        </div>
+      <div className={`game-page game-page--${state?.phase?.toLowerCase() ?? "loading"}`}>
+        <div className={`game-phase-canvas ${isGameOverPhase ? "is-gameover" : ""}`}>
+          <div className="game-phase-topbar">
+            <div className="game-phase-topbar__timer">Time: {timerLabel}</div>
+            <div className="game-phase-topbar__phase">{phaseLabel}</div>
 
-        <div style={{ marginBottom: 10 }}>
-        <div>
-            <strong>Room:</strong> {cleanRoomId}
-        </div>
-        <div>
-            <strong>You:</strong> {cleanPlayerName}
-            {me
-              ? ` ${getPlayerTags(me, {
-                  hostId: state?.hostId ?? "",
-                  viewerClientId: clientId,
-                })
-                  .filter((tag) => tag.key !== "YOU")
-                  .map((tag) => `(${tag.label})`)
-                  .join(" ")}`
-              : ""}
-        </div>
-        </div>
+            <div className="game-phase-topbar__right">
+              <span className={`game-status-pill ${myStatus === "Alive" ? "is-alive" : "is-dead"}`}>
+                {myStatus}
+              </span>
 
-      {/* Game/Phase info (simple, easy to read) */}
-        {state && (
-        <div style={{ marginBottom: 12 }}>
-            <div>
-            <strong>Game:</strong>{" "}
-            {state.gameStarted ? `Started (#${state.gameNumber})` : "Not started"}
+              {!isGameOverPhase && (
+                <div className="game-quick-menu" ref={quickMenuRef}>
+                  <button
+                    type="button"
+                    className="game-quick-menu__trigger"
+                    onClick={toggleQuickMenu}
+                    aria-expanded={quickMenuOpen}
+                    aria-haspopup="menu"
+                    title="Open player menu"
+                  >
+                    <span className="game-quick-menu__bar" />
+                    <span className="game-quick-menu__bar" />
+                    <span className="game-quick-menu__bar" />
+                  </button>
+
+                  {quickMenuOpen && (
+                    <div className="game-quick-menu__panel" role="menu">
+                      <button
+                        type="button"
+                        className="game-quick-menu__hold"
+                        onPointerDown={startRolePeek}
+                        onPointerUp={stopRolePeek}
+                        onPointerCancel={stopRolePeek}
+                        onPointerLeave={stopRolePeek}
+                        onBlur={stopRolePeek}
+                        title={`Player: ${cleanPlayerName}`}
+                      >
+                        Hold to Reveal Role
+                      </button>
+
+                      <div className={`game-quick-menu__role ${showRoleWhilePressed ? "is-revealed" : ""}`}>
+                        {showRoleWhilePressed ? roleLabel : "Hidden"}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="game-quick-menu__leave"
+                        onClick={leaveRoom}
+                      >
+                        Leave Room
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div>
-            <strong>Phase:</strong> {getPhaseLabel(state.phase)}
-            </div>
-            {remainingSec !== null && (
-            <div>
-                <strong>Time left:</strong> {remainingSec}s
-            </div>
-            )}
-        </div>
-        )}
-
-        {state && (
-          <div style={{ marginBottom: 14 }}>
-            <h3 style={{ margin: "0 0 8px 0" }}>Player Status</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {state.players.map((p) => {
-                const lifeState = getPlayerLifeStateLabel(p)
-                const tags = getPlayerTags(p, {
-                  hostId: state.hostId,
-                  viewerClientId: clientId,
-                })
-                  .map((tag) => `(${tag.label})`)
-                  .join(" ")
-
-                return (
-                  <li key={p.clientId} style={{ marginBottom: 4 }}>
-                    {p.name}
-                    {tags ? ` ${tags}` : ""}
-                    {" - "}
-                    {lifeState}
-                  </li>
-                )
-              })}
-            </ul>
           </div>
-        )}
 
-      {/* Minimal actions (no flashy UI) */}
-        <div className="ui-action-row" style={{ marginBottom: 16 }}>
-        {isGameOverPhase ? (
-          <>
-            <button style={leaveButtonStyle} onClick={leaveRoom}>
-              Leave Room
-            </button>
-            <button style={backToLobbyButtonStyle} onClick={backToLobby}>
-              Back to Lobby
-            </button>
-            <button
-              style={startNewGameButtonStyle}
-              onClick={startNewGame}
-              disabled={!isHost}
-              title={isHost ? "Start a fresh game immediately." : "Only the host can start a new game."}
-            >
-              Start New Game
-            </button>
-          </>
-        ) : (
-          <button style={leaveButtonStyle} onClick={leaveRoom}>
-            Leave Room
-          </button>
-        )}
-        </div>
-
-      {/* Phase-specific screen (keeps styling/components isolated per phase) */}
-        {state && (
-            <PhaseRouter
+          <main className={`game-phase-host ${isGameOverPhase ? "is-gameover" : ""}`}>
+            {state ? (
+              <PhaseRouter
                 phase={state.phase}
                 state={state}
                 me={me}
@@ -540,18 +512,51 @@ useEffect(() => {
                 isSpectator={amSpectator}
                 myRole={myRole}
                 rolemateClientIds={rolemateClientIds}
-                myActions={myActions}
                 privateMessages={privateMessages}
                 banner={banner}
                 winner={winner}
                 actionFeedback={actionFeedback}
                 submitRoleAction={submitRoleAction}
-            />
-        )}
+              />
+            ) : (
+              <div className="game-phase-loading">Waiting for room state...</div>
+            )}
+          </main>
 
-    </div>
+          {isGameOverPhase && (
+            <div className="game-phase-bottom-actions">
+              <button className="game-button game-button--leave" onClick={leaveRoom}>
+                Leave Room
+              </button>
+              <button className="game-button game-button--back" onClick={backToLobby}>
+                Back to Lobby
+              </button>
+              <button
+                className={`game-button game-button--start ${!isHost ? "is-disabled" : ""}`}
+                onClick={startNewGame}
+                disabled={!isHost}
+                title={isHost ? "Start a fresh game immediately." : "Only the host can start a new game."}
+              >
+                Start New Game
+              </button>
+            </div>
+          )}
+
+          {canUseTestingTools && !isGameOverPhase && (
+            <button
+              type="button"
+              className="game-skip-phase-floating"
+              onClick={skipPhaseForTesting}
+              title="Skip to next phase (testing)"
+            >
+              Skip Phase
+            </button>
+          )}
+        </div>
+      </div>
     )
 }
+
 
 
 

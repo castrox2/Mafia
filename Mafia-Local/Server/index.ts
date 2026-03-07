@@ -9,6 +9,7 @@ import { fileURLToPath } from "url"
 import { createRoomsManager } from "./rooms.js"
 import { normalizeRoomId } from "../Shared/events.js"
 import type {
+  AddBotPayload,
   CreateRoomPayload,
   ImportBotcScriptPayload,
   JoinRoomPayload,
@@ -285,10 +286,6 @@ io.on("connection", (socket) => {
   }
   socket.on("setHostParticipation", onSetHostParticipation)
 
-  socket.on("requestMyActions", ({ roomId }: RoomIdPayload) => {
-    roomsManager.requestMyActionsLocal(socket, roomId)
-  })
-
   socket.on("requestRoomState", ({ roomId }: RoomIdPayload) => {
     roomsManager.emitRoomState(roomId)
     roomsManager.requestMyRoleLocal(socket, roomId)
@@ -300,6 +297,10 @@ io.on("connection", (socket) => {
 
   socket.on("forceStartGame", ({ roomId }: RoomIdPayload) => {
     roomsManager.startGameLocal(socket, roomId, { force: true })
+  })
+
+  socket.on("skipPhase", ({ roomId }: RoomIdPayload) => {
+    roomsManager.skipPhaseLocal(socket, roomId)
   })
 
   socket.on(
@@ -315,6 +316,10 @@ io.on("connection", (socket) => {
 
   socket.on("redealRoleSelector", ({ roomId }: RoomIdPayload) => {
     roomsManager.redealRoleSelectorLocal(socket, roomId)
+  })
+
+  socket.on("addBot", ({ roomId }: AddBotPayload) => {
+    roomsManager.addBotLocal(socket, roomId)
   })
 
   socket.on(
