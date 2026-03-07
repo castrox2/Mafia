@@ -82,6 +82,52 @@
   color: rgba(179, 179, 179, 0.82);
 }
 
+.lobby-sidebar-settings {
+  margin-top: 12px;
+  padding: 10px 8px;
+  border: 1px solid rgba(179, 179, 179, 0.22);
+  border-radius: 10px;
+  background: rgba(11, 11, 15, 0.74);
+  display: grid;
+  gap: 12px;
+}
+
+.lobby-sidebar-settings-group {
+  display: grid;
+  gap: 6px;
+}
+
+.lobby-sidebar-settings-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.lobby-sidebar-settings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.lobby-sidebar-settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(226, 226, 226, 0.92);
+}
+
+.lobby-sidebar-settings-item span:last-child {
+  color: #ffffff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .lobby-sidebar-actions {
   margin-top: auto;
   display: grid;
@@ -536,6 +582,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .lobby-sidebar-settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .lobby-main {
     padding: 14px 12px calc(16px + env(safe-area-inset-bottom, 0px));
   }
@@ -591,6 +642,10 @@
   .lobby-side-button {
     height: 40px;
     font-size: 12px;
+  }
+
+  .lobby-sidebar-settings {
+    grid-template-columns: 1fr;
   }
 
   .lobby-manual-roles-overlay {

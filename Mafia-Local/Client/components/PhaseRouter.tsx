@@ -14,6 +14,8 @@ import {
   getWinnerLabel,
 } from "../src/uiMeta.js"
 import "../src/styles/phases/day.css"
+import "../src/styles/phases/discussion.css"
+import "../src/styles/phases/public-discussion.css"
 
 /* ======================================================
                     PhaseRouter.tsx
@@ -212,6 +214,27 @@ type ScreenProps = {
   submitRoleAction: (kind: RoleActionKind, targetClientId: string) => void
 }
 
+const PHASE_PLACEHOLDER_TEXTS = ["PH1", "PH2", "PH3", "PH4", "PH5"] as const
+const PHASE_PLACEHOLDER_ROTATE_MS = 4000
+
+const RotatingPhasePlaceholder = ({
+  className,
+}: {
+  className?: string
+}) => {
+  const [index, setIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setIndex((prev) => (prev + 1) % PHASE_PLACEHOLDER_TEXTS.length)
+    }, PHASE_PLACEHOLDER_ROTATE_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  return <p className={className}>{PHASE_PLACEHOLDER_TEXTS[index]}</p>
+}
+
 const BannerView = ({ banner }: { banner: Banner }) => {
   if (!banner) return null
 
@@ -256,112 +279,58 @@ const LobbyScreen = ({ isHost, isSpectator, myRole, banner, actionFeedback }: Sc
   </div>
 )
 
-const SheriffActionPanel = ({
-  state,
-  me,
-  isSpectator,
-  myRole,
-  submitRoleAction,
-}: Pick<ScreenProps, "state" | "me" | "isSpectator" | "myRole" | "submitRoleAction">) => {
-  if (myRole !== "SHERIFF") return null
-  if (isSpectator || me?.alive !== true) return null
-
-  const targets = state.players.filter(
-    (p) => p.alive === true && p.isSpectator !== true && p.clientId !== me.clientId
-  )
-
-  return (
-    <div style={{ marginTop: 14 }}>
-      <strong>Sheriff Action:</strong>
-      {targets.length <= 0 ? (
-        <div style={{ marginTop: 6, fontSize: 13 }}>No valid targets right now.</div>
-      ) : (
-        <ul style={{ marginTop: 8 }}>
-          {targets.map((p) => (
-            <li key={p.clientId} style={{ marginBottom: 8 }}>
-              {p.name}{" "}
-              <button onClick={() => submitRoleAction("SHERIFF_SHOOT", p.clientId)}>
-                Shoot
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button onClick={() => submitRoleAction("SHERIFF_SHOOT", SKIP_TARGET_CLIENT_ID)}>
-        Skip Shot
-      </button>
-    </div>
-  )
-}
-
-const DayScreen = ({ state, me, isSpectator, myRole, submitRoleAction, banner, actionFeedback }: ScreenProps) => (
-  <section className="phase-day">
-    <div className="phase-day__card">
-      <h2 className="phase-day__title">{getPhaseLabel("DAY")}</h2>
-
-      <p className="phase-day__subtitle">
-        Morning breaks over the town. Share reads, build trust, and get ready for voting.
-      </p>
-
-      <BannerView banner={banner} />
-      <ActionFeedbackView actionFeedback={actionFeedback} />
-      <SheriffActionPanel
-        state={state}
-        me={me}
-        isSpectator={isSpectator}
-        myRole={myRole}
-        submitRoleAction={submitRoleAction}
-      />
+const DayScreen = ({ banner, actionFeedback }: ScreenProps) => (
+  <section className="phase-day phase-message-phase">
+    <div className="phase-message-phase__card phase-message-phase__surface">
+      <div className="phase-message-phase__alerts">
+        <BannerView banner={banner} />
+        <ActionFeedbackView actionFeedback={actionFeedback} />
+      </div>
+      <div className="phase-message-phase__center">
+        <RotatingPhasePlaceholder className="phase-message-phase__rotating-text" />
+      </div>
     </div>
   </section>
 )
 
-const DiscussionScreen = ({
-  state,
-  me,
-  isSpectator,
-  myRole,
-  submitRoleAction,
-  banner,
-  actionFeedback,
-}: ScreenProps) => (
-  <div>
-    <h2>{getPhaseLabel("DISCUSSION")}</h2>
-    <BannerView banner={banner} />
-    <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Discussion phase content goes here.</div>
-    <SheriffActionPanel
-      state={state}
-      me={me}
-      isSpectator={isSpectator}
-      myRole={myRole}
-      submitRoleAction={submitRoleAction}
-    />
-  </div>
+const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
+  <section className="phase-day phase-message-phase phase-discussion">
+    <div className="phase-message-phase__card phase-message-phase__surface">
+      <div className="phase-message-phase__alerts">
+        <BannerView banner={banner} />
+        <ActionFeedbackView actionFeedback={actionFeedback} />
+      </div>
+      <img
+        className="phase-message-phase__illustration phase-message-phase__illustration--private"
+        src="/assets/images/Private%20Discussion.png"
+        alt=""
+        aria-hidden="true"
+      />
+      <div className="phase-message-phase__center">
+        <RotatingPhasePlaceholder className="phase-message-phase__rotating-text" />
+      </div>
+    </div>
+  </section>
 )
 
-const PubDiscussionScreen = ({
-  state,
-  me,
-  isSpectator,
-  myRole,
-  submitRoleAction,
-  banner,
-  actionFeedback,
-}: ScreenProps) => (
-  <div>
-    <h2>{getPhaseLabel("PUBDISCUSSION")}</h2>
-    <BannerView banner={banner} />
-    <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Public discussion content goes here.</div>
-    <SheriffActionPanel
-      state={state}
-      me={me}
-      isSpectator={isSpectator}
-      myRole={myRole}
-      submitRoleAction={submitRoleAction}
-    />
-  </div>
+const PubDiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
+  <section className="phase-day phase-message-phase phase-public-discussion">
+    <div className="phase-message-phase__card phase-message-phase__surface">
+      <div className="phase-message-phase__alerts">
+        <BannerView banner={banner} />
+        <ActionFeedbackView actionFeedback={actionFeedback} />
+      </div>
+      <img
+        className="phase-message-phase__illustration phase-message-phase__illustration--public"
+        src="/assets/images/Public%20Discussion.png"
+        alt=""
+        aria-hidden="true"
+      />
+      <div className="phase-message-phase__center">
+        <RotatingPhasePlaceholder className="phase-message-phase__rotating-text" />
+      </div>
+    </div>
+  </section>
 )
 
 const VotingScreen = ({

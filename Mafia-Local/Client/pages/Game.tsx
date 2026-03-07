@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
 import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/PhaseRouter.js"
+import RoleRollOverlay from "../components/RoleRollOverlay.js"
 import type { RoomState } from "../src/types.js"
-import { normalizeRoomId } from "../../Shared/events.js"
+import { normalizeRoomId, SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
 import "../src/styles/pages/game.css"
 import type {
   ActionAcceptedPayload,
@@ -25,6 +26,10 @@ import {
   getPhaseLabel,
   getRoleLabel,
 } from "../src/uiMeta.js"
+import {
+  getRegularRoleImageSrc,
+  getRegularRoleRollCandidates,
+} from "../src/roleRoll.js"
 
 type Props = {
     roomId: string
@@ -35,6 +40,15 @@ type Props = {
 
 type Winner = MafiaWinner
 type ActionFeedback = null | { kind: "ACCEPTED" | "REFUSED"; text: string }
+type DetectiveResultPopup = null | { checkedClientId: string; isMafia: boolean }
+
+const formatRemainingTime = (seconds: number | null): string => {
+  if (seconds == null) return "--m --s"
+  const safeSeconds = Math.max(0, Math.floor(seconds))
+  const minutes = Math.floor(safeSeconds / 60)
+  const secs = safeSeconds % 60
+  return `${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`
+}
 
 export default function Game({ roomId, playerName, onExit, onBackToLobby }: Props) {
     const [state, setState] = useState<RoomState | null>(null)
@@ -57,6 +71,7 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
 
     // Private messages (ex: Detective result). UI teammate can turn into toast/modal later.
     const [privateMessages, setPrivateMessages] = useState<PrivateMessagePayload[]>([])
+    const [detectiveResultPopup, setDetectiveResultPopup] = useState<DetectiveResultPopup>(null)
 
     // End-game winner (authoritative event from server)
     const [winner, setWinner] = useState<Winner | null>(null)
@@ -65,10 +80,14 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
     const [actionFeedback, setActionFeedback] = useState<ActionFeedback>(null)
     const [showRoleWhilePressed, setShowRoleWhilePressed] = useState(false)
     const [quickMenuOpen, setQuickMenuOpen] = useState(false)
+    const [sheriffPanelOpen, setSheriffPanelOpen] = useState(false)
+    const [sheriffAbilityUsed, setSheriffAbilityUsed] = useState(false)
+    const [roleRollOpen, setRoleRollOpen] = useState(false)
 
     const bannerTimeoutRef = useRef<number | null>(null)
     const actionFeedbackTimeoutRef = useRef<number | null>(null)
     const quickMenuRef = useRef<HTMLDivElement | null>(null)
+    const sheriffPanelRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 500)
@@ -259,6 +278,12 @@ useEffect(() => {
     // - Show toast/modal
     // - Or add to an "Inbox" panel for the player
     setPrivateMessages((prev) => [...prev, payload])
+    if (payload.type === "DETECTIVE_RESULT") {
+      setDetectiveResultPopup({
+        checkedClientId: payload.checkedClientId,
+        isMafia: payload.isMafia === true,
+      })
+    }
     console.log("privateMessage", payload)
   }
 
@@ -312,6 +337,10 @@ useEffect(() => {
     )
 
     if (sheriffAnnouncement && sheriffAnnouncement.type === "SHERIFF_USED") {
+      if (sheriffAnnouncement.byClientId === clientId) {
+        setSheriffAbilityUsed(true)
+      }
+
       setBanner({
         kind: "PUBLIC",
         text: sheriffAnnouncement.mafiaKilled
@@ -337,6 +366,14 @@ useEffect(() => {
 
   const onActionAccepted = (payload: ActionAcceptedPayload) => {
     const actionKind = getActionRecordedLabel(String(payload?.kind || "ACTION"))
+    const acceptedKind = String(payload?.kind || "").trim()
+    if (acceptedKind === "SHERIFF_SHOOT") {
+      setSheriffAbilityUsed(true)
+      setSheriffPanelOpen(false)
+      setQuickMenuOpen(false)
+      setShowRoleWhilePressed(false)
+    }
+
     showActionFeedback({
       kind: "ACCEPTED",
       text: `${actionKind} recorded.`,
@@ -346,6 +383,15 @@ useEffect(() => {
 
   const onActionRefused = (payload: ActionRefusedPayload) => {
     const reason = String(payload?.reason || "Action was refused.")
+    const refusedKind = String(payload?.kind || "").trim()
+    if (
+      refusedKind === "SHERIFF_SHOOT" &&
+      reason.toLowerCase().includes("once per game")
+    ) {
+      setSheriffAbilityUsed(true)
+      setSheriffPanelOpen(false)
+    }
+
     showActionFeedback({
       kind: "REFUSED",
       text: reason,
@@ -386,7 +432,88 @@ useEffect(() => {
 useEffect(() => {
   setQuickMenuOpen(false)
   setShowRoleWhilePressed(false)
+  setSheriffPanelOpen(false)
 }, [state?.phase])
+
+useEffect(() => {
+  setSheriffAbilityUsed(false)
+}, [cleanRoomId, state?.gameNumber])
+
+useEffect(() => {
+  if (!state?.gameStarted) {
+    setRoleRollOpen(false)
+    return
+  }
+  if (state.roomType !== "CLASSIC") return
+  if (state.phase !== "DAY") return
+  if (!myRole) return
+  const amSpectatorNow =
+    state.players.find((player) => player.clientId === clientId)?.isSpectator === true
+  if (amSpectatorNow) return
+
+  const seenKey = `mafia_role_roll_seen:${cleanRoomId}:game${state.gameNumber}:client:${clientId}`
+  if (window.sessionStorage.getItem(seenKey) === "1") return
+
+  window.sessionStorage.setItem(seenKey, "1")
+  setRoleRollOpen(true)
+}, [
+  cleanRoomId,
+  myRole,
+  state?.players,
+  state?.gameNumber,
+  state?.gameStarted,
+  state?.phase,
+  state?.roomType,
+])
+
+useEffect(() => {
+  if (!detectiveResultPopup) return
+
+  const timeoutId = window.setTimeout(() => {
+    setDetectiveResultPopup(null)
+  }, 3200)
+
+  return () => window.clearTimeout(timeoutId)
+}, [detectiveResultPopup])
+
+useEffect(() => {
+  if (!sheriffPanelOpen) return
+
+  const htmlEl = document.documentElement
+  const bodyEl = document.body
+  const lockScrollY = window.scrollY
+  const previousBodyStyle = {
+    position: bodyEl.style.position,
+    top: bodyEl.style.top,
+    left: bodyEl.style.left,
+    right: bodyEl.style.right,
+    width: bodyEl.style.width,
+    overflow: bodyEl.style.overflow,
+  }
+
+  htmlEl.classList.add("ui-no-scroll")
+  bodyEl.classList.add("ui-no-scroll")
+  bodyEl.style.position = "fixed"
+  bodyEl.style.top = `-${lockScrollY}px`
+  bodyEl.style.left = "0"
+  bodyEl.style.right = "0"
+  bodyEl.style.width = "100%"
+  bodyEl.style.overflow = "hidden"
+
+  return () => {
+    htmlEl.classList.remove("ui-no-scroll")
+    bodyEl.classList.remove("ui-no-scroll")
+
+    bodyEl.style.position = previousBodyStyle.position
+    bodyEl.style.top = previousBodyStyle.top
+    bodyEl.style.left = previousBodyStyle.left
+    bodyEl.style.right = previousBodyStyle.right
+    bodyEl.style.width = previousBodyStyle.width
+    bodyEl.style.overflow = previousBodyStyle.overflow
+
+    window.scrollTo(0, lockScrollY)
+  }
+}, [sheriffPanelOpen])
 
 useEffect(() => {
   if (!quickMenuOpen) return
@@ -419,13 +546,50 @@ useEffect(() => {
     const canUseTestingTools = Boolean(isHost && state?.roomType === "CLASSIC")
     const myStatus = me?.alive === false ? "Dead" : "Alive"
     const roleLabel = myRole ? getRoleLabel(myRole) : "Unknown"
+    const regularRoleRollCandidates = useMemo(() => getRegularRoleRollCandidates(), [])
+    const roleRollImageSrc = useMemo(
+      () => getRegularRoleImageSrc(myRole),
+      [myRole]
+    )
+    const sheriffActionAllowedPhase =
+      state?.phase === "DAY" ||
+      state?.phase === "DISCUSSION" ||
+      state?.phase === "PUBDISCUSSION"
+    const canUseSheriffMenuAction = Boolean(
+      myRole === "SHERIFF" &&
+      me?.alive === true &&
+      !amSpectator &&
+      sheriffActionAllowedPhase &&
+      !sheriffAbilityUsed
+    )
+    const canRenderSheriffMenuAction = Boolean(
+      myRole === "SHERIFF" &&
+      me?.alive === true &&
+      !amSpectator &&
+      sheriffActionAllowedPhase
+    )
+    const sheriffTargets =
+      canUseSheriffMenuAction && state
+        ? state.players.filter(
+            (player) =>
+              player.clientId !== me?.clientId &&
+              player.alive === true &&
+              player.isSpectator !== true
+          )
+        : []
+    const detectiveTargetName =
+      detectiveResultPopup && state
+        ? state.players.find((player) => player.clientId === detectiveResultPopup.checkedClientId)?.name ??
+          detectiveResultPopup.checkedClientId
+        : ""
 
     const phaseLabel = state ? getPhaseLabel(state.phase) : "Loading"
-    const timerLabel = remainingSec === null ? "--" : `${remainingSec}s`
+    const timerLabel = formatRemainingTime(remainingSec)
 
     const leaveRoom = () => {
       setQuickMenuOpen(false)
       setShowRoleWhilePressed(false)
+      setSheriffPanelOpen(false)
       socket.emit("leaveRoom", cleanRoomId)
       onExit()
     }
@@ -460,6 +624,27 @@ useEffect(() => {
       }
     }
 
+    const openSheriffPanelFromMenu = () => {
+      if (!canUseSheriffMenuAction) return
+      setQuickMenuOpen(false)
+      setShowRoleWhilePressed(false)
+      setSheriffPanelOpen(true)
+    }
+
+    const closeSheriffPanel = () => {
+      setSheriffPanelOpen(false)
+    }
+
+    const submitSheriffShoot = (targetClientId: string) => {
+      if (!canUseSheriffMenuAction) return
+      socket.emit("submitRoleAction", {
+        roomId: cleanRoomId,
+        kind: "SHERIFF_SHOOT",
+        targetClientId,
+      })
+      setSheriffPanelOpen(false)
+    }
+
     const skipPhaseForTesting = () => {
       if (!isHost) return
       if (!state) return
@@ -470,9 +655,23 @@ useEffect(() => {
       socket.emit("skipPhase", { roomId: cleanRoomId })
     }
 
+    const closeRoleRollOverlay = () => {
+      setRoleRollOpen(false)
+    }
+
     return (
       <div className={`game-page game-page--${state?.phase?.toLowerCase() ?? "loading"}`}>
         <div className={`game-phase-canvas ${isGameOverPhase ? "is-gameover" : ""}`}>
+          <RoleRollOverlay
+            open={roleRollOpen}
+            title="Assigning Role"
+            finalLabel={roleLabel}
+            finalImageSrc={roleRollImageSrc}
+            candidates={regularRoleRollCandidates}
+            onComplete={closeRoleRollOverlay}
+            onSkip={closeRoleRollOverlay}
+          />
+
           <div className="game-phase-topbar">
             <div className="game-phase-topbar__timer">Time: {timerLabel}</div>
             <div className="game-phase-topbar__phase">{phaseLabel}</div>
@@ -515,6 +714,17 @@ useEffect(() => {
                       <div className={`game-quick-menu__role ${showRoleWhilePressed ? "is-revealed" : ""}`}>
                         {showRoleWhilePressed ? roleLabel : "Hidden"}
                       </div>
+
+                      {canRenderSheriffMenuAction && (
+                        <button
+                          type="button"
+                          className="game-quick-menu__sheriff"
+                          onClick={openSheriffPanelFromMenu}
+                          disabled={!canUseSheriffMenuAction}
+                        >
+                          {canUseSheriffMenuAction ? "Sheriff Action" : "Sheriff Action Used"}
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -580,10 +790,106 @@ useEffect(() => {
               Skip Phase
             </button>
           )}
+
+          {sheriffPanelOpen && canUseSheriffMenuAction && (
+            <div
+              className="game-sheriff-panel-overlay"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeSheriffPanel()
+                }
+              }}
+              onWheel={(event) => {
+                if (!sheriffPanelRef.current) {
+                  event.preventDefault()
+                  return
+                }
+                if (!sheriffPanelRef.current.contains(event.target as Node)) {
+                  event.preventDefault()
+                }
+              }}
+              onTouchMove={(event) => {
+                if (!sheriffPanelRef.current) {
+                  event.preventDefault()
+                  return
+                }
+                if (!sheriffPanelRef.current.contains(event.target as Node)) {
+                  event.preventDefault()
+                }
+              }}
+            >
+              <div
+                ref={sheriffPanelRef}
+                className="game-sheriff-panel"
+                role="dialog"
+                aria-modal="true"
+              >
+                <div className="game-sheriff-panel__title">Sheriff Action</div>
+                <div className="game-sheriff-panel__help">Choose a target to shoot.</div>
+
+                {sheriffTargets.length <= 0 ? (
+                  <div className="game-sheriff-panel__empty">No valid targets available.</div>
+                ) : (
+                  <div className="game-sheriff-panel__list">
+                    {sheriffTargets.map((target) => (
+                      <button
+                        key={target.clientId}
+                        type="button"
+                        className="game-sheriff-panel__target"
+                        onClick={() => submitSheriffShoot(target.clientId)}
+                      >
+                        <span className="game-sheriff-panel__target-name">{target.name}</span>
+                        <span className="game-sheriff-panel__target-action">Shoot</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="game-sheriff-panel__actions">
+                  <button
+                    type="button"
+                    className="game-sheriff-panel__skip"
+                    onClick={() => submitSheriffShoot(SKIP_TARGET_CLIENT_ID)}
+                  >
+                    Skip Shot
+                  </button>
+                  <button
+                    type="button"
+                    className="game-sheriff-panel__close"
+                    onClick={closeSheriffPanel}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {detectiveResultPopup && (
+            <div
+              className="game-detective-popup"
+              role="dialog"
+              aria-live="polite"
+              aria-label="Detective investigation result"
+            >
+              <div className="game-detective-popup__title">Investigation Result</div>
+              <div className="game-detective-popup__text">
+                {detectiveTargetName} {detectiveResultPopup.isMafia ? "is Mafia." : "is not Mafia."}
+              </div>
+              <button
+                type="button"
+                className="game-detective-popup__close"
+                onClick={() => setDetectiveResultPopup(null)}
+              >
+                Close
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )
 }
+
 
 
 

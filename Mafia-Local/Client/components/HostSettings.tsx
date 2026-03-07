@@ -24,6 +24,7 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
   const [doctor, setDoctor] = useState(0)
   const [detective, setDetective] = useState(0)
   const [sheriff, setSheriff] = useState(0)
+  const [manualRoleAssignEnabled, setManualRoleAssignEnabled] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -38,12 +39,14 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
     setDoctor(s?.roleCount?.doctor ?? 0)
     setDetective(s?.roleCount?.detective ?? 0)
     setSheriff(s?.roleCount?.sheriff ?? 0)
+    setManualRoleAssignEnabled(s?.manualRoleAssignEnabled === true)
   }, [open])
 
   const handleSave = () => {
     onSave({
       timers: { daySec, voteSec, nightSec, discussionSec, pubDiscussionSec },
       roleCount: { mafia, doctor, detective, sheriff },
+      manualRoleAssignEnabled,
     })
 
     onClose()
@@ -60,6 +63,7 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
     setDoctor(s?.roleCount?.doctor ?? 0)
     setDetective(s?.roleCount?.detective ?? 0)
     setSheriff(s?.roleCount?.sheriff ?? 0)
+    setManualRoleAssignEnabled(s?.manualRoleAssignEnabled === true)
 
     onClose()
   }
@@ -203,6 +207,15 @@ export default function HostSettingsModal({ open, roomState, onClose, onSave }: 
                 min={0}
                 onChange={(event) => setSheriff(Number(event.target.value))}
               />
+            </label>
+
+            <label className="settings-choice">
+              <input
+                type="checkbox"
+                checked={manualRoleAssignEnabled}
+                onChange={(event) => setManualRoleAssignEnabled(event.target.checked)}
+              />
+              <span>Enable manual role assignment in lobby</span>
             </label>
           </section>
         </div>

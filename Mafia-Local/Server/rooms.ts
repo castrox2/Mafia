@@ -194,6 +194,7 @@ export const createRoomsManager = (io: MafiaIoServer) => {
       detective: 0,
       sheriff: 0,
     },
+    manualRoleAssignEnabled: false,
   })
 
   const defaultRoleSelectorSettings = (): RoleSelectorSettingsPayload => ({
@@ -572,6 +573,14 @@ export const createRoomsManager = (io: MafiaIoServer) => {
     ),
   })
 
+  const normalizeManualRoleAssignEnabled = (
+    nextValue: boolean | undefined,
+    currentValue: boolean | undefined
+  ): boolean => {
+    if (typeof nextValue === "boolean") return nextValue
+    return currentValue === true
+  }
+
   const normalizeRoleCount = (
     r: Partial<RoleCount> | undefined,
     current: RoleCount,
@@ -774,7 +783,11 @@ export const createRoomsManager = (io: MafiaIoServer) => {
         role: room.gameStarted ? "CIVILIAN" : p.role,
       })),
 
-      settings: room.settings,
+      settings: {
+        timers: room.settings.timers,
+        roleCount: room.settings.roleCount,
+        manualRoleAssignEnabled: room.settings.manualRoleAssignEnabled === true,
+      },
       roleSelectorSettings: room.roleSelectorSettings,
       botcScriptSummary: room.botcScriptSummary,
       roleBounds: getRoleBounds(getActivePlayerCount(room)),
@@ -1494,6 +1507,10 @@ const updateRoomSettings = (
       room.settings.roleCount,
       playerCount,
       bounds
+    ),
+    manualRoleAssignEnabled: normalizeManualRoleAssignEnabled(
+      settings.manualRoleAssignEnabled,
+      room.settings.manualRoleAssignEnabled
     ),
   }
 
@@ -2658,6 +2675,25 @@ const updateRoomSettings = (
       if (alreadyVoted) return refuse("You already voted. Waiting for others.")
     } else {
       return refuse("Unknown action kind.")
+    }
+
+    // Detective checks resolve immediately so the detective sees
+    // the result popup right after clicking investigate.
+    if (kind === "DETECTIVE_CHECK") {
+      socket.emit("actionAccepted", { kind, targetClientId })
+
+      if (!isSkipAction && target) {
+        socket.emit("privateMessage", {
+          roomId: cleanRoomId,
+          gameNumber: room.gameNumber,
+          type: "DETECTIVE_RESULT",
+          toClientId: fromClientId,
+          checkedClientId: target.clientId,
+          isMafia: target.role === "MAFIA",
+        })
+      }
+
+      return
     }
 
     // Record action into in-memory buffer (phase bucket is derived by kind)

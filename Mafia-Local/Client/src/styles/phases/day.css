@@ -13,11 +13,14 @@
   overflow: hidden;
 }
 
-.phase-day__card {
+.phase-day__card,
+.phase-message-phase__card {
   width: 100%;
   min-height: 100%;
   padding: clamp(18px, 2.4vw, 28px);
   color: #3b1600;
+  display: flex;
+  flex-direction: column;
 }
 
 .phase-day__title {
@@ -34,6 +37,61 @@
   color: rgba(69, 34, 11, 0.85);
   font-size: clamp(15px, 2vw, 18px);
   line-height: 1.45;
+}
+
+.phase-message-phase__surface {
+  position: relative;
+}
+
+.phase-message-phase__alerts {
+  position: relative;
+  z-index: 2;
+}
+
+.phase-message-phase__center {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(12px, 2vw, 20px);
+}
+
+.phase-message-phase__rotating-text {
+  margin: 0;
+  max-width: min(85vw, 780px);
+  font-size: clamp(30px, 5vw, 56px);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: rgba(69, 34, 11, 0.9);
+}
+
+.phase-message-phase__illustration {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -42%);
+  width: min(560px, 72vw);
+  max-width: 92%;
+  height: auto;
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+@media (max-width: 900px) {
+  .phase-message-phase__illustration {
+    top: 52%;
+    transform: translate(-50%, -48%);
+    width: min(640px, 96vw);
+    max-width: 96%;
+  }
 }
 
 .phase-day .phase-banner,

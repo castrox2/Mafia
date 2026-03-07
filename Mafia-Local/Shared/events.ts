@@ -87,6 +87,7 @@ export type RoleCountPayload = {
 export type GameSettingsPayload = {
   timers: PhaseTimersPayload
   roleCount: RoleCountPayload
+  manualRoleAssignEnabled: boolean
 }
 
 export type RoleSelectorSettingsPayload = {

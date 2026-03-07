@@ -20,7 +20,7 @@ const parsePort = (value, fallback) => {
 
 const SERVER_PORT = parsePort(process.env.MAFIA_SERVER_PORT || process.env.PORT, 3100)
 const SERVER_URL = process.env.ELECTRON_SERVER_URL || `http://127.0.0.1:${SERVER_PORT}`
-const SPLASH_MIN_VISIBLE_MS = 900
+const SPLASH_MIN_VISIBLE_MS = 2500
 
 let win
 let splashWin

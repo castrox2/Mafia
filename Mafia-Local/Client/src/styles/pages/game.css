@@ -2,14 +2,23 @@
 
 .game-page {
   width: 100%;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
+  max-height: 100dvh;
   color: #f5f5f5;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .game-phase-canvas {
   position: relative;
   width: 100%;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .game-phase-topbar {
@@ -129,7 +138,8 @@
 }
 
 .game-quick-menu__hold,
-.game-quick-menu__leave {
+.game-quick-menu__leave,
+.game-quick-menu__sheriff {
   height: 34px;
   border-radius: 10px;
   border: 1px solid rgba(147, 51, 234, 0.4);
@@ -147,6 +157,17 @@
 .game-quick-menu__leave {
   border-color: rgba(239, 68, 68, 0.45);
   background: rgba(136, 31, 25, 0.82);
+}
+
+.game-quick-menu__sheriff {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(120, 56, 11, 0.78);
+}
+
+.game-quick-menu__sheriff:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  filter: saturate(0.7);
 }
 
 .game-quick-menu__role {
@@ -171,13 +192,19 @@
 
 .game-phase-host {
   width: 100%;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .game-phase-host > * {
   width: 100%;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
   padding-top: 74px;
+  overflow: hidden;
 }
 
 .game-phase-host.is-gameover > * {
@@ -260,6 +287,155 @@
   opacity: 0.65;
 }
 
+.game-sheriff-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 68;
+  background: rgba(0, 0, 0, 0.56);
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.game-sheriff-panel {
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(78vh, 640px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  border-radius: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.36);
+  background:
+    radial-gradient(120% 130% at 100% 100%, rgba(239, 68, 68, 0.18) 0%, rgba(239, 68, 68, 0) 58%),
+    rgba(7, 8, 16, 0.95);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.46);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.game-sheriff-panel__title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.game-sheriff-panel__help {
+  font-size: 12px;
+  color: rgba(243, 244, 246, 0.84);
+}
+
+.game-sheriff-panel__empty {
+  font-size: 13px;
+  color: rgba(226, 226, 226, 0.82);
+  border: 1px solid rgba(179, 179, 179, 0.24);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.game-sheriff-panel__list {
+  display: grid;
+  gap: 8px;
+}
+
+.game-sheriff-panel__target {
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(179, 179, 179, 0.3);
+  background: rgba(13, 14, 23, 0.88);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.game-sheriff-panel__target-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.game-sheriff-panel__target-action {
+  color: #ffb86b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.game-sheriff-panel__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.game-sheriff-panel__skip,
+.game-sheriff-panel__close {
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(147, 51, 234, 0.45);
+  background: rgba(45, 19, 72, 0.78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.game-sheriff-panel__skip {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(120, 56, 11, 0.78);
+}
+
+.game-detective-popup {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(360px, calc(100vw - 20px));
+  border-radius: 12px;
+  border: 1px solid rgba(147, 51, 234, 0.42);
+  background:
+    radial-gradient(120% 130% at 100% 100%, rgba(239, 68, 68, 0.16) 0%, rgba(239, 68, 68, 0) 58%),
+    rgba(7, 8, 16, 0.94);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.game-detective-popup__title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.game-detective-popup__text {
+  font-size: 13px;
+  color: rgba(243, 244, 246, 0.96);
+}
+
+.game-detective-popup__close {
+  justify-self: end;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(147, 51, 234, 0.48);
+  background: rgba(56, 26, 89, 0.76);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
 @media (max-width: 900px) {
   .game-phase-topbar {
     grid-template-columns: minmax(74px, 1fr) auto minmax(96px, 1fr);
@@ -300,6 +476,7 @@
 
   .game-quick-menu__hold,
   .game-quick-menu__leave,
+  .game-quick-menu__sheriff,
   .game-quick-menu__role {
     height: 30px;
     font-size: 11px;
@@ -325,6 +502,27 @@
     height: 32px;
     font-size: 11px;
     padding: 0 10px;
+  }
+
+  .game-detective-popup {
+    bottom: 12px;
+    padding: 10px;
+  }
+
+  .game-detective-popup__title {
+    font-size: 13px;
+  }
+
+  .game-detective-popup__text {
+    font-size: 12px;
+  }
+
+  .game-sheriff-panel {
+    padding: 10px;
+  }
+
+  .game-sheriff-panel__title {
+    font-size: 15px;
   }
 }
 

@@ -5,6 +5,7 @@ import HostSettingsModal from "../components/HostSettings.js"
 import RoleSelectorSettingsModal from "../components/RoleSelectorSettings.js"
 import RoleCatalogModal from "../components/RoleCatalogModal.js"
 import RoleInfoModal from "../components/RoleInfoModal.js"
+import RoleRollOverlay from "../components/RoleRollOverlay.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
   AddBotRefusedPayload,
@@ -23,6 +24,11 @@ import type {
 } from "../../Shared/events.js"
 import { getPlayerTags, getRoleLabel, getStatusLabel } from "../src/uiMeta.js"
 import { getBotcRoleInfo } from "../src/constants/botcRoleInfo.js"
+import {
+  getBotcRoleRollCandidates,
+  getRegularRoleImageSrc,
+  getRegularRoleRollCandidates,
+} from "../src/roleRoll.js"
 import "../src/styles/pages/lobby.css"
 
 type Props = {
@@ -56,6 +62,13 @@ const statusClassName = (status: string): string => {
   return "is-neutral"
 }
 
+const formatSecondsToMinSec = (totalSeconds: number): string => {
+  const safe = Math.max(0, Math.floor(totalSeconds))
+  const minutes = Math.floor(safe / 60)
+  const seconds = safe % 60
+  return `${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`
+}
+
 const TEST_ROLE_OPTIONS: MafiaPlayerRole[] = [
   "CIVILIAN",
   "MAFIA",
@@ -82,6 +95,7 @@ export default function Lobby({
     useState<RoleSelectorHostCountsPayload | null>(null)
   const [manualRolesOpen, setManualRolesOpen] = useState(false)
   const [manualRoleDraft, setManualRoleDraft] = useState<Record<string, MafiaPlayerRole>>({})
+  const [roleRollOpen, setRoleRollOpen] = useState(false)
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
@@ -112,12 +126,32 @@ export default function Lobby({
       : roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
         ? myBotcRoleInfo?.roleName ?? String(myRole)
         : getRoleLabel(myRole)
+  const regularRoleRollCandidates = useMemo(
+    () => getRegularRoleRollCandidates(),
+    []
+  )
+  const botcRoleRollCandidates = useMemo(
+    () => getBotcRoleRollCandidates(state?.botcScriptSummary),
+    [state?.botcScriptSummary]
+  )
+  const roleRollCandidates =
+    roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+      ? botcRoleRollCandidates
+      : regularRoleRollCandidates
+  const roleRollImageSrc =
+    roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
+      ? null
+      : getRegularRoleImageSrc(myRole)
 
   const amReady = me?.status === "READY"
   const activePlayers = players.filter((p) => !p.isSpectator)
   const allReady = activePlayers.length > 0 && activePlayers.every((p) => p.status === "READY")
   const canUseManualRoleAssign = Boolean(
-    isHost && !isRoleSelectorRoom && state && !state.gameStarted
+    isHost &&
+      !isRoleSelectorRoom &&
+      state &&
+      !state.gameStarted &&
+      state.settings?.manualRoleAssignEnabled === true
   )
 
   const lobbyTitle = isRoleSelectorRoom ? "Role Selector Lobby" : "Lobby"
@@ -142,6 +176,40 @@ export default function Lobby({
       return next
     })
   }, [manualRolesOpen, state])
+
+  useEffect(() => {
+    if (!manualRolesOpen) return
+    if (canUseManualRoleAssign) return
+    setManualRolesOpen(false)
+  }, [canUseManualRoleAssign, manualRolesOpen])
+
+  useEffect(() => {
+    if (!state) {
+      setRoleRollOpen(false)
+      return
+    }
+    if (state.roomType !== "ROLE_SELECTOR") {
+      setRoleRollOpen(false)
+      return
+    }
+    if (!state.gameStarted) {
+      setRoleRollOpen(false)
+      return
+    }
+    if (amSpectator) return
+    if (!myRole) return
+
+    const seenKey = `mafia_role_roll_seen:${cleanRoomId}:game${state.gameNumber}:client:${clientId}`
+    if (window.sessionStorage.getItem(seenKey) === "1") return
+
+    window.sessionStorage.setItem(seenKey, "1")
+    setRoleRollOpen(true)
+  }, [
+    amSpectator,
+    cleanRoomId,
+    myRole,
+    state,
+  ])
 
   useEffect(() => {
     const onRoomState = (s: RoomState) => {
@@ -397,8 +465,22 @@ export default function Lobby({
     socket.emit("redealRoleSelector", { roomId: cleanRoomId })
   }
 
+  const closeRoleRollOverlay = () => {
+    setRoleRollOpen(false)
+  }
+
   return (
     <div className="lobby-page">
+      <RoleRollOverlay
+        open={roleRollOpen}
+        title="Dealing Role"
+        finalLabel={myRoleLabel ?? "Unknown"}
+        finalImageSrc={roleRollImageSrc}
+        candidates={roleRollCandidates}
+        onComplete={closeRoleRollOverlay}
+        onSkip={closeRoleRollOverlay}
+      />
+
       <aside className="lobby-sidebar">
         <div className="lobby-sidebar-brand">
           <img
@@ -427,6 +509,58 @@ export default function Lobby({
             )}
           </div>
         </div>
+
+        {state?.settings && !isRoleSelectorRoom && (
+          <section className="lobby-sidebar-settings" aria-label="Lobby settings summary">
+            <div className="lobby-sidebar-settings-group">
+              <h3 className="lobby-sidebar-settings-title">Timers</h3>
+              <ul className="lobby-sidebar-settings-list">
+                <li className="lobby-sidebar-settings-item">
+                  <span>Day</span>
+                  <span>{formatSecondsToMinSec(state.settings.timers.daySec)}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Discussion</span>
+                  <span>{formatSecondsToMinSec(state.settings.timers.discussionSec)}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Public</span>
+                  <span>{formatSecondsToMinSec(state.settings.timers.pubDiscussionSec)}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Vote</span>
+                  <span>{formatSecondsToMinSec(state.settings.timers.voteSec)}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Night</span>
+                  <span>{formatSecondsToMinSec(state.settings.timers.nightSec)}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="lobby-sidebar-settings-group">
+              <h3 className="lobby-sidebar-settings-title">Roles</h3>
+              <ul className="lobby-sidebar-settings-list">
+                <li className="lobby-sidebar-settings-item">
+                  <span>Mafia</span>
+                  <span>{state.settings.roleCount.mafia}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Doctor</span>
+                  <span>{state.settings.roleCount.doctor}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Detective</span>
+                  <span>{state.settings.roleCount.detective}</span>
+                </li>
+                <li className="lobby-sidebar-settings-item">
+                  <span>Sheriff</span>
+                  <span>{state.settings.roleCount.sheriff}</span>
+                </li>
+              </ul>
+            </div>
+          </section>
+        )}
 
         <div className="lobby-sidebar-actions">
           {isHost && (
@@ -572,15 +706,6 @@ export default function Lobby({
                 Host participation can only be changed before the game starts.
               </div>
             )}
-          </section>
-        )}
-
-        {state?.settings && !isRoleSelectorRoom && (
-          <section className="lobby-info-panel">
-            <div>
-              roles: mafia {state.settings.roleCount.mafia}, doctor {state.settings.roleCount.doctor},
-              detective {state.settings.roleCount.detective}, sheriff {state.settings.roleCount.sheriff}
-            </div>
           </section>
         )}
 
@@ -789,6 +914,18 @@ export default function Lobby({
               onClose={() => setSettingsOpen(false)}
               roomState={state}
               onSave={(settings) => {
+                setState((prev) => {
+                  if (!prev) return prev
+                  return {
+                    ...prev,
+                    settings: {
+                      ...prev.settings,
+                      ...settings,
+                      manualRoleAssignEnabled:
+                        settings.manualRoleAssignEnabled === true,
+                    },
+                  }
+                })
                 socket.emit("updateSettings", {
                   roomId: cleanRoomId,
                   settings,
@@ -835,9 +972,9 @@ export default function Lobby({
           }}
         >
           <div className="lobby-manual-roles-panel" role="dialog" aria-modal="true">
-            <h2 className="lobby-manual-roles-title">Manual Role Assignment (Testing)</h2>
+            <h2 className="lobby-manual-roles-title">Manual Role Assignment</h2>
             <p className="lobby-manual-roles-help">
-              Temporary host-only tool for classic lobby testing.
+              Host tool for assigning roles before game start.
             </p>
 
             <div className="lobby-manual-roles-list">

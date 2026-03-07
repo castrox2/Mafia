@@ -1,4 +1,20 @@
 /* Phase scaffold: DISCUSSION */
 
-.phase-discussion {}
+.phase-discussion {
+  background:
+    radial-gradient(120% 95% at 14% 8%, rgba(121, 140, 171, 0.3) 0%, rgba(121, 140, 171, 0) 52%),
+    radial-gradient(95% 78% at 88% 86%, rgba(87, 110, 145, 0.22) 0%, rgba(87, 110, 145, 0) 56%),
+    linear-gradient(180deg, rgba(224, 233, 247, 0.94) 0%, rgba(186, 199, 220, 0.9) 100%);
+}
+
+.phase-discussion .phase-message-phase__rotating-text {
+  color: rgba(28, 46, 74, 0.92);
+  text-shadow: 0 3px 14px rgba(214, 225, 244, 0.45);
+}
+
+.phase-discussion .phase-banner,
+.phase-discussion .phase-feedback {
+  border-color: rgba(62, 85, 122, 0.3) !important;
+  background: rgba(239, 245, 255, 0.72);
+}
 

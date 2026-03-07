@@ -1,4 +1,20 @@
 /* Phase scaffold: PUBDISCUSSION */
 
-.phase-public-discussion {}
+.phase-public-discussion {
+  background:
+    radial-gradient(120% 86% at 16% 10%, rgba(244, 114, 182, 0.24) 0%, rgba(244, 114, 182, 0) 50%),
+    radial-gradient(95% 76% at 84% 84%, rgba(249, 115, 22, 0.24) 0%, rgba(249, 115, 22, 0) 58%),
+    linear-gradient(180deg, rgba(255, 240, 245, 0.94) 0%, rgba(255, 227, 199, 0.9) 100%);
+}
+
+.phase-public-discussion .phase-message-phase__rotating-text {
+  color: rgba(87, 27, 45, 0.92);
+  text-shadow: 0 3px 14px rgba(255, 213, 226, 0.5);
+}
+
+.phase-public-discussion .phase-banner,
+.phase-public-discussion .phase-feedback {
+  border-color: rgba(173, 73, 104, 0.3) !important;
+  background: rgba(255, 245, 248, 0.72);
+}
 
