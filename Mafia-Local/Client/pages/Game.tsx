@@ -783,7 +783,7 @@ useEffect(() => {
           {canUseTestingTools && !isGameOverPhase && (
             <button
               type="button"
-              className="game-skip-phase-floating"
+              className={`game-skip-phase-floating ${state?.phase === "VOTING" ? "is-left" : ""}`}
               onClick={skipPhaseForTesting}
               title="Skip to next phase (testing)"
             >

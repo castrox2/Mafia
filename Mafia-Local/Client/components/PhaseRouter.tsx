@@ -1,6 +1,7 @@
 import React from "react"
 import type { RoomState, Player } from "../src/types.js"
 import { SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
+import VotePanel from "./VotePanel.js"
 import type {
   MafiaWinner,
   PrivateMessagePayload,
@@ -15,6 +16,7 @@ import {
 } from "../src/uiMeta.js"
 import "../src/styles/phases/day.css"
 import "../src/styles/phases/discussion.css"
+import "../src/styles/phases/night.css"
 import "../src/styles/phases/public-discussion.css"
 
 /* ======================================================
@@ -341,61 +343,51 @@ const VotingScreen = ({
   actionFeedback,
   submitRoleAction,
 }: ScreenProps) => {
-  const actionButtonStyle: React.CSSProperties = {
-    padding: "10px 12px",
-    fontSize: 16,
-    borderRadius: 8,
-    border: "1px solid #bdbdbd",
-    background: "#fff",
-    cursor: "pointer",
-  }
-
-  const skipVoteButtonStyle: React.CSSProperties = {
-    ...actionButtonStyle,
-    border: "1px solid #7ea0c4",
-    background: "#f3f8ff",
-  }
+  const voteTargets =
+    me == null
+      ? []
+      : state.players
+          .filter((p) => p.alive && p.isSpectator !== true && p.clientId !== me.clientId)
+          .map((p) => ({
+            clientId: p.clientId,
+            name: p.name,
+            subtitle: `ID: ${p.clientId}`,
+          }))
 
   return (
-    <div>
-      <h2>{getPhaseLabel("VOTING")}</h2>
-      <BannerView banner={banner} />
-      <ActionFeedbackView actionFeedback={actionFeedback} />
-      <div>Cast your vote or skip this round.</div>
+    <section className="phase-voting-screen">
+      <div className="phase-voting-screen__header">
+        <BannerView banner={banner} />
+        <ActionFeedbackView actionFeedback={actionFeedback} />
+        <p className="phase-voting-screen__description">Cast your vote or skip this round.</p>
+      </div>
 
-      {!isSpectator && me?.alive === true && (
-        <div style={{ marginTop: 10 }}>
-          <ul>
-            {state.players
-              .filter((p) => p.alive && p.isSpectator !== true && p.clientId !== me.clientId)
-              .map((p) => (
-                <li key={p.clientId} style={{ marginBottom: 8 }}>
-                  {p.name}{" "}
-                  <button
-                    style={actionButtonStyle}
-                    onClick={() => submitRoleAction("CIVILIAN_VOTE", p.clientId)}
-                  >
-                    Vote
-                  </button>
-                </li>
-              ))}
-          </ul>
-
-          <button
-            style={skipVoteButtonStyle}
-            onClick={() => submitRoleAction("CIVILIAN_VOTE", SKIP_TARGET_CLIENT_ID)}
-          >
-            Skip Vote
-          </button>
+        {!isSpectator && me?.alive === true && (
+          <div className="phase-voting-screen__panel">
+            <VotePanel
+              className="vote-panel--courtroom"
+              title="Vote"
+              description="Choose one player to eliminate, or skip if you are not ready to commit."
+              targets={voteTargets}
+              actionLabel="Vote"
+            emptyLabel="No valid players are available to vote for."
+            skipLabel="Skip Vote"
+            onSelect={(targetClientId) => {
+              submitRoleAction("CIVILIAN_VOTE", targetClientId)
+            }}
+            onSkip={() => {
+              submitRoleAction("CIVILIAN_VOTE", SKIP_TARGET_CLIENT_ID)
+            }}
+          />
         </div>
       )}
 
       {isSpectator && (
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+        <div className="phase-voting-screen__spectator-note">
           Spectators can view, but not vote.
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -410,10 +402,6 @@ const NightScreen = ({
   submitRoleAction,
 }: ScreenProps) => {
   const canActAtNight = isSpectator !== true && me?.alive === true
-  const aliveTargets = state.players.filter(
-    (p) => p.alive && p.isSpectator !== true && p.clientId !== me?.clientId
-  )
-
   const actionByRole = getNightActionMetaForRole(myRole)
 
   const rolemateSet = new Set(rolemateClientIds)
@@ -423,59 +411,82 @@ const NightScreen = ({
       : myRole === "DOCTOR"
         ? "/assets/icons/Doctor.ico"
         : null
+  const allowSelfTargetAtNight = actionByRole?.kind === "DOCTOR_SAVE"
+  const nightTargets =
+    canActAtNight && actionByRole
+      ? state.players
+          .filter(
+            (p) =>
+              p.alive &&
+              p.isSpectator !== true &&
+              (allowSelfTargetAtNight || p.clientId !== me?.clientId)
+          )
+          .map((p) => ({
+            clientId: p.clientId,
+            name: p.name,
+            iconSrc: rolemateSet.has(p.clientId) ? rolemateIconSrc ?? undefined : undefined,
+            iconAlt: rolemateSet.has(p.clientId)
+              ? myRole === "MAFIA"
+                ? "Mafia rolemate"
+                : "Doctor rolemate"
+              : undefined,
+          }))
+      : []
+  const nightActionCopy =
+    actionByRole?.kind === "MAFIA_KILL_VOTE"
+      ? {
+          title: "Night Kill Vote",
+          description: "Choose one player to eliminate, or skip if you want to hold the vote.",
+        }
+      : actionByRole?.kind === "DOCTOR_SAVE"
+        ? {
+            title: "Night Save",
+            description: "Choose one player to protect tonight, or skip to leave things unchanged.",
+          }
+        : actionByRole?.kind === "DETECTIVE_CHECK"
+          ? {
+              title: "Night Investigation",
+              description: "Choose one player to investigate tonight, or skip if you do not want to check anyone.",
+            }
+          : null
 
   return (
-    <div>
-      <h2>{getPhaseLabel("NIGHT")}</h2>
-      <BannerView banner={banner} />
-      <ActionFeedbackView actionFeedback={actionFeedback} />
-      <div>Night role action UI goes here.</div>
-
-      <div style={{ marginTop: 10 }}>
-        <div>
-          <strong>My role:</strong> {myRole ? getRoleLabel(myRole) : "(unknown)"}
+    <section className="phase-night">
+      <div className="phase-night__card">
+        <div className="phase-night__alerts">
+          <BannerView banner={banner} />
+          <ActionFeedbackView actionFeedback={actionFeedback} />
         </div>
 
-        {canActAtNight && actionByRole && (
-          <div style={{ marginTop: 10 }}>
-            <ul>
-              {aliveTargets.map((p) => {
-                const isRolemate = rolemateSet.has(p.clientId)
+        <div className="phase-night__body">
+          {canActAtNight && actionByRole && nightActionCopy && (
+            <div className="phase-night__panel-wrap">
+              <VotePanel
+                className="vote-panel--night"
+                title={nightActionCopy.title}
+                description={nightActionCopy.description}
+                targets={nightTargets}
+                actionLabel={actionByRole.actionLabel}
+                emptyLabel="No valid players are available for this action."
+                skipLabel={actionByRole.skipLabel}
+                onSelect={(targetClientId) => {
+                  submitRoleAction(actionByRole.kind, targetClientId)
+                }}
+                onSkip={() => {
+                  submitRoleAction(actionByRole.kind, SKIP_TARGET_CLIENT_ID)
+                }}
+              />
+            </div>
+          )}
 
-                return (
-                  <li key={p.clientId}>
-                    {p.name}{" "}
-                    {isRolemate && rolemateIconSrc && (
-                      <img
-                        src={rolemateIconSrc}
-                        alt={myRole === "MAFIA" ? "Mafia rolemate" : "Doctor rolemate"}
-                        style={{ width: 16, height: 16, objectFit: "contain", marginRight: 6 }}
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none"
-                        }}
-                      />
-                    )}
-                    <button onClick={() => submitRoleAction(actionByRole.kind, p.clientId)}>
-                      {actionByRole.actionLabel}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-
-            <button onClick={() => submitRoleAction(actionByRole.kind, SKIP_TARGET_CLIENT_ID)}>
-              {actionByRole.skipLabel}
-            </button>
-          </div>
-        )}
-
-        {isSpectator && (
-          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-            Spectators can view, but cannot act at night.
-          </div>
-        )}
+          {isSpectator && (
+            <div className="phase-night__spectator-note">
+              Spectators can view, but cannot act at night.
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </section>
   )
 }
 

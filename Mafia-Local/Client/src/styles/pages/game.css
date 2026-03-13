@@ -235,6 +235,11 @@
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
+.game-skip-phase-floating.is-left {
+  left: 14px;
+  right: auto;
+}
+
 .game-phase-bottom-actions {
   position: absolute;
   left: 0;
@@ -502,6 +507,11 @@
     height: 32px;
     font-size: 11px;
     padding: 0 10px;
+  }
+
+  .game-skip-phase-floating.is-left {
+    left: 10px;
+    right: auto;
   }
 
   .game-detective-popup {

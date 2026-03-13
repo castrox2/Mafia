@@ -1,0 +1,439 @@
+.phase-voting-screen {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+  background:
+    radial-gradient(140% 120% at 50% -10%, rgba(211, 166, 96, 0.18) 0%, rgba(211, 166, 96, 0) 46%),
+    radial-gradient(70% 90% at 100% 100%, rgba(123, 29, 29, 0.22) 0%, rgba(123, 29, 29, 0) 58%),
+    linear-gradient(180deg, #0f0a0b 0%, #170e10 44%, #12090c 100%);
+}
+
+.phase-voting-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(222, 190, 128, 0.05) 0%,
+      rgba(222, 190, 128, 0) 12%,
+      rgba(222, 190, 128, 0) 88%,
+      rgba(222, 190, 128, 0.05) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 232, 195, 0.05) 0%,
+      rgba(255, 232, 195, 0) 14%,
+      rgba(255, 232, 195, 0.03) 100%
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.phase-voting-screen__header {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  flex: 0 0 auto;
+  justify-items: center;
+  text-align: center;
+}
+
+.phase-voting-screen__description {
+  margin: 0;
+  max-width: 560px;
+  color: rgba(229, 211, 177, 0.9);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.32);
+}
+
+.phase-voting-screen__panel {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.phase-voting-screen__panel > .vote-panel {
+  max-height: 100%;
+}
+
+.phase-voting-screen__spectator-note {
+  position: relative;
+  z-index: 1;
+  margin-top: 4px;
+  align-self: center;
+  padding: 12px 16px;
+  border: 1px solid rgba(191, 155, 96, 0.28);
+  border-radius: 14px;
+  background: rgba(28, 16, 18, 0.72);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  color: rgba(236, 221, 196, 0.84);
+}
+
+.vote-panel {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  border: 1px solid rgba(179, 179, 179, 0.26);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 130% at 100% 100%, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0) 56%),
+    rgba(9, 11, 18, 0.82);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+  padding: 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  max-height: min(100%, calc(100dvh - 160px));
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.vote-panel__header {
+  display: grid;
+  gap: 6px;
+}
+
+.vote-panel__title {
+  margin: 0;
+  font-size: clamp(20px, 2vw, 28px);
+  line-height: 1.1;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.vote-panel__description {
+  margin: 0;
+  color: rgba(226, 226, 226, 0.82);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vote-panel__empty {
+  border: 1px solid rgba(179, 179, 179, 0.22);
+  border-radius: 12px;
+  background: rgba(14, 16, 24, 0.72);
+  color: rgba(226, 226, 226, 0.82);
+  padding: 14px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.vote-panel__list {
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding-right: 4px;
+}
+
+.vote-panel__target {
+  width: 100%;
+  min-height: 58px;
+  border: 1px solid rgba(179, 179, 179, 0.28);
+  border-radius: 12px;
+  background: rgba(14, 16, 24, 0.84);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+  touch-action: pan-y;
+}
+
+.vote-panel__target:hover:not(:disabled),
+.vote-panel__target:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(147, 51, 234, 0.48);
+  background: rgba(24, 19, 37, 0.9);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  outline: none;
+}
+
+.vote-panel__target:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vote-panel__target-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.vote-panel__target-name-row {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vote-panel__target-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vote-panel__target-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.vote-panel__target-subtitle {
+  font-size: 12px;
+  color: rgba(179, 179, 179, 0.84);
+}
+
+.vote-panel__target-action {
+  flex: 0 0 auto;
+  height: 32px;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: linear-gradient(90deg, rgba(147, 51, 234, 0.92), rgba(239, 68, 68, 0.9));
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vote-panel__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vote-panel__skip {
+  min-width: 112px;
+  height: 36px;
+  border: 1px solid rgba(147, 51, 234, 0.42);
+  border-radius: 10px;
+  background: rgba(45, 19, 72, 0.8);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vote-panel__skip:hover:not(:disabled),
+.vote-panel__skip:focus-visible:not(:disabled) {
+  border-color: rgba(196, 181, 253, 0.5);
+  background: rgba(58, 27, 92, 0.92);
+  outline: none;
+}
+
+.vote-panel__skip:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.phase-voting-screen .vote-panel--courtroom {
+  position: relative;
+  width: min(760px, 100%);
+  border: 1px solid rgba(192, 152, 90, 0.48);
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 120% at 50% 0%, rgba(207, 165, 92, 0.12) 0%, rgba(207, 165, 92, 0) 38%),
+    linear-gradient(180deg, rgba(73, 32, 26, 0.94) 0%, rgba(31, 18, 20, 0.96) 46%, rgba(15, 11, 15, 0.98) 100%);
+  box-shadow:
+    0 24px 54px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 248, 231, 0.06),
+    inset 0 -1px 0 rgba(100, 43, 36, 0.38);
+}
+
+.phase-voting-screen .vote-panel--courtroom::before {
+  content: "PUBLIC HEARING";
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: rgba(224, 199, 154, 0.62);
+  pointer-events: none;
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__header {
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(192, 152, 90, 0.18);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__title {
+  color: #f6e3bd;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.26);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__description {
+  color: rgba(232, 214, 181, 0.84);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__empty {
+  border-color: rgba(192, 152, 90, 0.22);
+  background: rgba(23, 17, 21, 0.76);
+  color: rgba(236, 221, 196, 0.84);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__list {
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(192, 152, 90, 0.5) rgba(27, 18, 20, 0.35);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(192, 152, 90, 0.45);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__list::-webkit-scrollbar-track {
+  background: rgba(27, 18, 20, 0.3);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__target {
+  min-height: 64px;
+  border-color: rgba(192, 152, 90, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(44, 25, 23, 0.92) 0%, rgba(26, 16, 19, 0.96) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 242, 216, 0.04),
+    0 10px 26px rgba(0, 0, 0, 0.18);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__target:hover:not(:disabled),
+.phase-voting-screen .vote-panel--courtroom .vote-panel__target:focus-visible:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(220, 180, 113, 0.56);
+  background:
+    linear-gradient(180deg, rgba(58, 31, 27, 0.96) 0%, rgba(34, 20, 22, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 245, 222, 0.07),
+    0 18px 34px rgba(0, 0, 0, 0.28);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__target-name {
+  color: #f7ead2;
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__target-subtitle {
+  color: rgba(220, 197, 162, 0.72);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__target-action {
+  min-width: 78px;
+  height: 34px;
+  border: 1px solid rgba(212, 173, 106, 0.42);
+  border-radius: 10px;
+  padding: 0 14px;
+  background:
+    linear-gradient(180deg, rgba(108, 33, 33, 0.96) 0%, rgba(71, 20, 27, 0.96) 100%);
+  color: #ffeccc;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 1px 0 rgba(255, 238, 207, 0.08);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__actions {
+  justify-content: flex-start;
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__skip {
+  min-width: 126px;
+  height: 38px;
+  border-color: rgba(192, 152, 90, 0.36);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(31, 20, 22, 0.94) 0%, rgba(20, 15, 18, 0.98) 100%);
+  color: rgba(241, 224, 196, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 242, 216, 0.04);
+}
+
+.phase-voting-screen .vote-panel--courtroom .vote-panel__skip:hover:not(:disabled),
+.phase-voting-screen .vote-panel--courtroom .vote-panel__skip:focus-visible:not(:disabled) {
+  border-color: rgba(220, 180, 113, 0.5);
+  background:
+    linear-gradient(180deg, rgba(42, 26, 28, 0.96) 0%, rgba(26, 17, 22, 1) 100%);
+}
+
+@media (max-width: 640px) {
+  .phase-voting-screen {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .phase-voting-screen__header {
+    gap: 6px;
+  }
+
+  .phase-voting-screen__description,
+  .phase-voting-screen__spectator-note {
+    font-size: 13px;
+  }
+
+  .vote-panel {
+    padding: 14px;
+    gap: 12px;
+    max-height: min(100%, calc(100dvh - 132px));
+  }
+
+  .phase-voting-screen .vote-panel--courtroom::before {
+    top: 14px;
+    right: 16px;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+  }
+
+  .vote-panel__target {
+    min-height: 54px;
+    padding: 10px 12px;
+  }
+
+  .vote-panel__target-name {
+    font-size: 14px;
+  }
+
+  .vote-panel__target-action {
+    min-width: 72px;
+    padding: 0 10px;
+  }
+
+  .phase-voting-screen__spectator-note {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -517,5 +517,165 @@ TODO / next-agent suggestions:
     - Splash window resized to fixed 16:9 (`960x540`).
 - Validation:
   - `npm --prefix Mafia-Local/Electron run build` passes.
-  - Preview screenshot generated to root output folder:
-    - `output/splash-fullbg-preview.png`
+- Preview screenshot generated to root output folder:
+  - `output/splash-fullbg-preview.png`
+
+---
+
+- New task: start extracting voting UI into a reusable panel component.
+- Added reusable `Client/components/VotePanel.tsx` with a dedicated stylesheet:
+  - `Client/src/styles/components/vote-panel.css`
+- Voting phase in `Client/components/PhaseRouter.tsx` now uses `VotePanel` instead of inline button/list markup.
+- Goal: use this same panel pattern later for other target-selection phases/actions to reduce duplicated UI logic.
+
+---
+
+- Follow-up task: make the voting list scroll internally when too many players are present and remove leftover preview HTML after screenshot export.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Voting phase now uses a dedicated full-height wrapper around `VotePanel`.
+- Updated `Client/src/styles/components/vote-panel.css`:
+  - Voting screen wrapper now reserves bounded height inside the locked game shell.
+  - `VotePanel` now supports internal overflow and mobile touch scrolling for long player lists.
+- Cleaned up preview artifacts:
+  - Deleted `output/web-game/vote-panel-preview.html`
+  - Kept only the exported image files in `output/web-game`
+
+---
+
+- Follow-up task: remove duplicated centered phase text only where the phase screen already shows its own inline title.
+- Scan result:
+  - Duplicate title phases were `LOBBY`, `VOTING`, `NIGHT`, and `GAMEOVER`.
+- Updated `Client/pages/Game.tsx`:
+  - The centered topbar phase label is now hidden only for phases that already render an internal title.
+- Updated `Client/src/styles/pages/game.css`:
+  - Added a small spacer class so the topbar grid remains stable when the center label is suppressed.
+
+---
+
+- Follow-up correction: restored the centered topbar phase label on all phases.
+- Updated `Client/pages/Game.tsx`:
+  - Removed the temporary phase-title suppression logic.
+- Updated `Client/src/styles/pages/game.css`:
+  - Removed the temporary topbar spacer class added for the suppression logic.
+
+---
+
+- Follow-up clarification: keep the centered topbar phase label and remove only the duplicated in-content phase title.
+- Applied only to `VOTING` and `NIGHT` for now.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Removed the inline `Voting` title from the voting phase content.
+  - Removed the inline `Night` title from the night phase content.
+- Updated `Client/src/styles/components/vote-panel.css`:
+  - Removed the now-unused voting title style.
+
+---
+
+- Follow-up task: remove two leftover night-phase placeholder lines and move the host-only testing skip button away from the voting panel's skip button.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Removed `Night role action UI goes here.`
+  - Removed the inline `My role: ...` line from the night phase.
+- Updated `Client/pages/Game.tsx`:
+  - The host-only `Skip Phase` testing button now gains a voting-only modifier while the current phase is `VOTING`.
+- Updated `Client/src/styles/pages/game.css`:
+  - Added a voting-only left-side placement for the floating `Skip Phase` button on desktop and mobile.
+
+---
+
+- Follow-up task: restyle the night phase only visually, keeping the existing gameplay/action flow unchanged.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Imported `Client/src/styles/phases/night.css`.
+  - Added dedicated night-phase class hooks around the existing action list and buttons.
+  - Kept the same night actions and target submission behavior.
+- Updated `Client/src/styles/phases/night.css`:
+  - Replaced the placeholder file with a full moonlit/cool-toned night theme.
+  - Added styling for alerts, action list rows, rolemate icon treatment, action buttons, skip button, and spectator note.
+- Validation:
+  - Generated a disposable night preview image at `output/web-game/night-phase-preview.png`.
+  - Deleted the temporary preview HTML after capture to keep only the image artifact.
+  - Ran Playwright smoke client against the app root and inspected the latest screenshot.
+
+---
+
+- Follow-up task: fix night action overflow so long Mafia/Doctor/Detective target lists remain usable on mobile and desktop.
+- Current behavior note:
+  - The night actions do **not** use the shared `VotePanel`; they still use the custom night panel in `Client/components/PhaseRouter.tsx`.
+- Updated `Client/src/styles/phases/night.css`:
+  - The night action panel now has a bounded max height.
+  - The target list inside the panel now scrolls internally with touch scrolling enabled.
+  - The bottom skip button stays visible outside the scrolling list.
+- Validation:
+  - Generated and inspected a temporary mobile overflow check image with 10 sample targets.
+  - Deleted the temporary validation files after inspection.
+  - Ran Playwright smoke client against the app root again.
+
+---
+
+- Follow-up task: move Mafia/Doctor/Detective night actions onto the shared `VotePanel` while keeping the cool night styling.
+- Updated `Client/components/VotePanel.tsx`:
+  - Added optional `className` support for themed variants.
+  - Added optional per-target icon support for rolemate markers.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Replaced the custom night action list/buttons with the shared `VotePanel`.
+  - Preserved existing role action submission behavior and skip behavior.
+  - Added role-specific night copy for Mafia/Doctor/Detective panel titles/descriptions.
+- Updated `Client/src/styles/components/vote-panel.css`:
+  - Added shared icon row/icon styling for reusable target rows.
+- Updated `Client/src/styles/phases/night.css`:
+  - Replaced the old custom night list/button skin with theme overrides for `.vote-panel--night`.
+  - Kept the night panel bounded and internally scrollable.
+- Validation:
+  - `npm run build` passed.
+  - Ran Playwright smoke client against the app root and inspected the output screenshot.
+
+---
+
+- Follow-up task: fix the remaining night shared-panel overflow issue where the Mafia kill panel could still expand instead of scrolling.
+- Updated `Client/src/styles/phases/night.css`:
+  - Made the night panel wrapper use a direct viewport-based bounded height.
+  - Kept the night panel stretched to that fixed slot and clipped within it.
+- Updated `Client/src/styles/components/vote-panel.css`:
+  - Made the shared `VotePanel` use an explicit `grid-template-rows: auto minmax(0, 1fr) auto` layout.
+  - Added `overflow: hidden` on the panel shell so the list area is the scrolling region.
+  - Kept the target list as the middle bounded scroll area.
+  - Added `touch-action: pan-y` on the shared panel and target rows to improve touch scrolling.
+- Validation:
+  - Built a disposable mobile height-check page and verified the list is clipped while the skip action stays anchored.
+  - Deleted the temporary validation files after inspection.
+  - Ran Playwright smoke client against the app root again.
+
+---
+
+- Follow-up task: prevent detectives from investigating more than once in the same NIGHT phase.
+- Updated `Server/roles/index.ts`:
+  - Added a detective once-per-phase tracker keyed by `(roomId, phase, detectiveClientId)`.
+  - Wired the tracker to clear automatically when phase actions are cleared.
+- Updated `Server/rooms.ts`:
+  - Detective checks are now refused after the first accepted investigation in the current NIGHT.
+  - The first accepted non-skip detective check marks the phase-use tracker immediately.
+- Validation:
+  - `npm run build` to verify client/server compile cleanly after the server-side rule change.
+  - Re-ran client smoke boot via the Playwright web-game client against `http://127.0.0.1:5173`.
+  - Inspected fresh screenshot artifact:
+    - `output/web-game/shot-0.png`
+
+---
+
+- Follow-up task: allow only doctors to target themselves in the shared night action panel.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Night target filtering is now role-aware.
+  - `DOCTOR_SAVE` includes the current player in the target list.
+  - `MAFIA_KILL_VOTE` and `DETECTIVE_CHECK` still exclude self.
+
+---
+
+- Follow-up task: restyle the voting phase with a more serious courtroom vibe while keeping behavior unchanged.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Voting phase now applies a dedicated courtroom variant class to the shared `VotePanel`.
+- Updated `Client/src/styles/components/vote-panel.css`:
+  - Reworked the voting-phase backdrop into a darker, formal courtroom palette.
+  - Added brass/mahogany styling for the voting panel, target rows, and controls.
+  - Styled the spectator note to match the courtroom presentation.
+- Validation:
+  - Generated and inspected a disposable courtroom preview screenshot:
+    - `output/web-game/shot-0.png`
+  - Deleted the temporary preview HTML after use.

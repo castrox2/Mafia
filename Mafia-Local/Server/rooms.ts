@@ -50,8 +50,10 @@ import {
   getRoleActions,
   clearRoleActions,
   recordRoleAction,
+  getDetectivePhaseUsed,
   getDoctorSelfSaveUsed,
   getSheriffUsed,
+  markDetectivePhaseUsed,
   clearRoomRoleMemory,
 } from "./roles/index.js"
 
@@ -2654,6 +2656,9 @@ const updateRoomSettings = (
     } else if (kind === "DETECTIVE_CHECK") {
       if (phase !== "NIGHT") return refuse("Detective can only check during NIGHT.")
       if (actor.role !== "DETECTIVE") return refuse("Only Detective can submit checks.")
+      if (getDetectivePhaseUsed(cleanRoomId, phase, fromClientId)) {
+        return refuse("Detective can only investigate once per NIGHT.")
+      }
     } else if (kind === "SHERIFF_SHOOT") {
       const sheriffAllowedPhase =
         phase === "DAY" || phase === "DISCUSSION" || phase === "PUBDISCUSSION"
@@ -2680,6 +2685,10 @@ const updateRoomSettings = (
     // Detective checks resolve immediately so the detective sees
     // the result popup right after clicking investigate.
     if (kind === "DETECTIVE_CHECK") {
+      if (!isSkipAction) {
+        markDetectivePhaseUsed(cleanRoomId, phase, fromClientId)
+      }
+
       socket.emit("actionAccepted", { kind, targetClientId })
 
       if (!isSkipAction && target) {

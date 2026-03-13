@@ -82,6 +82,13 @@ export const getRoleActions = (roomId: string, phase: PhaseName): RoleAction[] =
 export const clearRoleActions = (roomId: string, phase: PhaseName) => {
   const key = makeKey(roomId, phase)
   actionsByRoomPhase.delete(key)
+
+  const cleanRoomId = normalizeRoomId(roomId)
+  for (const detectiveKey of detectivePhaseUsed.keys()) {
+    if (detectiveKey.startsWith(`${cleanRoomId}:phase:${phase}:`)) {
+      detectivePhaseUsed.delete(detectiveKey)
+    }
+  }
 }
 
 /**
@@ -202,6 +209,42 @@ export const markDoctorSelfSaveUsed = (
   doctorSelfSaveUsed.add(makeDoctorSelfSaveKey(roomId, gameNumber, doctorClientId))
 }
 
+/* ------------------------------------------------------
+        Detective once-per-phase tracker (per NIGHT)
+  - Keyed by (roomId, phase, detectiveClientId)
+  - Cleared automatically with clearRoleActions(roomId, phase)
+------------------------------------------------------ */
+
+type DetectivePhaseUseKey = `${string}:phase:${PhaseName}:detective:${string}`
+
+const detectivePhaseUsed = new Set<DetectivePhaseUseKey>()
+
+const makeDetectivePhaseUseKey = (
+  roomId: string,
+  phase: PhaseName,
+  detectiveClientId: string
+): DetectivePhaseUseKey => {
+  const cleanRoomId = normalizeRoomId(roomId)
+  const cleanDetectiveId = (detectiveClientId || "").trim()
+  return `${cleanRoomId}:phase:${phase}:detective:${cleanDetectiveId}` as DetectivePhaseUseKey
+}
+
+export const getDetectivePhaseUsed = (
+  roomId: string,
+  phase: PhaseName,
+  detectiveClientId: string
+): boolean => {
+  return detectivePhaseUsed.has(makeDetectivePhaseUseKey(roomId, phase, detectiveClientId))
+}
+
+export const markDetectivePhaseUsed = (
+  roomId: string,
+  phase: PhaseName,
+  detectiveClientId: string
+) => {
+  detectivePhaseUsed.add(makeDetectivePhaseUseKey(roomId, phase, detectiveClientId))
+}
+
 /**
  * Optional cleanup: clear ALL role memory for a room.
  * Safe to call when a room is deleted/closed.
@@ -222,6 +265,12 @@ export const clearRoomRoleMemory = (roomId: string) => {
   for (const key of doctorSelfSaveUsed.keys()) {
     if (key.startsWith(`${cleanRoomId}:`)) {
       doctorSelfSaveUsed.delete(key)
+    }
+  }
+
+  for (const key of detectivePhaseUsed.keys()) {
+    if (key.startsWith(`${cleanRoomId}:`)) {
+      detectivePhaseUsed.delete(key)
     }
   }
 }
