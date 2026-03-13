@@ -151,3 +151,7 @@ Installer output:
 - This project is built first for local play.
 - Online matchmaking and remote hosting are still future work.
 - Empty placeholder UI files may exist for future UI work and should not be treated as dead code by default.
+
+## Release Notes
+
+For the launch summary of `1.0.0`, see `docs/release-1.0.0.md`.

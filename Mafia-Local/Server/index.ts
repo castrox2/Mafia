@@ -227,8 +227,8 @@ io.on("connection", (socket) => {
 
   // --- New: Player state updates ---
 
-  // For testing: allow player to kill/revive themselves.
-  // Later: restrict to host only / game rules.
+  // Direct alive-state override hook.
+  // This is currently only intended for controlled host/admin flows.
   socket.on(
     "setAlive",
     ({ roomId, playerId, alive }: SetAlivePayload) => {

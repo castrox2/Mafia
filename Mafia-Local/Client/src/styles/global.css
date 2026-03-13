@@ -1,7 +1,6 @@
 /*
-  Universal client stylesheet scaffold.
-  This file is intentionally framework-agnostic and does not assume
-  any specific page/component implementation details.
+  Universal client stylesheet baseline.
+  Shared tokens, resets, and app-wide utilities live here.
 */
 
 :root {

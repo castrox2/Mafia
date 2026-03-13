@@ -1,7 +1,7 @@
 {
   "name": "mafia-local",
   "version": "1.0.0",
-  "description": "Web game based on the party game mafia and its different variations",
+  "description": "React and Vite client for the Mafia local-first party game",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "start": "vite",

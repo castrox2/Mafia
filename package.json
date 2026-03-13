@@ -1,7 +1,7 @@
 {
   "name": "mafia",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local-first Mafia party game with an Electron host app and mobile-friendly browser clients",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

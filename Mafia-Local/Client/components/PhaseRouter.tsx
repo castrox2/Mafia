@@ -225,9 +225,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
 }
 
 /* ======================================================
-            Minimal placeholder screens (no styling yet)
-  - Keep these dumb.
-  - UI teammate can split into separate files later.
+                  Phase screen components
+  - Keep these presentation-focused.
+  - They can still be split into separate files later.
 ====================================================== */
 
 type ScreenProps = {
@@ -248,24 +248,20 @@ type ScreenProps = {
 }
 
 const DAY_PHASE_PLACEHOLDER_TEXTS = [
-  "Buddy Listen to the story teller", 
-  "Why are you reading me right now?", 
-  "Bro listen, do you even know whats happening rn?", 
-  "Bro's gonna be lost not listening to the story", 
-  "Fucking nerd, go listen to GM",
-  "Bro finna get voted out for a bs story for not listening"
+  "The town wakes up and everyone starts watching each other closely.",
+  "Listen carefully. One small slip can change the whole game.",
+  "This is the best time to read reactions and notice who feels nervous.",
+  "Talk through what happened, but do not trust every confident voice.",
+  "Someone is hiding something. The hard part is proving who it is.",
+  "Pay attention to who speaks first, who stays quiet, and who changes their story.",
 ] as const
 const DISCUSSION_PHASE_PLACEHOLDER_TEXTS = [
-  "Bro go talk to people, stop just looking at me????", 
-  "Buddy stop being useless....", 
-  "You gotta get voted out for being useless", 
-  "Useless fuck go help your team bro", 
-  "This guy wants to lose so bad...",
-  "Bro's must have a crush on me the way bro's looking at me sm",
-  "tf u doing? go help bruh",
-  "you creep, staring at me and shi",
-  "Bro go use ur mouth and talk to people",
-  "atp why are u even playing...",
+  "Use this time to compare stories and look for anything that does not match.",
+  "Good information is shared carefully. Bad information is shared loudly.",
+  "Ask simple questions, listen to the answers, and notice who avoids details.",
+  "Quiet conversations can reveal more than a loud accusation ever will.",
+  "Trust should be earned here, not handed out too quickly.",
+  "The smallest detail from one player can expose a bigger lie from another.",
 ] as const
 const PHASE_PLACEHOLDER_ROTATE_MS = 4000
 

@@ -1,7 +1,7 @@
 {
   "name": "mafia-local-electron",
   "version": "1.0.0",
-  "description": "",
+  "description": "Electron desktop host wrapper for the Mafia local-first party game",
   "main": "main.js",
   "scripts": {
     "dev": "electron .",

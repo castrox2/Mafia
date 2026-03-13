@@ -2180,7 +2180,7 @@ const updateRoomSettings = (
       return
     }
 
-    // Manual role overrides are a lobby testing helper; consume after successful use.
+    // Manual role overrides are consumed after a successful manual assignment start.
     room.manualRoleOverrides = null
 
     startPhase(cleanRoomId, "DAY")

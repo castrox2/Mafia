@@ -883,3 +883,25 @@ TODO / next-agent suggestions:
   - Removed the old open question about temporary host testing tools.
 - Updated `temporary features.txt`:
   - Cleared the file so it is empty for future temporary items.
+
+---
+
+- Release-prep pass for the `1.0.0` launch candidate.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Replaced the live `PH`-style rotating placeholder copy with production-ready Day and Discussion text.
+  - Cleaned the old placeholder-screen section comment.
+- Updated `Client/src/styles/global.css`:
+  - Reframed the top comment from scaffold wording to baseline/shared-styles wording.
+- Updated server comments:
+  - `Server/index.ts`
+  - `Server/rooms.ts`
+  - Removed stale testing-helper phrasing where the features are now part of normal host/admin flows.
+- Updated package metadata:
+  - `package.json`
+  - `Client/package.json`
+  - `Server/package.json`
+  - `Electron/package.json`
+  - Added real release-ready descriptions.
+- Updated docs:
+  - `README.md` now links to dedicated release notes.
+  - Added `docs/release-1.0.0.md` with highlights, scope, installer path, and a launch checklist.
