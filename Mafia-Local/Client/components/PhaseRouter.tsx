@@ -16,6 +16,7 @@ import {
 } from "../src/uiMeta.js"
 import "../src/styles/phases/day.css"
 import "../src/styles/phases/discussion.css"
+import "../src/styles/phases/gameover.css"
 import "../src/styles/phases/night.css"
 import "../src/styles/phases/public-discussion.css"
 
@@ -55,6 +56,9 @@ type PhaseRouterProps = {
   winner: Winner | null
   actionFeedback: ActionFeedback
   submitRoleAction: (kind: RoleActionKind, targetClientId: string) => void
+  leaveRoom: () => void
+  backToLobby: () => void
+  startNewGame: () => void
 }
 
 export const PhaseRouter: React.FC<PhaseRouterProps> = ({
@@ -70,6 +74,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
   winner,
   actionFeedback,
   submitRoleAction,
+  leaveRoom,
+  backToLobby,
+  startNewGame,
 }) => {
   switch (phase) {
     case "LOBBY":
@@ -86,6 +93,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -103,6 +113,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -120,6 +133,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -137,6 +153,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -154,6 +173,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -171,6 +193,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -188,6 +213,9 @@ export const PhaseRouter: React.FC<PhaseRouterProps> = ({
           winner={winner}
           actionFeedback={actionFeedback}
           submitRoleAction={submitRoleAction}
+          leaveRoom={leaveRoom}
+          backToLobby={backToLobby}
+          startNewGame={startNewGame}
         />
       )
 
@@ -214,27 +242,72 @@ type ScreenProps = {
   winner: Winner | null
   actionFeedback: ActionFeedback
   submitRoleAction: (kind: RoleActionKind, targetClientId: string) => void
+  leaveRoom: () => void
+  backToLobby: () => void
+  startNewGame: () => void
 }
 
-const PHASE_PLACEHOLDER_TEXTS = ["PH1", "PH2", "PH3", "PH4", "PH5"] as const
+const DAY_PHASE_PLACEHOLDER_TEXTS = [
+  "Buddy Listen to the story teller", 
+  "Why are you reading me right now?", 
+  "Bro listen, do you even know whats happening rn?", 
+  "Bro's gonna be lost not listening to the story", 
+  "Fucking nerd, go listen to GM",
+  "Bro finna get voted out for a bs story for not listening"
+] as const
+const DISCUSSION_PHASE_PLACEHOLDER_TEXTS = [
+  "Bro go talk to people, stop just looking at me????", 
+  "Buddy stop being useless....", 
+  "You gotta get voted out for being useless", 
+  "Useless fuck go help your team bro", 
+  "This guy wants to lose so bad...",
+  "Bro's must have a crush on me the way bro's looking at me sm",
+  "tf u doing? go help bruh",
+  "you creep, staring at me and shi",
+  "Bro go use ur mouth and talk to people",
+  "atp why are u even playing...",
+] as const
 const PHASE_PLACEHOLDER_ROTATE_MS = 4000
+
+const getRandomPlaceholderIndex = (
+  length: number,
+  previousIndex?: number
+): number => {
+  if (length <= 0) return 0
+  if (length === 1) return 0
+
+  let nextIndex = Math.floor(Math.random() * length)
+  while (nextIndex === previousIndex) {
+    nextIndex = Math.floor(Math.random() * length)
+  }
+
+  return nextIndex
+}
 
 const RotatingPhasePlaceholder = ({
   className,
+  texts,
 }: {
   className?: string
+  texts: readonly string[]
 }) => {
-  const [index, setIndex] = React.useState(0)
+  const [index, setIndex] = React.useState(() => getRandomPlaceholderIndex(texts.length))
 
   React.useEffect(() => {
+    setIndex(getRandomPlaceholderIndex(texts.length))
+  }, [texts])
+
+  React.useEffect(() => {
+    if (texts.length <= 1) return
+
     const intervalId = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % PHASE_PLACEHOLDER_TEXTS.length)
+      setIndex((prev) => getRandomPlaceholderIndex(texts.length, prev))
     }, PHASE_PLACEHOLDER_ROTATE_MS)
 
     return () => window.clearInterval(intervalId)
-  }, [])
+  }, [texts])
 
-  return <p className={className}>{PHASE_PLACEHOLDER_TEXTS[index]}</p>
+  return <p className={className}>{texts[index] ?? ""}</p>
 }
 
 const BannerView = ({ banner }: { banner: Banner }) => {
@@ -289,7 +362,10 @@ const DayScreen = ({ banner, actionFeedback }: ScreenProps) => (
         <ActionFeedbackView actionFeedback={actionFeedback} />
       </div>
       <div className="phase-message-phase__center">
-        <RotatingPhasePlaceholder className="phase-message-phase__rotating-text" />
+        <RotatingPhasePlaceholder
+          className="phase-message-phase__rotating-text"
+          texts={DAY_PHASE_PLACEHOLDER_TEXTS}
+        />
       </div>
     </div>
   </section>
@@ -309,7 +385,10 @@ const DiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
         aria-hidden="true"
       />
       <div className="phase-message-phase__center">
-        <RotatingPhasePlaceholder className="phase-message-phase__rotating-text" />
+        <RotatingPhasePlaceholder
+          className="phase-message-phase__rotating-text"
+          texts={DISCUSSION_PHASE_PLACEHOLDER_TEXTS}
+        />
       </div>
     </div>
   </section>
@@ -329,7 +408,10 @@ const PubDiscussionScreen = ({ banner, actionFeedback }: ScreenProps) => (
         aria-hidden="true"
       />
       <div className="phase-message-phase__center">
-        <RotatingPhasePlaceholder className="phase-message-phase__rotating-text" />
+        <RotatingPhasePlaceholder
+          className="phase-message-phase__rotating-text"
+          texts={DISCUSSION_PHASE_PLACEHOLDER_TEXTS}
+        />
       </div>
     </div>
   </section>
@@ -421,16 +503,20 @@ const NightScreen = ({
               p.isSpectator !== true &&
               (allowSelfTargetAtNight || p.clientId !== me?.clientId)
           )
-          .map((p) => ({
-            clientId: p.clientId,
-            name: p.name,
-            iconSrc: rolemateSet.has(p.clientId) ? rolemateIconSrc ?? undefined : undefined,
-            iconAlt: rolemateSet.has(p.clientId)
-              ? myRole === "MAFIA"
-                ? "Mafia rolemate"
-                : "Doctor rolemate"
-              : undefined,
-          }))
+          .map((p) => {
+            const hasRolemateIcon = rolemateSet.has(p.clientId) && rolemateIconSrc != null
+
+            return {
+              clientId: p.clientId,
+              name: p.name,
+              ...(hasRolemateIcon
+                ? {
+                    iconSrc: rolemateIconSrc,
+                    iconAlt: myRole === "MAFIA" ? "Mafia rolemate" : "Doctor rolemate",
+                  }
+                : {}),
+            }
+          })
       : []
   const nightActionCopy =
     actionByRole?.kind === "MAFIA_KILL_VOTE"
@@ -490,14 +576,54 @@ const NightScreen = ({
   )
 }
 
-const GameOverScreen = ({ isHost, banner, winner, actionFeedback }: ScreenProps) => (
-  <div>
-    <h2>{getPhaseLabel("GAMEOVER")}</h2>
-    <BannerView banner={banner} />
-    <ActionFeedbackView actionFeedback={actionFeedback} />
-    <div>Winner: {getWinnerLabel(winner)}</div>
-    <div style={{ marginTop: 8 }}>Host: {isHost ? "Yes" : "No"}</div>
-  </div>
+const GameOverScreen = ({
+  isHost,
+  banner,
+  winner,
+  actionFeedback,
+  leaveRoom,
+  backToLobby,
+  startNewGame,
+}: ScreenProps) => (
+  <section className="phase-gameover">
+    <div className="phase-gameover__main">
+      <div className="phase-gameover__alerts">
+        <BannerView banner={banner} />
+        <ActionFeedbackView actionFeedback={actionFeedback} />
+      </div>
+
+      <section className="phase-gameover__card">
+        <div className="phase-gameover__card-title">WINNER</div>
+        <div className="phase-gameover__winner">{getWinnerLabel(winner)}</div>
+
+        <div className="phase-gameover__actions">
+          <button
+            type="button"
+            className="phase-gameover__button phase-gameover__button--secondary"
+            onClick={leaveRoom}
+          >
+            Leave Room
+          </button>
+          <button
+            type="button"
+            className="phase-gameover__button phase-gameover__button--secondary"
+            onClick={backToLobby}
+          >
+            Back to Lobby
+          </button>
+          <button
+            type="button"
+            className={`phase-gameover__button phase-gameover__button--primary ${isHost ? "" : "is-disabled"}`}
+            onClick={startNewGame}
+            disabled={!isHost}
+            title={isHost ? "Start a fresh game immediately." : "Only the host can start a new game."}
+          >
+            Start New Game
+          </button>
+        </div>
+      </section>
+    </div>
+  </section>
 )
 
 

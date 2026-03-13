@@ -33,9 +33,17 @@ export default function RoleRollOverlay({
   onComplete,
   onSkip,
 }: Props) {
+  const makeCandidate = React.useCallback(
+    (label: string, imageSrc: string | null | undefined): RoleRollCandidate => ({
+      label,
+      imageSrc: imageSrc ?? null,
+    }),
+    []
+  )
+
   const [display, setDisplay] = React.useState<RoleRollCandidate>({
     label: finalLabel,
-    imageSrc: finalImageSrc ?? undefined,
+    imageSrc: finalImageSrc ?? null,
   })
   const [revealed, setRevealed] = React.useState(false)
   const completeCalledRef = React.useRef(false)
@@ -48,7 +56,7 @@ export default function RoleRollOverlay({
   React.useEffect(() => {
     if (!open) {
       setRevealed(false)
-      setDisplay({ label: finalLabel, imageSrc: finalImageSrc ?? undefined })
+      setDisplay(makeCandidate(finalLabel, finalImageSrc))
       completeCalledRef.current = false
       return
     }
@@ -56,7 +64,7 @@ export default function RoleRollOverlay({
     const pool =
       candidates.length > 0
         ? candidates
-        : [{ label: finalLabel, imageSrc: finalImageSrc ?? undefined }]
+        : [makeCandidate(finalLabel, finalImageSrc)]
 
     setRevealed(false)
     setDisplay(randomPick(pool))
@@ -69,7 +77,7 @@ export default function RoleRollOverlay({
 
     const revealTimer = window.setTimeout(() => {
       window.clearInterval(spinTimer)
-      setDisplay({ label: finalLabel, imageSrc: finalImageSrc ?? undefined })
+      setDisplay(makeCandidate(finalLabel, finalImageSrc))
       setRevealed(true)
 
       completeTimer = window.setTimeout(() => {
@@ -92,6 +100,7 @@ export default function RoleRollOverlay({
     durationMs,
     finalImageSrc,
     finalLabel,
+    makeCandidate,
     revealMs,
     spinIntervalMs,
   ])

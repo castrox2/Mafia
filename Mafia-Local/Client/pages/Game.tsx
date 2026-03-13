@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react"
 import { socket, clientId } from "../src/socket.js"
 import { PhaseRouter } from "../components/PhaseRouter.js"
 import RoleRollOverlay from "../components/RoleRollOverlay.js"
+import PartnerRevealOverlay from "../components/PartnerRevealOverlay.js"
 import type { RoomState } from "../src/types.js"
 import { normalizeRoomId, SKIP_TARGET_CLIENT_ID } from "../../Shared/events.js"
 import "../src/styles/pages/game.css"
@@ -27,8 +28,10 @@ import {
   getRoleLabel,
 } from "../src/uiMeta.js"
 import {
+  getPartnerRevealSeenKey,
   getRegularRoleImageSrc,
   getRegularRoleRollCandidates,
+  getRoleRollSeenKey,
 } from "../src/roleRoll.js"
 
 type Props = {
@@ -83,6 +86,8 @@ export default function Game({ roomId, playerName, onExit, onBackToLobby }: Prop
     const [sheriffPanelOpen, setSheriffPanelOpen] = useState(false)
     const [sheriffAbilityUsed, setSheriffAbilityUsed] = useState(false)
     const [roleRollOpen, setRoleRollOpen] = useState(false)
+    const [partnerRevealOpen, setPartnerRevealOpen] = useState(false)
+    const [partnerRevealPending, setPartnerRevealPending] = useState(false)
 
     const bannerTimeoutRef = useRef<number | null>(null)
     const actionFeedbackTimeoutRef = useRef<number | null>(null)
@@ -441,6 +446,13 @@ useEffect(() => {
 
 useEffect(() => {
   if (!state?.gameStarted) {
+    setPartnerRevealOpen(false)
+    setPartnerRevealPending(false)
+  }
+}, [state?.gameStarted])
+
+useEffect(() => {
+  if (!state?.gameStarted) {
     setRoleRollOpen(false)
     return
   }
@@ -451,14 +463,27 @@ useEffect(() => {
     state.players.find((player) => player.clientId === clientId)?.isSpectator === true
   if (amSpectatorNow) return
 
-  const seenKey = `mafia_role_roll_seen:${cleanRoomId}:game${state.gameNumber}:client:${clientId}`
+  const seenKey = getRoleRollSeenKey(cleanRoomId, state.gameNumber, clientId)
   if (window.sessionStorage.getItem(seenKey) === "1") return
 
   window.sessionStorage.setItem(seenKey, "1")
+  const partnerRevealSeenKey = getPartnerRevealSeenKey(cleanRoomId, state.gameNumber, clientId)
+  const partnerRevealRole = myRole === "MAFIA" || myRole === "DOCTOR" ? myRole : null
+  const partnerNames =
+    partnerRevealRole == null
+      ? []
+      : state.players
+          .filter((player) => rolemateClientIds.includes(player.clientId))
+          .map((player) => player.name)
+          .filter((name) => String(name || "").trim().length > 0)
+  setPartnerRevealPending(
+    partnerNames.length > 0 && window.sessionStorage.getItem(partnerRevealSeenKey) !== "1"
+  )
   setRoleRollOpen(true)
 }, [
   cleanRoomId,
   myRole,
+  rolemateClientIds,
   state?.players,
   state?.gameNumber,
   state?.gameStarted,
@@ -543,13 +568,28 @@ useEffect(() => {
     const me = state?.players?.find((p) => p.clientId === clientId) ?? null
     const amSpectator = me?.isSpectator === true
     const isGameOverPhase = state?.phase === "GAMEOVER"
-    const canUseTestingTools = Boolean(isHost && state?.roomType === "CLASSIC")
+    const canUsePhaseSkip = Boolean(isHost && state?.roomType === "CLASSIC")
     const myStatus = me?.alive === false ? "Dead" : "Alive"
     const roleLabel = myRole ? getRoleLabel(myRole) : "Unknown"
     const regularRoleRollCandidates = useMemo(() => getRegularRoleRollCandidates(), [])
     const roleRollImageSrc = useMemo(
       () => getRegularRoleImageSrc(myRole),
       [myRole]
+    )
+    const partnerRevealRole = myRole === "MAFIA" || myRole === "DOCTOR" ? myRole : null
+    const partnerRevealNames = useMemo(() => {
+      if (!state || !partnerRevealRole) return []
+
+      const rolemateSet = new Set(rolemateClientIds)
+      return state.players
+        .filter((player) => rolemateSet.has(player.clientId))
+        .map((player) => String(player.name || "").trim())
+        .filter((name) => name.length > 0)
+    }, [partnerRevealRole, rolemateClientIds, state])
+    const partnerRevealRoleLabel = partnerRevealRole ? getRoleLabel(partnerRevealRole) : "Partner"
+    const partnerRevealImageSrc = useMemo(
+      () => getRegularRoleImageSrc(partnerRevealRole),
+      [partnerRevealRole]
     )
     const sheriffActionAllowedPhase =
       state?.phase === "DAY" ||
@@ -645,7 +685,7 @@ useEffect(() => {
       setSheriffPanelOpen(false)
     }
 
-    const skipPhaseForTesting = () => {
+    const skipPhase = () => {
       if (!isHost) return
       if (!state) return
       if (state.phase === "GAMEOVER") return
@@ -657,6 +697,19 @@ useEffect(() => {
 
     const closeRoleRollOverlay = () => {
       setRoleRollOpen(false)
+      if (!partnerRevealPending || !state || !partnerRevealRole || partnerRevealNames.length <= 0) {
+        setPartnerRevealPending(false)
+        return
+      }
+
+      const partnerRevealSeenKey = getPartnerRevealSeenKey(cleanRoomId, state.gameNumber, clientId)
+      window.sessionStorage.setItem(partnerRevealSeenKey, "1")
+      setPartnerRevealPending(false)
+      setPartnerRevealOpen(true)
+    }
+
+    const closePartnerRevealOverlay = () => {
+      setPartnerRevealOpen(false)
     }
 
     return (
@@ -671,15 +724,26 @@ useEffect(() => {
             onComplete={closeRoleRollOverlay}
             onSkip={closeRoleRollOverlay}
           />
+          <PartnerRevealOverlay
+            open={partnerRevealOpen}
+            roleLabel={partnerRevealRoleLabel}
+            roleImageSrc={partnerRevealImageSrc}
+            partnerNames={partnerRevealNames}
+            onContinue={closePartnerRevealOverlay}
+          />
 
-          <div className="game-phase-topbar">
-            <div className="game-phase-topbar__timer">Time: {timerLabel}</div>
+          <div className={`game-phase-topbar ${isGameOverPhase ? "is-gameover" : ""}`}>
+            <div className="game-phase-topbar__timer">
+              {!isGameOverPhase ? `Time: ${timerLabel}` : null}
+            </div>
             <div className="game-phase-topbar__phase">{phaseLabel}</div>
 
             <div className="game-phase-topbar__right">
-              <span className={`game-status-pill ${myStatus === "Alive" ? "is-alive" : "is-dead"}`}>
-                {myStatus}
-              </span>
+              {!isGameOverPhase && (
+                <span className={`game-status-pill ${myStatus === "Alive" ? "is-alive" : "is-dead"}`}>
+                  {myStatus}
+                </span>
+              )}
 
               {!isGameOverPhase && (
                 <div className="game-quick-menu" ref={quickMenuRef}>
@@ -755,37 +819,21 @@ useEffect(() => {
                 winner={winner}
                 actionFeedback={actionFeedback}
                 submitRoleAction={submitRoleAction}
+                leaveRoom={leaveRoom}
+                backToLobby={backToLobby}
+                startNewGame={startNewGame}
               />
             ) : (
               <div className="game-phase-loading">Waiting for room state...</div>
             )}
           </main>
 
-          {isGameOverPhase && (
-            <div className="game-phase-bottom-actions">
-              <button className="game-button game-button--leave" onClick={leaveRoom}>
-                Leave Room
-              </button>
-              <button className="game-button game-button--back" onClick={backToLobby}>
-                Back to Lobby
-              </button>
-              <button
-                className={`game-button game-button--start ${!isHost ? "is-disabled" : ""}`}
-                onClick={startNewGame}
-                disabled={!isHost}
-                title={isHost ? "Start a fresh game immediately." : "Only the host can start a new game."}
-              >
-                Start New Game
-              </button>
-            </div>
-          )}
-
-          {canUseTestingTools && !isGameOverPhase && (
+          {canUsePhaseSkip && !isGameOverPhase && (
             <button
               type="button"
               className={`game-skip-phase-floating ${state?.phase === "VOTING" ? "is-left" : ""}`}
-              onClick={skipPhaseForTesting}
-              title="Skip to next phase (testing)"
+              onClick={skipPhase}
+              title="Advance to the next phase"
             >
               Skip Phase
             </button>
@@ -889,8 +937,3 @@ useEffect(() => {
       </div>
     )
 }
-
-
-
-
-

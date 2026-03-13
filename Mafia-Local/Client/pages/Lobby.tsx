@@ -6,6 +6,7 @@ import RoleSelectorSettingsModal from "../components/RoleSelectorSettings.js"
 import RoleCatalogModal from "../components/RoleCatalogModal.js"
 import RoleInfoModal from "../components/RoleInfoModal.js"
 import RoleRollOverlay from "../components/RoleRollOverlay.js"
+import PartnerRevealOverlay from "../components/PartnerRevealOverlay.js"
 import { normalizeRoomId } from "../../Shared/events.js"
 import type {
   AddBotRefusedPayload,
@@ -25,9 +26,11 @@ import type {
 import { getPlayerTags, getRoleLabel, getStatusLabel } from "../src/uiMeta.js"
 import { getBotcRoleInfo } from "../src/constants/botcRoleInfo.js"
 import {
+  getPartnerRevealSeenKey,
   getBotcRoleRollCandidates,
   getRegularRoleImageSrc,
   getRegularRoleRollCandidates,
+  getRoleRollSeenKey,
 } from "../src/roleRoll.js"
 import "../src/styles/pages/lobby.css"
 
@@ -91,11 +94,14 @@ export default function Lobby({
   const [state, setState] = useState<RoomState | null>(null)
   const [status, setStatus] = useState("")
   const [myRole, setMyRole] = useState<YourRolePayload["role"] | null>(null)
+  const [rolemateClientIds, setRolemateClientIds] = useState<string[]>([])
   const [hostRoleCounts, setHostRoleCounts] =
     useState<RoleSelectorHostCountsPayload | null>(null)
   const [manualRolesOpen, setManualRolesOpen] = useState(false)
   const [manualRoleDraft, setManualRoleDraft] = useState<Record<string, MafiaPlayerRole>>({})
   const [roleRollOpen, setRoleRollOpen] = useState(false)
+  const [partnerRevealOpen, setPartnerRevealOpen] = useState(false)
+  const [partnerRevealPending, setPartnerRevealPending] = useState(false)
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
@@ -142,6 +148,19 @@ export default function Lobby({
     roleSelectorScriptMode === "BLOOD_ON_THE_CLOCKTOWER"
       ? null
       : getRegularRoleImageSrc(myRole)
+  const partnerRevealRole = myRole === "MAFIA" || myRole === "DOCTOR" ? myRole : null
+  const partnerRevealNames = useMemo(() => {
+    if (!partnerRevealRole) return []
+
+    const rolemateSet = new Set(rolemateClientIds)
+    return players
+      .filter((player) => rolemateSet.has(player.clientId))
+      .map((player) => String(player.name || "").trim())
+      .filter((name) => name.length > 0)
+  }, [partnerRevealRole, players, rolemateClientIds])
+  const partnerRevealRoleLabel = partnerRevealRole ? getRoleLabel(partnerRevealRole) : "Partner"
+  const partnerRevealImageSrc =
+    partnerRevealRole == null ? null : getRegularRoleImageSrc(partnerRevealRole)
 
   const amReady = me?.status === "READY"
   const activePlayers = players.filter((p) => !p.isSpectator)
@@ -186,28 +205,42 @@ export default function Lobby({
   useEffect(() => {
     if (!state) {
       setRoleRollOpen(false)
+      setPartnerRevealOpen(false)
+      setPartnerRevealPending(false)
       return
     }
     if (state.roomType !== "ROLE_SELECTOR") {
       setRoleRollOpen(false)
+      setPartnerRevealOpen(false)
+      setPartnerRevealPending(false)
       return
     }
     if (!state.gameStarted) {
       setRoleRollOpen(false)
+      setPartnerRevealOpen(false)
+      setPartnerRevealPending(false)
       return
     }
     if (amSpectator) return
     if (!myRole) return
 
-    const seenKey = `mafia_role_roll_seen:${cleanRoomId}:game${state.gameNumber}:client:${clientId}`
+    const seenKey = getRoleRollSeenKey(cleanRoomId, state.gameNumber, clientId)
     if (window.sessionStorage.getItem(seenKey) === "1") return
 
     window.sessionStorage.setItem(seenKey, "1")
+    const partnerRevealSeenKey = getPartnerRevealSeenKey(cleanRoomId, state.gameNumber, clientId)
+    setPartnerRevealPending(
+      roleSelectorScriptMode === "REGULAR_MAFIA" &&
+        partnerRevealNames.length > 0 &&
+        window.sessionStorage.getItem(partnerRevealSeenKey) !== "1"
+    )
     setRoleRollOpen(true)
   }, [
     amSpectator,
     cleanRoomId,
     myRole,
+    partnerRevealNames,
+    roleSelectorScriptMode,
     state,
   ])
 
@@ -221,6 +254,7 @@ export default function Lobby({
       if (s.roomType === "ROLE_SELECTOR") {
         if (currentPlayer?.isSpectator === true) {
           setMyRole(null)
+          setRolemateClientIds([])
         }
         if (s.gameStarted) {
           socket.emit("requestMyRole", { roomId: cleanRoomId })
@@ -231,11 +265,13 @@ export default function Lobby({
           }
         } else {
           setMyRole(null)
+          setRolemateClientIds([])
         }
         return
       }
 
       setMyRole(null)
+      setRolemateClientIds([])
       setHostRoleCounts(null)
 
       if (s.gameStarted) {
@@ -287,6 +323,7 @@ export default function Lobby({
     const onYourRole = (payload: YourRolePayload) => {
       if (payload.roomId !== cleanRoomId) return
       setMyRole(payload.role)
+      setRolemateClientIds(Array.isArray(payload.rolemateClientIds) ? payload.rolemateClientIds : [])
     }
 
     const onRoleSelectorHostCounts = (payload: RoleSelectorHostCountsPayload) => {
@@ -467,6 +504,25 @@ export default function Lobby({
 
   const closeRoleRollOverlay = () => {
     setRoleRollOpen(false)
+    if (
+      !state ||
+      !partnerRevealPending ||
+      roleSelectorScriptMode !== "REGULAR_MAFIA" ||
+      !partnerRevealRole ||
+      partnerRevealNames.length <= 0
+    ) {
+      setPartnerRevealPending(false)
+      return
+    }
+
+    const partnerRevealSeenKey = getPartnerRevealSeenKey(cleanRoomId, state.gameNumber, clientId)
+    window.sessionStorage.setItem(partnerRevealSeenKey, "1")
+    setPartnerRevealPending(false)
+    setPartnerRevealOpen(true)
+  }
+
+  const closePartnerRevealOverlay = () => {
+    setPartnerRevealOpen(false)
   }
 
   return (
@@ -479,6 +535,13 @@ export default function Lobby({
         candidates={roleRollCandidates}
         onComplete={closeRoleRollOverlay}
         onSkip={closeRoleRollOverlay}
+      />
+      <PartnerRevealOverlay
+        open={partnerRevealOpen}
+        roleLabel={partnerRevealRoleLabel}
+        roleImageSrc={partnerRevealImageSrc}
+        partnerNames={partnerRevealNames}
+        onContinue={closePartnerRevealOverlay}
       />
 
       <aside className="lobby-sidebar">
@@ -636,7 +699,7 @@ export default function Lobby({
                 type="button"
                 className="lobby-add-bot"
                 onClick={addBotPlayer}
-                title="Add a test bot player"
+                title="Add a bot player"
               >
                 Add Bot
               </button>

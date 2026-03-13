@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react"
+import ElectronTitleBar from "../components/ElectronTitleBar.js"
 import MainMenu from "../pages/MainMenu.js"
 import Join from "../pages/Join.js"
 import Lobby from "../pages/Lobby.js"
@@ -15,6 +16,7 @@ export default function App() {
   const [playerName, setPlayerName] = useState("")
   const [joinUrl, setJoinUrl] = useState("")
   const [qrDataUrl, setQrDataUrl] = useState("")
+  const hasElectronTitleBar = window.mafiaWindow?.isElectron === true
 
   useEffect(() => {
     // Subscribe via buffered handler so we can't miss the event
@@ -42,8 +44,10 @@ export default function App() {
     window.history.replaceState({}, "", "/")
   }
 
+  let content: React.ReactNode
+
   if (screen === "MENU") {
-    return (
+    content = (
       <MainMenu
         onSelectPlayGame={() => {
           setEntryMode("PLAY_GAME")
@@ -55,15 +59,13 @@ export default function App() {
         }}
       />
     )
-  }
-
-  /* ------------------------------------------------------
-        JOIN screen
-    - If we don't have roomId/playerName, we must be in Join.
-    - This avoids accidental Lobby/Game rendering with missing state.
-  ------------------------------------------------------ */
-  if (!roomId || !playerName || screen === "JOIN") {
-    return (
+  } else if (!roomId || !playerName || screen === "JOIN") {
+    /* ------------------------------------------------------
+          JOIN screen
+      - If we don't have roomId/playerName, we must be in Join.
+      - This avoids accidental Lobby/Game rendering with missing state.
+    ------------------------------------------------------ */
+    content = (
       <div className="ui-app-shell ui-app-shell--join">
         <Join
           mode={entryMode ?? "PLAY_GAME"}
@@ -82,15 +84,13 @@ export default function App() {
         />
       </div>
     )
-  }
-
-  /* ------------------------------------------------------
-        GAME screen
-    - Entered when Lobby tells us game started.
-    - Game.tsx should NOT auto-join (prevents duplicates).
-  ------------------------------------------------------ */
-  if (screen === "GAME") {
-    return (
+  } else if (screen === "GAME") {
+    /* ------------------------------------------------------
+          GAME screen
+      - Entered when Lobby tells us game started.
+      - Game.tsx should NOT auto-join (prevents duplicates).
+    ------------------------------------------------------ */
+    content = (
       <div className="ui-app-shell ui-app-shell--game">
         <Game
           roomId={roomId}
@@ -100,21 +100,32 @@ export default function App() {
         />
       </div>
     )
+  } else {
+    /* ------------------------------------------------------
+          LOBBY screen (default once in a room)
+    ------------------------------------------------------ */
+    content = (
+      <div className="ui-app-shell ui-app-shell--lobby">
+        <Lobby
+          roomId={roomId}
+          playerName={playerName}
+          joinUrl={joinUrl}
+          qrDataUrl={qrDataUrl}
+          onExit={onExit}
+          onEnterGame={() => setScreen("GAME")}
+        />
+      </div>
+    )
   }
 
-  /* ------------------------------------------------------
-        LOBBY screen (default once in a room)
-  ------------------------------------------------------ */
+  if (!hasElectronTitleBar) {
+    return <>{content}</>
+  }
+
   return (
-    <div className="ui-app-shell ui-app-shell--lobby">
-      <Lobby
-        roomId={roomId}
-        playerName={playerName}
-        joinUrl={joinUrl}
-        qrDataUrl={qrDataUrl}
-        onExit={onExit}
-        onEnterGame={() => setScreen("GAME")}
-      />
+    <div className="mafia-electron-shell">
+      <ElectronTitleBar />
+      <div className="mafia-electron-shell__content">{content}</div>
     </div>
   )
 }

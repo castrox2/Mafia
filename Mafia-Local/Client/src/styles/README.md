@@ -1,9 +1,13 @@
-Client style scaffolding for UI implementation.
+Client styles for the current UI implementation.
 
-Current intent:
+Current structure:
 
-- `global.css`: universal baseline tokens + utility classes.
-- `pages/*`: page-level style buckets.
-- `phases/*`: phase-specific style buckets.
+- `global.css`: shared tokens, resets, and shell-level utilities.
+- `pages/*`: page-level styles for menu, join, lobby, and game screens.
+- `phases/*`: phase-specific styles layered on top of the game screen.
+- `components/*`: reusable component styles such as vote panels and overlays.
 
-These files are prepared only; they are not wired into components yet.
+Note:
+
+- Some files still exist as placeholders for future UI work.
+- Empty placeholder files are intentional and should not be treated as dead code by default.

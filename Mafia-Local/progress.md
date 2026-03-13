@@ -679,3 +679,207 @@ TODO / next-agent suggestions:
   - Generated and inspected a disposable courtroom preview screenshot:
     - `output/web-game/shot-0.png`
   - Deleted the temporary preview HTML after use.
+
+---
+
+- Follow-up task: recover accidentally reverted post-`PATCH 0.9.10` UI/type changes.
+- Restored `GAMEOVER` redesign:
+  - `Client/components/PhaseRouter.tsx`
+  - `Client/pages/Game.tsx`
+  - `Client/src/styles/pages/game.css`
+  - `Client/src/styles/phases/gameover.css`
+- Restored client type-safety cleanup:
+  - `Client/components/PhaseRouter.tsx` now omits optional night target icon props unless they exist.
+  - `Client/components/RoleRollOverlay.tsx` now normalizes fallback image values to `null` through a shared helper.
+- Validation:
+  - Ran `npm exec -- tsc -p tsconfig.json --noEmit` inside `Client` after restoring the reverted changes.
+
+---
+
+- Follow-up task: add a `How to Play` popup to the main menu instead of a separate page.
+- Updated `Client/pages/MainMenu.tsx`:
+  - Added a `How to Play` button under `Role Assigner`.
+  - Added a centered modal popup with close button, outside-click close, and `Esc` close.
+  - Added simple beginner-friendly sections for:
+    - Classic Mafia
+    - Classic Mafia Flow
+    - Role Assigner
+    - BOCT Importer
+- Updated `Client/src/styles/pages/main-menu.css`:
+  - Added modal/backdrop styling that matches the menu screens while keeping the content readable.
+  - Added styles for the new `How to Play` trigger button and modal sections.
+- Validation:
+  - Ran `npm exec -- tsc -p tsconfig.json --noEmit` inside `Client`.
+
+---
+
+- Follow-up task: reveal mafia/doctor partners right after the role roll, but only once per game and never again on reconnect.
+- Added `Client/components/PartnerRevealOverlay.tsx`:
+  - New post-roll teammate reveal overlay for `MAFIA` and `DOCTOR`.
+  - Shows partner names only.
+  - Uses a simple `Continue` acknowledgment instead of replaying automatically later.
+- Added `Client/src/styles/components/partner-reveal-overlay.css`:
+  - Styled the partner reveal to match the existing role-roll/menu visual language.
+- Updated `Client/src/roleRoll.ts`:
+  - Added shared session-storage key helpers for role-roll and partner-reveal tracking.
+- Updated `Client/pages/Game.tsx`:
+  - Classic mode now queues a partner reveal after the role roll when the player is `MAFIA` or `DOCTOR` and has at least one partner.
+  - Dealer-only/spectator players still receive no role roll and no partner reveal.
+  - Partner reveals are gated per `(room, gameNumber, clientId)` so reconnects do not show them again.
+- Updated `Client/pages/Lobby.tsx`:
+  - Role selector regular-mafia mode now does the same post-roll partner reveal in the lobby deal flow.
+  - BOCT mode is explicitly excluded.
+
+---
+
+- Follow-up task: refresh docs for the current release state and align package metadata to `1.0.0`.
+- Updated `README.md`:
+  - Rewrote the root README to match the current shipped feature set.
+  - Added clear sections for Classic mode, Role Assigner, BOTC importing, install steps, and developer setup.
+  - Updated installer references to `Mafia Local Setup 1.0.0.exe`.
+- Updated `docs/GDD.md`:
+  - Refreshed the GDD around the current product shape instead of the older prototype scope.
+  - Documented the two room modes, current roles, current phase flow, teammate reveal behavior, UI direction, and future-work boundaries.
+- Updated version metadata to `1.0.0` in:
+  - `package.json`
+  - `package-lock.json`
+  - `Mafia-Local/Client/package.json`
+  - `Mafia-Local/Client/package-lock.json`
+  - `Mafia-Local/Server/package.json`
+  - `Mafia-Local/Server/package-lock.json`
+  - `Mafia-Local/Electron/package.json`
+  - `Mafia-Local/Electron/package-lock.json`
+- Validation:
+  - `npm run build`
+  - `npm run dist`
+- Cleanup:
+  - Removed the older `Mafia Local Setup 0.9.5.exe` and matching blockmap from `Mafia-Local/Electron/dist` so only the `1.0.0` installer artifacts remain.
+
+---
+
+- Follow-up task: split rotating placeholder text groups so Day can have its own set while both discussion phases share one set.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Replaced the single shared placeholder text array with:
+    - `DAY_PHASE_PLACEHOLDER_TEXTS`
+    - `DISCUSSION_PHASE_PLACEHOLDER_TEXTS`
+  - Updated the rotating placeholder component to accept a `texts` prop.
+  - Wired Day to its own placeholder set.
+  - Wired both Private Discussion and Public Discussion to the shared discussion placeholder set.
+
+---
+
+- Follow-up task: rename the `DISCUSSION` phase header to `Private Discussion` while leaving `Public Discussion` unchanged.
+- Updated `Client/src/uiMeta.ts`:
+  - Changed the `DISCUSSION` phase label from `Discussion` to `Private Discussion`.
+  - Updated the short label to `Private`.
+
+---
+
+- Follow-up task: make rotating phase placeholder text cycle randomly instead of in a fixed order.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Added a random placeholder index helper.
+  - Rotating placeholder text now starts from a random entry.
+  - Each rotation now picks a random next entry instead of stepping sequentially.
+  - Prevented immediate back-to-back repeats when more than one placeholder exists.
+
+---
+
+- Follow-up task: apply the `Special Elite` font to the in-app game top-bar title.
+- Updated `Client/src/styles/global.css`:
+  - Imported the `Special Elite` web font.
+  - Added `--ui-font-display` for display-title usage.
+- Updated `Client/src/styles/pages/game.css`:
+  - Applied the display font to `.game-phase-topbar__phase`.
+  - Added slight tracking to help the title read cleanly.
+
+---
+
+- Follow-up task: revert the `Special Elite` title-font experiment.
+- Updated `Client/src/styles/global.css`:
+  - Removed the `Special Elite` font import.
+  - Removed the temporary display-font CSS variable.
+- Updated `Client/src/styles/pages/game.css`:
+  - Restored the game top-bar title to the default app typography.
+  - Removed the temporary title tracking added for the font experiment.
+
+---
+
+- Follow-up task: apply `Special Elite` to the custom Electron title bar scaffold.
+- Updated `Electron/ui/titlebar.css`:
+  - Imported the `Special Elite` font.
+  - Applied it to `.app-titlebar__label`.
+  - Added slight letter spacing for readability.
+- Note:
+  - This file is still a scaffold and not wired into the live Electron window yet, so this change prepares the title bar styling without changing the active app window frame.
+
+---
+
+- Follow-up task: fully wire the custom Electron title bar.
+- Added `Electron/preload.cjs`:
+  - Exposed `window.mafiaWindow` bridge methods for minimize, maximize/restore, close, maximize state reads, and maximize state change events.
+- Updated `Electron/main.js`:
+  - Switched the main host window to frameless mode.
+  - Hid the native menu bar to let the custom title bar own the window chrome.
+  - Wired preload into the BrowserWindow.
+  - Added IPC handlers for window controls.
+  - Broadcast maximize state changes back to the renderer.
+  - Fixed the Electron runtime import so the main process boots correctly under the current ESM setup.
+- Added `Client/components/ElectronTitleBar.tsx`:
+  - Renderer-mounted custom title bar using the existing Electron titlebar stylesheet.
+  - Added minimize, maximize/restore, and close buttons.
+  - Added maximize-state-aware icon swapping.
+- Updated `Client/src/App.tsx`:
+  - Wrapped the app in an Electron-only shell when `window.mafiaWindow` is available.
+  - Mounted the custom title bar above the app content.
+- Updated `Client/src/vite-env.d.ts`:
+  - Declared the `window.mafiaWindow` bridge shape for TypeScript.
+- Updated `Electron/ui/titlebar.css`:
+  - Expanded the scaffold into a live title bar style with shell layout, control icons, and content-height overrides.
+- Updated `Electron/ui/titlebar.contract.md` and `Electron/ui/README.md`:
+  - Marked the title bar as implemented and documented the active bridge behavior.
+
+---
+
+- Follow-up task: verify the live custom Electron title bar end-to-end.
+- Investigation notes:
+  - The renderer/titlebar bridge pieces are in place (`Electron/preload.cjs`, `Client/components/ElectronTitleBar.tsx`, `Client/src/App.tsx`, `Electron/ui/titlebar.css`).
+  - The remaining blocker is the Electron main-process API import on this Windows setup.
+- Verified runtime failures while testing the frameless window wiring:
+  - `import { app, BrowserWindow } from "electron"` failed due missing named exports.
+  - `import { app, BrowserWindow, ipcMain } from "electron/main"` failed due missing named exports.
+  - `import * as electron from "electron/main"` produced an empty module shape for the user app entrypoint on this machine.
+  - A `.cjs` main entry with `require("electron")` returned the executable-path string instead of the Electron API object.
+  - `require("electron/main")` failed to resolve at runtime.
+- Mitigation attempt:
+  - Upgraded local Electron in `Mafia-Local/Electron` from `39.2.7` to `41.0.2`.
+  - Re-ran the main-process import test; the same blocker persisted.
+- Validation:
+  - `Electron`: `npm run build` passes.
+  - `Electron`: `npm run dist` passes and now packages against Electron `41.0.2`.
+- Next-step suggestion:
+  - Before more titlebar code churn, confirm whether to continue with a version/runtime workaround strategy, because the unresolved part is now Electron’s Windows main-process API loading rather than the app UI implementation itself.
+
+---
+
+- Follow-up task: keep the live custom title bar as-is and remove safe stale pieces only.
+- Cleanup performed:
+  - Removed unused Electron dev dependency `electron-reloader`.
+  - Refreshed `Client/src/styles/README.md` so it reflects the current wired style structure instead of the old scaffold-only note.
+- Validation:
+  - Ran `npm run build` in `Mafia-Local/Electron`.
+  - Ran `npm run dist` in `Mafia-Local/Electron`.
+
+---
+
+- Follow-up task: convert the remaining temporary host tools into normal supported features and clear the temp feature list.
+- Updated `Client/pages/Lobby.tsx`:
+  - Removed the testing wording from the classic `Add Bot` host control.
+- Updated `Client/pages/Game.tsx`:
+  - Renamed local phase-skip variables away from testing-only naming.
+  - Removed the testing wording from the host phase-skip control tooltip.
+- Updated docs:
+  - `README.md` now lists Add Bot and phase skip as supported host features.
+  - `docs/GDD.md` now treats Add Bot and phase skip as normal implemented features.
+  - Removed the old open question about temporary host testing tools.
+- Updated `temporary features.txt`:
+  - Cleared the file so it is empty for future temporary items.

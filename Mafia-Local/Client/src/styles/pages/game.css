@@ -42,12 +42,27 @@
   backdrop-filter: blur(3px);
 }
 
+.game-phase-topbar.is-gameover {
+  grid-template-columns: minmax(96px, 1fr) auto minmax(96px, 1fr);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.16) 0%,
+      rgba(0, 0, 0, 0.06) 62%,
+      rgba(0, 0, 0, 0) 100%
+    );
+}
+
 .game-phase-topbar__timer {
   justify-self: start;
   font-size: 16px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.game-phase-topbar.is-gameover .game-phase-topbar__timer {
+  min-height: 1px;
 }
 
 .game-phase-topbar__phase {
@@ -205,10 +220,6 @@
   max-height: 100dvh;
   padding-top: 74px;
   overflow: hidden;
-}
-
-.game-phase-host.is-gameover > * {
-  padding-bottom: 86px;
 }
 
 .game-phase-loading {
@@ -492,7 +503,7 @@
   }
 
   .game-phase-host.is-gameover > * {
-    padding-bottom: 80px;
+    padding-bottom: 0;
   }
 
   .game-button {

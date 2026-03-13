@@ -1,4 +1,4 @@
-Custom title bar scaffold contract (not implemented/wired yet).
+Custom title bar contract.
 
 Expected renderer DOM shape:
 
@@ -12,7 +12,7 @@ Expected renderer DOM shape:
   - `maximize`
   - `close`
 
-Expected bridge API (future preload wiring):
+Bridge API:
 
 - `window.mafiaWindow.minimize()`
 - `window.mafiaWindow.maximize()`
@@ -20,4 +20,8 @@ Expected bridge API (future preload wiring):
 - `window.mafiaWindow.isMaximized()`
 - `window.mafiaWindow.onMaximizeChange(handler)`
 
-None of this is active yet; this file only defines the implementation target.
+Current implementation notes:
+
+- The Electron host window is frameless and uses a renderer-mounted custom title bar.
+- The title bar is only shown inside Electron, not in the normal browser/mobile client.
+- `window.mafiaWindow.maximize()` toggles maximize/restore for the custom maximize button.

@@ -1,17 +1,22 @@
+import * as electron from "electron/main"
 import fs from "fs"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
-import { app, BrowserWindow } from "electron"
 
-const DEV_URL = "http://localhost:5173"
+const electronMain = electron.default ?? electron
+const { app, BrowserWindow, ipcMain } = electronMain
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+const DEV_URL = "http://localhost:5173"
 const WINDOW_ICON_PATH = (() => {
   const icoPath = path.join(__dirname, "assets", "Mafia-Icon.ico")
   if (fs.existsSync(icoPath)) return icoPath
   return path.join(__dirname, "assets", "Mafia-Icon.png")
 })()
 const DEV_RENDERER_URL = process.env.ELECTRON_START_URL || DEV_URL
+const PRELOAD_PATH = path.join(__dirname, "preload.cjs")
 
 const parsePort = (value, fallback) => {
   const parsed = Number(value)
@@ -35,6 +40,7 @@ let backendStartPromise = null
 
 const shouldUseDevRenderer = () => {
   if (process.env.ELECTRON_USE_DEV_SERVER === "1") return true
+  if (process.env.ELECTRON_USE_DEV_SERVER === "0") return false
   return !app.isPackaged
 }
 
@@ -252,6 +258,39 @@ const createSplashWindow = () => {
   })
 }
 
+const emitMaximizeState = (targetWindow) => {
+  if (!targetWindow || targetWindow.isDestroyed()) return
+  targetWindow.webContents.send("mafia-window:maximize-change", targetWindow.isMaximized())
+}
+
+ipcMain.handle("mafia-window:minimize", (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!targetWindow) return
+  targetWindow.minimize()
+})
+
+ipcMain.handle("mafia-window:maximize", (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!targetWindow) return
+  if (targetWindow.isMaximized()) {
+    targetWindow.unmaximize()
+  } else {
+    targetWindow.maximize()
+  }
+})
+
+ipcMain.handle("mafia-window:close", (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!targetWindow) return
+  targetWindow.close()
+})
+
+ipcMain.handle("mafia-window:is-maximized", (event) => {
+  const targetWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!targetWindow) return false
+  return targetWindow.isMaximized()
+})
+
 async function createWindow() {
   const splashStartedAt = Date.now()
   createSplashWindow()
@@ -261,6 +300,14 @@ async function createWindow() {
     height: 750,
     show: false,
     backgroundColor: "#05070f",
+    frame: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: PRELOAD_PATH,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
   }
 
   if (fs.existsSync(WINDOW_ICON_PATH)) {
@@ -268,6 +315,11 @@ async function createWindow() {
   }
 
   win = new BrowserWindow(windowOptions)
+  win.setMenuBarVisibility(false)
+  win.on("maximize", () => emitMaximizeState(win))
+  win.on("unmaximize", () => emitMaximizeState(win))
+  win.on("enter-full-screen", () => emitMaximizeState(win))
+  win.on("leave-full-screen", () => emitMaximizeState(win))
 
   win.once("ready-to-show", async () => {
     const elapsed = Date.now() - splashStartedAt

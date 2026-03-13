@@ -1,10 +1,12 @@
-UI scaffolding prepared for future Electron chrome work.
+Electron UI assets and window-chrome resources.
 
-Files in this folder are placeholders only:
+Files in this folder:
 
 - `splash.html`
 - `splash.css`
 - `titlebar.css`
 - `titlebar.contract.md`
 
-They are intentionally not wired in `main.js` yet.
+- `splash.html` / `splash.css` are used by the splash window.
+- `titlebar.css` is now used by the live custom Electron title bar implementation.
+- `titlebar.contract.md` documents the expected renderer DOM and preload bridge surface for the title bar.

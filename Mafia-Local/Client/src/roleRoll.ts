@@ -46,3 +46,15 @@ export const getBotcRoleRollCandidates = (
     label: String(roleId || "").trim(),
   }))
 }
+
+export const getRoleRollSeenKey = (
+  roomId: string,
+  gameNumber: number,
+  clientId: string
+): string => `mafia_role_roll_seen:${roomId}:game${gameNumber}:client:${clientId}`
+
+export const getPartnerRevealSeenKey = (
+  roomId: string,
+  gameNumber: number,
+  clientId: string
+): string => `mafia_partner_reveal_seen:${roomId}:game${gameNumber}:client:${clientId}`

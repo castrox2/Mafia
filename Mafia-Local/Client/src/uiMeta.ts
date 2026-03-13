@@ -23,7 +23,7 @@ export const PHASE_UI_META: Record<
 > = {
   LOBBY: { label: "Lobby", shortLabel: "Lobby", tone: "info" },
   DAY: { label: "Day", shortLabel: "Day", tone: "neutral" },
-  DISCUSSION: { label: "Discussion", shortLabel: "Discussion", tone: "neutral" },
+  DISCUSSION: { label: "Private Discussion", shortLabel: "Private", tone: "neutral" },
   PUBDISCUSSION: {
     label: "Public Discussion",
     shortLabel: "Public",

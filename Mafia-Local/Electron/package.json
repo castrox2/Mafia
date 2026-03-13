@@ -1,6 +1,6 @@
 {
-  "name": "electron",
-  "version": "0.9.5",
+  "name": "mafia-local-electron",
+  "version": "1.0.0",
   "description": "",
   "main": "main.js",
   "scripts": {
@@ -22,9 +22,8 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.9",
-    "electron": "^39.2.7",
+    "electron": "^41.0.2",
     "electron-builder": "^26.4.0",
-    "electron-reloader": "^1.2.3",
     "typescript": "^5.9.3"
   }
 }
