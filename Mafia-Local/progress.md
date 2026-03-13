@@ -905,3 +905,12 @@ TODO / next-agent suggestions:
 - Updated docs:
   - `README.md` now links to dedicated release notes.
   - Added `docs/release-1.0.0.md` with highlights, scope, installer path, and a launch checklist.
+
+---
+
+- Packaged-Electron fix pass: custom window controls worked in `npm run dev` but not in installed builds.
+- Root cause found:
+  - `Electron/preload.cjs` was being used by the BrowserWindow, but it was not listed in `Electron/electron-builder.json` under packaged files.
+  - That meant dev builds had the preload bridge, while packaged builds could lose `window.mafiaWindow`, breaking the custom title-bar window controls.
+- Updated `Electron/electron-builder.json`:
+  - Added `preload.cjs` to the packaged file list.
