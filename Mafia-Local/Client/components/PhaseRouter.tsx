@@ -248,22 +248,30 @@ type ScreenProps = {
 }
 
 const DAY_PHASE_PLACEHOLDER_TEXTS = [
-  "The town wakes up and everyone starts watching each other closely.",
-  "Listen carefully. One small slip can change the whole game.",
-  "This is the best time to read reactions and notice who feels nervous.",
-  "Talk through what happened, but do not trust every confident voice.",
-  "Someone is hiding something. The hard part is proving who it is.",
-  "Pay attention to who speaks first, who stays quiet, and who changes their story.",
+  "Bro go talk to people, stop just looking at me????", 
+  "Buddy stop being useless....", 
+  "You gotta get voted out for being useless", 
+  "Useless fuck go help your team bro", 
+  "This guy wants to lose so bad...",
+  "Bro's must have a crush on me the way bro's looking at me sm",
+  "tf u doing? go help bruh",
+  "you creep, staring at me and shi",
+  "Bro go use ur mouth and talk to people",
+  "atp why are u even playing...",
 ] as const
 const DISCUSSION_PHASE_PLACEHOLDER_TEXTS = [
-  "Use this time to compare stories and look for anything that does not match.",
-  "Good information is shared carefully. Bad information is shared loudly.",
-  "Ask simple questions, listen to the answers, and notice who avoids details.",
-  "Quiet conversations can reveal more than a loud accusation ever will.",
-  "Trust should be earned here, not handed out too quickly.",
-  "The smallest detail from one player can expose a bigger lie from another.",
+  "Bro go talk to people, stop just looking at me????", 
+  "Buddy stop being useless....", 
+  "You gotta get voted out for being useless", 
+  "Useless fuck go help your team bro", 
+  "This guy wants to lose so bad...",
+  "Bro's must have a crush on me the way bro's looking at me sm",
+  "tf u doing? go help bruh",
+  "you creep, staring at me and shi",
+  "Bro go use ur mouth and talk to people",
+  "atp why are u even playing...",
 ] as const
-const PHASE_PLACEHOLDER_ROTATE_MS = 4000
+const PHASE_PLACEHOLDER_ROTATE_MS = 8000
 
 const getRandomPlaceholderIndex = (
   length: number,
@@ -429,7 +437,6 @@ const VotingScreen = ({
           .map((p) => ({
             clientId: p.clientId,
             name: p.name,
-            subtitle: `ID: ${p.clientId}`,
           }))
 
   return (

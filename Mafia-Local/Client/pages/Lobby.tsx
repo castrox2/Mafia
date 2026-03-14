@@ -15,6 +15,7 @@ import type {
   MafiaPlayerRole,
   HostParticipationRefusedEvent,
   HostParticipationRefusedPayload,
+  RoomInvitePayload,
   RoleSelectorHostCountsPayload,
   RoomStatePayload,
   ReasonPayload,
@@ -102,6 +103,8 @@ export default function Lobby({
   const [roleRollOpen, setRoleRollOpen] = useState(false)
   const [partnerRevealOpen, setPartnerRevealOpen] = useState(false)
   const [partnerRevealPending, setPartnerRevealPending] = useState(false)
+  const [inviteJoinUrl, setInviteJoinUrl] = useState(joinUrl)
+  const [inviteQrDataUrl, setInviteQrDataUrl] = useState(qrDataUrl)
 
   const cleanRoomId = useMemo(() => normalizeRoomId(roomId), [roomId])
   const cleanPlayerName = useMemo(() => playerName.trim(), [playerName])
@@ -174,7 +177,12 @@ export default function Lobby({
   )
 
   const lobbyTitle = isRoleSelectorRoom ? "Role Selector Lobby" : "Lobby"
-  const joinLink = joinUrl || `${window.location.origin}/?room=${cleanRoomId}`
+  const joinLink = inviteJoinUrl || `${window.location.origin}/?room=${cleanRoomId}`
+
+  useEffect(() => {
+    setInviteJoinUrl(joinUrl)
+    setInviteQrDataUrl(qrDataUrl)
+  }, [joinUrl, qrDataUrl])
 
   useEffect(() => {
     if (roleSelectorScriptMode !== "BLOOD_ON_THE_CLOCKTOWER" || !myRole) {
@@ -340,6 +348,12 @@ export default function Lobby({
       )
     }
 
+    const onRoomInvite = ({ roomId: invitedRoomId, joinUrl, qrDataUrl }: RoomInvitePayload) => {
+      if (invitedRoomId !== cleanRoomId) return
+      setInviteJoinUrl(joinUrl)
+      setInviteQrDataUrl(qrDataUrl)
+    }
+
     socket.on("roomState", onRoomState)
     socket.on("roomClosed", onRoomClosed)
     socket.on("startRefused", onStartRefused)
@@ -349,6 +363,7 @@ export default function Lobby({
     socket.on("yourRole", onYourRole)
     socket.on("roleSelectorHostCounts", onRoleSelectorHostCounts)
     socket.on("botcScriptImported", onBotcScriptImported)
+    socket.on("roomInvite", onRoomInvite)
     socket.on("kicked", onKicked)
     socket.on("addBotRefused", onAddBotRefused)
 
@@ -364,6 +379,8 @@ export default function Lobby({
     }
 
     if (cleanRoomId) {
+      socket.emit("requestRoomState", { roomId: cleanRoomId })
+      socket.emit("requestRoomInvite", { roomId: cleanRoomId })
       socket.emit("requestMyRole", { roomId: cleanRoomId })
     }
 
@@ -377,6 +394,7 @@ export default function Lobby({
       socket.off("yourRole", onYourRole)
       socket.off("roleSelectorHostCounts", onRoleSelectorHostCounts)
       socket.off("botcScriptImported", onBotcScriptImported)
+      socket.off("roomInvite", onRoomInvite)
       socket.off("kicked", onKicked)
       socket.off("addBotRefused", onAddBotRefused)
     }
@@ -797,10 +815,10 @@ export default function Lobby({
           </section>
         )}
 
-        {qrDataUrl && state?.hostId === clientId && (
+        {inviteQrDataUrl && state?.hostId === clientId && (
           <section className="lobby-info-panel">
             <div className="lobby-info-title">Scan to join this room</div>
-            <img src={qrDataUrl} alt="Room QR Code" className="lobby-qr-image" />
+            <img src={inviteQrDataUrl} alt="Room QR Code" className="lobby-qr-image" />
             <div>
               Link:{" "}
               <a href={joinLink} target="_blank" rel="noreferrer" className="lobby-join-link">

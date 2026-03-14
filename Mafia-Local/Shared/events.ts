@@ -202,6 +202,12 @@ export type RoomCreatedPayload = {
   qrDataUrl: string
 }
 
+export type RoomInvitePayload = {
+  roomId: string
+  joinUrl: string
+  qrDataUrl: string
+}
+
 export type ReconnectedPayload = {
   roomId: string
   playerName: string
@@ -378,6 +384,7 @@ export interface MafiaClientToServerEvents {
   setPlayerStatus: (payload: SetPlayerStatusPayload) => void
   setHostParticipation: (payload: SetHostParticipationPayload) => void
   requestRoomState: (payload: RoomIdPayload) => void
+  requestRoomInvite: (payload: RoomIdPayload) => void
   startGame: (payload: RoomIdPayload) => void
   forceStartGame: (payload: RoomIdPayload) => void
   submitRoleAction: (payload: SubmitRoleActionPayload) => void
@@ -390,6 +397,7 @@ export interface MafiaClientToServerEvents {
 
 export interface MafiaServerToClientEvents {
   roomCreated: (payload: RoomCreatedPayload) => void
+  roomInvite: (payload: RoomInvitePayload) => void
   roomState: (payload: RoomStatePayload) => void
   roomClosed: (payload: RoomIdPayload) => void
   roomNotFound: (payload: RoomIdPayload) => void

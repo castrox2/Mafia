@@ -392,44 +392,74 @@
 
 @media (max-width: 640px) {
   .phase-voting-screen {
-    gap: 10px;
-    padding: 12px;
+    gap: 8px;
+    padding: 10px;
   }
 
   .phase-voting-screen__header {
-    gap: 6px;
+    gap: 4px;
   }
 
   .phase-voting-screen__description,
   .phase-voting-screen__spectator-note {
-    font-size: 13px;
+    font-size: 12px;
+    line-height: 1.4;
   }
 
   .vote-panel {
-    padding: 14px;
-    gap: 12px;
-    max-height: min(100%, calc(100dvh - 132px));
+    padding: 12px 10px;
+    gap: 10px;
+    border-radius: 18px;
+    max-height: min(100%, calc(100dvh - 116px));
+  }
+
+  .vote-panel__header {
+    gap: 4px;
+  }
+
+  .vote-panel__title {
+    font-size: 18px;
+  }
+
+  .vote-panel__description {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .vote-panel__list {
+    gap: 8px;
+    padding-right: 0;
   }
 
   .phase-voting-screen .vote-panel--courtroom::before {
-    top: 14px;
-    right: 16px;
-    font-size: 9px;
-    letter-spacing: 0.18em;
+    display: none;
   }
 
   .vote-panel__target {
-    min-height: 54px;
-    padding: 10px 12px;
+    min-height: 52px;
+    padding: 10px;
+    gap: 8px;
   }
 
   .vote-panel__target-name {
     font-size: 14px;
   }
 
-  .vote-panel__target-action {
-    min-width: 72px;
-    padding: 0 10px;
+  .vote-panel__target-copy {
+    gap: 2px;
+  }
+
+  .phase-voting-screen .vote-panel--courtroom .vote-panel__target-action {
+    display: none;
+  }
+
+  .vote-panel__actions {
+    justify-content: stretch;
+  }
+
+  .vote-panel__skip {
+    width: 100%;
+    min-width: 0;
   }
 
   .phase-voting-screen__spectator-note {
