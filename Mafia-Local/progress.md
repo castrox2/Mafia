@@ -914,3 +914,24 @@ TODO / next-agent suggestions:
   - That meant dev builds had the preload bridge, while packaged builds could lose `window.mafiaWindow`, breaking the custom title-bar window controls.
 - Updated `Electron/electron-builder.json`:
   - Added `preload.cjs` to the packaged file list.
+
+---
+
+- Night-phase UI follow-up: give `CIVILIAN` and `SHERIFF` a night voting panel without granting a real action.
+- Updated `Client/components/PhaseRouter.tsx`:
+  - Added a shared night guess panel for `CIVILIAN` and `SHERIFF`.
+  - Panel title: `Who do you think it is?`
+  - Uses the shared `VotePanel` night styling.
+  - Player presses are intentional no-ops and do not emit any socket action.
+- Existing real night-action roles (`MAFIA`, `DOCTOR`, `DETECTIVE`) are unchanged.
+
+---
+
+- Night-phase civilian/sheriff decoy-panel polish:
+  - Added a local-only `Good Choice` popup when a civilian or sheriff taps a player in the fake night guess panel.
+  - The popup does not emit any socket action and does not change game state.
+- Updated files:
+  - `Client/components/PhaseRouter.tsx`
+  - `Client/src/styles/phases/night.css`
+
+- Electron launch hardening: if the Vite dev renderer at localhost:5173 is unavailable, Electron now falls back cleanly to the built renderer/backend instead of surfacing ERR_CONNECTION_REFUSED. If no fallback exists, it shows an in-app status page with clear recovery steps.
