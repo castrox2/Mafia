@@ -489,6 +489,8 @@ const NightScreen = ({
       : myRole === "DOCTOR"
         ? "/assets/icons/Doctor.ico"
         : null
+  const [showNightGuessToast, setShowNightGuessToast] = React.useState(false)
+  const isNightGuessPanelRole = myRole === "CIVILIAN" || myRole === "SHERIFF"
   const allowSelfTargetAtNight = actionByRole?.kind === "DOCTOR_SAVE"
   const nightTargets =
     canActAtNight && actionByRole
@@ -514,6 +516,20 @@ const NightScreen = ({
             }
           })
       : []
+  const nightGuessTargets =
+    canActAtNight && isNightGuessPanelRole
+      ? state.players
+          .filter(
+            (p) =>
+              p.alive &&
+              p.isSpectator !== true &&
+              p.clientId !== me?.clientId
+          )
+          .map((p) => ({
+            clientId: p.clientId,
+            name: p.name,
+          }))
+      : []
   const nightActionCopy =
     actionByRole?.kind === "MAFIA_KILL_VOTE"
       ? {
@@ -531,6 +547,16 @@ const NightScreen = ({
               description: "Choose one player to investigate tonight, or skip if you do not want to check anyone.",
             }
           : null
+
+  React.useEffect(() => {
+    if (!showNightGuessToast) return
+
+    const timeoutId = window.setTimeout(() => {
+      setShowNightGuessToast(false)
+    }, 1200)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [showNightGuessToast])
 
   return (
     <section className="phase-night">
@@ -561,12 +587,38 @@ const NightScreen = ({
             </div>
           )}
 
+          {canActAtNight && isNightGuessPanelRole && (
+            <div className="phase-night__panel-wrap">
+              <VotePanel
+                className="vote-panel--night"
+                title="Who do you think it is?"
+                description="Choose the player who feels the most suspicious tonight."
+                targets={nightGuessTargets}
+                actionLabel="Guess"
+                emptyLabel="No valid players are available to choose from."
+                skipLabel="Not Sure"
+                onSelect={() => {
+                  setShowNightGuessToast(true)
+                }}
+                onSkip={() => {
+                  // Intentional no-op: this panel is only for private guessing.
+                }}
+              />
+            </div>
+          )}
+
           {isSpectator && (
             <div className="phase-night__spectator-note">
               Spectators can view, but cannot act at night.
             </div>
           )}
         </div>
+
+        {showNightGuessToast && (
+          <div className="phase-night__guess-toast" role="status" aria-live="polite">
+            Good Choice
+          </div>
+        )}
       </div>
     </section>
   )

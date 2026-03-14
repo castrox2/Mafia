@@ -81,6 +81,28 @@
   color: rgba(226, 232, 240, 0.88);
 }
 
+.phase-night__guess-toast {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(20px, 4vw, 34px);
+  transform: translateX(-50%);
+  z-index: 3;
+  min-width: 160px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  background:
+    linear-gradient(180deg, rgba(10, 18, 36, 0.92) 0%, rgba(7, 14, 30, 0.88) 100%);
+  box-shadow:
+    0 18px 34px rgba(3, 8, 22, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
 .phase-night .phase-banner,
 .phase-night .phase-feedback {
   border-radius: 12px;
@@ -198,6 +220,13 @@
     height: 100%;
     max-height: none;
     border-radius: 18px;
+  }
+
+  .phase-night__guess-toast {
+    bottom: 14px;
+    min-width: 144px;
+    padding: 11px 16px;
+    font-size: 13px;
   }
 
   .phase-night .vote-panel--night .vote-panel__skip {

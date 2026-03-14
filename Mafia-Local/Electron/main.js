@@ -18,6 +18,14 @@ const WINDOW_ICON_PATH = (() => {
 const DEV_RENDERER_URL = process.env.ELECTRON_START_URL || DEV_URL
 const PRELOAD_PATH = path.join(__dirname, "preload.cjs")
 
+const escapeHtml = (value) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+
 const parsePort = (value, fallback) => {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
@@ -121,6 +129,24 @@ const isBackendHealthy = async (timeoutMs = 1200) => {
   }
 }
 
+const isUrlReachable = async (targetUrl, timeoutMs = 1200) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(targetUrl, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+    return res.ok
+  } catch (_err) {
+    return false
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 const waitForBackendReady = async (timeoutMs = 15000) => {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -130,9 +156,9 @@ const waitForBackendReady = async (timeoutMs = 15000) => {
   return false
 }
 
-const startBackend = async () => {
+const startBackend = async ({ force = false } = {}) => {
   if (await isBackendHealthy()) return
-  if (!shouldAutoStartBackend()) return
+  if (!force && !shouldAutoStartBackend()) return
 
   if (backendStartPromise) {
     await backendStartPromise
@@ -175,16 +201,90 @@ const startBackend = async () => {
   }
 }
 
+const loadStatusPage = async ({ title, message, bullets = [] }) => {
+  if (!win || win.isDestroyed()) return
+
+  const bulletsMarkup = bullets.length
+    ? `<ul>${bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : ""
+
+  const html = `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>${escapeHtml(title)}</title>
+      <style>
+        :root {
+          color-scheme: dark;
+          font-family: "Segoe UI", system-ui, sans-serif;
+        }
+        body {
+          margin: 0;
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          background:
+            radial-gradient(circle at top left, rgba(125, 65, 255, 0.18), transparent 34%),
+            radial-gradient(circle at bottom right, rgba(239, 68, 68, 0.16), transparent 30%),
+            #07070c;
+          color: #f7f2ff;
+        }
+        .shell {
+          width: min(90vw, 720px);
+          padding: 32px;
+          border-radius: 22px;
+          border: 1px solid rgba(173, 116, 255, 0.35);
+          background: rgba(14, 10, 24, 0.92);
+          box-shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
+        }
+        h1 {
+          margin: 0 0 12px;
+          font-size: clamp(30px, 5vw, 42px);
+        }
+        p {
+          margin: 0 0 18px;
+          color: rgba(240, 232, 255, 0.82);
+          font-size: 16px;
+          line-height: 1.6;
+        }
+        ul {
+          margin: 0;
+          padding-left: 22px;
+          color: rgba(240, 232, 255, 0.92);
+          line-height: 1.7;
+        }
+        strong {
+          color: #ffffff;
+        }
+      </style>
+    </head>
+    <body>
+      <main class="shell">
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(message)}</p>
+        ${bulletsMarkup}
+      </main>
+    </body>
+  </html>`
+
+  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+}
+
 const loadRenderer = async () => {
   if (!win) return
 
   if (shouldUseDevRenderer()) {
-    await win.loadURL(DEV_RENDERER_URL)
-    return
+    if (await isUrlReachable(DEV_RENDERER_URL)) {
+      await win.loadURL(DEV_RENDERER_URL)
+      return
+    }
+
+    console.warn(`Dev renderer unavailable at ${DEV_RENDERER_URL}; falling back to built renderer.`)
   }
 
   try {
-    await startBackend()
+    await startBackend({ force: shouldUseDevRenderer() })
   } catch (err) {
     console.error("Backend startup failed:", err)
   }
@@ -200,8 +300,29 @@ const loadRenderer = async () => {
     return
   }
 
-  console.warn("Packaged renderer source not found; falling back to dev URL.")
-  await win.loadURL(DEV_RENDERER_URL)
+  if (shouldUseDevRenderer()) {
+    await loadStatusPage({
+      title: "Mafia Couldn’t Start Yet",
+      message:
+        "The Electron app was started in development mode, but the Vite client was not running and no built fallback was available.",
+      bullets: [
+        "Start the client with: cd Mafia-Local/Client && npm run dev",
+        "Or rebuild first with: cd Mafia-Local/Electron && npm run build",
+        `Expected dev renderer URL: ${DEV_RENDERER_URL}`,
+      ],
+    })
+    return
+  }
+
+  await loadStatusPage({
+    title: "Renderer Not Found",
+    message:
+      "Mafia could not find a renderer source to display. The packaged backend and built client were both unavailable.",
+    bullets: [
+      "Rebuild the Electron app with: cd Mafia-Local/Electron && npm run dist",
+      `Expected backend URL: ${SERVER_URL}`,
+    ],
+  })
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
