@@ -935,3 +935,7 @@ TODO / next-agent suggestions:
   - `Client/src/styles/phases/night.css`
 
 - Electron launch hardening: if the Vite dev renderer at localhost:5173 is unavailable, Electron now falls back cleanly to the built renderer/backend instead of surfacing ERR_CONNECTION_REFUSED. If no fallback exists, it shows an in-app status page with clear recovery steps.
+
+- Voting mobile polish: removed player ID subtitles from the voting phase list and tightened the courtroom VotePanel mobile layout so it fits better on narrow screens (smaller spacing, no action pill, full-width skip button, less header clutter).
+
+- Lobby rehydration fix: Lobby now requests current room state on mount, so returning from Game no longer leaves it stuck in an empty shell. Added room invite re-request flow (equestRoomInvite / oomInvite) so the host QR code and join link are restored after refresh/reconnect.

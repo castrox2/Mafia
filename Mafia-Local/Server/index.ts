@@ -18,6 +18,7 @@ import type {
   MafiaServerToClientEvents,
   MafiaSocketData,
   RoomIdPayload,
+  RoomInvitePayload,
   SetAlivePayload,
   SetHostParticipationEvent,
   SetPlayerStatusPayload,
@@ -289,6 +290,23 @@ io.on("connection", (socket) => {
   socket.on("requestRoomState", ({ roomId }: RoomIdPayload) => {
     roomsManager.emitRoomState(roomId)
     roomsManager.requestMyRoleLocal(socket, roomId)
+  })
+
+  socket.on("requestRoomInvite", async ({ roomId }: RoomIdPayload) => {
+    const cleanRoomId = normalizeRoomId(roomId)
+    const room = roomsManager.rooms[cleanRoomId]
+    if (!room) {
+      socket.emit("roomNotFound", { roomId: cleanRoomId })
+      return
+    }
+
+    const lanClientBaseUrl = `http://${getLanIp()}:${CLIENT_PORT_FOR_JOIN_URL}`
+    const invitePayload: RoomInvitePayload = {
+      roomId: cleanRoomId,
+      ...(await generateRoomJoinQrDataUrl(lanClientBaseUrl, cleanRoomId)),
+    }
+
+    socket.emit("roomInvite", invitePayload)
   })
 
   socket.on("startGame", ({ roomId }: RoomIdPayload) => {
